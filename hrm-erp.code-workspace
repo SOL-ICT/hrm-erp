@@ -1,0 +1,54 @@
+﻿{
+    "extensions":  {
+                       "recommendations":  [
+                                               "bmewburn.vscode-intelephense-client",
+                                               "ryannaddy.laravel-artisan",
+                                               "bradlc.vscode-tailwindcss",
+                                               "esbenp.prettier-vscode",
+                                               "ms-azuretools.vscode-docker",
+                                               "ms-vscode-remote.remote-containers",
+                                               "eamodio.gitlens",
+                                               "PKief.material-icon-theme",
+                                               "ms-vscode.vscode-typescript-next"
+                                           ]
+                   },
+    "folders":  [
+                    {
+                        "name":  "Docker Config",
+                        "path":  "."
+                    },
+                    {
+                        "name":  "Backend (Laravel)",
+                        "path":  "./backend"
+                    },
+                    {
+                        "name":  "Frontend (Next.js)",
+                        "path":  "./frontend"
+                    }
+                ],
+    "settings":  {
+                     "php.validate.executablePath":  "php",
+                     "editor.formatOnSave":  true,
+                     "[javascript]":  {
+                                          "editor.tabSize":  2
+                                      },
+                     "[json]":  {
+                                    "editor.tabSize":  2
+                                },
+                     "files.watcherExclude":  {
+                                                  "**/.git/**":  true,
+                                                  "**/vendor/**":  true,
+                                                  "**/node_modules/**":  true
+                                              },
+                     "[php]":  {
+                                   "editor.tabSize":  4,
+                                   "editor.defaultFormatter":  "bmewburn.vscode-intelephense-client"
+                               },
+                     "intelephense.files.maxSize":  5000000,
+                     "docker.dockerPath":  "docker",
+                     "editor.defaultFormatter":  "esbenp.prettier-vscode",
+                     "[typescript]":  {
+                                          "editor.tabSize":  2
+                                      }
+                 }
+}

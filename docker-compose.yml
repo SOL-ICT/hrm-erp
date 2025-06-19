@@ -1,0 +1,161 @@
+version: '3.8'
+
+services:
+  # Laravel Backend API
+  laravel-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hrm-laravel-api
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./backend:/var/www
+      - ./backend/storage:/var/www/storage
+      - ./backend/bootstrap/cache:/var/www/bootstrap/cache
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=hrm_database
+      - DB_USERNAME=hrm_user
+      - DB_PASSWORD=hrm_password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - APP_ENV=local
+      - APP_DEBUG=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - hrm-network
+    command: >
+      sh -c "composer install --no-dev --optimize-autoloader &&
+             php artisan config:cache &&
+             php artisan route:cache &&
+             php artisan serve --host=0.0.0.0 --port=8000"
+
+  # Next.js Frontend
+  nextjs-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hrm-nextjs-frontend
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    depends_on:
+      - laravel-api
+    networks:
+      - hrm-network
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: hrm-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_DATABASE=hrm_database
+      - MYSQL_USER=hrm_user
+      - MYSQL_PASSWORD=hrm_password
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_CHARSET=utf8mb4
+      - MYSQL_COLLATION=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+      - ./mysql/conf:/etc/mysql/conf.d
+    networks:
+      - hrm-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "hrm_user", "-phrm_password"]
+      timeout: 20s
+      retries: 10
+
+  # Redis for Caching/Sessions
+  redis:
+    image: redis:7-alpine
+    container_name: hrm-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - hrm-network
+    command: redis-server --appendonly yes
+
+  # phpMyAdmin for Database Management
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: hrm-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      - PMA_HOST=mysql
+      - PMA_USER=hrm_user
+      - PMA_PASSWORD=hrm_password
+      - PMA_ARBITRARY=1
+      - UPLOAD_LIMIT=1G
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - hrm-network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: hrm-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - laravel-api
+      - nextjs-frontend
+    networks:
+      - hrm-network
+
+  # Mailhog for Email Testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: hrm-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - hrm-network
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  hrm-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
