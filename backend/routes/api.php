@@ -2,115 +2,742 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
 */
 
-// Test API endpoint
-Route::get('/test', function () {
-    return response()->json([
-        'message' => 'HRM ERP API is working!',
-        'version' => '1.0.0',
-        'timestamp' => now(),
-        'status' => 'success'
-    ]);
-});
+// Public routes
+Route::get('/health', [AuthController::class, 'health']);
+Route::get('/', [AuthController::class, 'index']);
+Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register']);
+Route::get('/auth/check', [AuthController::class, 'checkAuth']);
+Route::post('/logout', [AuthController::class, 'logout']);
 
-// Health check
-Route::get('/health', function () {
-    return response()->json([
-        'status' => 'ok',
-        'database' => 'connected',
-        'api' => 'running',
-        'environment' => app()->environment()
-    ]);
-});
+// Protected routes - require authentication
+Route::middleware(function ($request, $next) {
+    $authUser = session('auth_user');
+    if (!$authUser) {
+        return response()->json(['error' => 'Unauthorized'], 401);
+    }
+    $request->merge(['auth_user' => $authUser]);
+    return $next($request);
+})->group(function () {
 
-// Get all users (for testing)
-Route::get('/users', function () {
-    return response()->json([
-        'users' => User::all(),
-        'count' => User::count()
-    ]);
-});
+    // Dashboard routes
+    Route::get('/dashboard/admin', function (Request $request) {
+        $authUser = $request->auth_user;
 
-// Authentication routes
-Route::post('/register', function (Request $request) {
-    $request->validate([
-        'name' => 'required|string|max:255',
-        'email' => 'required|string|email|max:255|unique:users',
-        'password' => 'required|string|min:8',
-    ]);
+        if ($authUser['user_role'] !== 'admin') {
+            return response()->json(['error' => 'Admin access required'], 403);
+        }
 
-    $user = User::create([
-        'name' => $request->name,
-        'email' => $request->email,
-        'password' => bcrypt($request->password),
-    ]);
-
-    return response()->json([
-        'message' => 'User created successfully',
-        'user' => $user
-    ], 201);
-});
-
-// Protected routes (require authentication)
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/user', function (Request $request) {
-        return $request->user();
+        return response()->json([
+            'dashboard_type' => 'admin',
+            'user' => $authUser,
+            'stats' => [
+                'total_employees' => DB::table('staff')->count(),
+                'total_candidates' => DB::table('candidates')->count(),
+                'active_clients' => DB::table('clients')->where('status', 'active')->count(),
+                'pending_approvals' => DB::table('candidates')->where('status', 'pending')->count()
+            ],
+            'recent_activities' => [],
+            'permissions' => ['full_access']
+        ]);
     });
 
-    // HRM Dashboard routes
-    Route::prefix('hrm')->group(function () {
-        Route::get('/dashboard', function () {
+    Route::get('/dashboard/staff', function (Request $request) {
+        $authUser = $request->auth_user;
+
+        if ($authUser['user_role'] !== 'staff') {
+            return response()->json(['error' => 'Staff access required'], 403);
+        }
+
+        return response()->json([
+            'dashboard_type' => 'staff',
+            'user' => $authUser,
+            'stats' => [
+                'my_candidates' => 0,
+                'pending_tasks' => 0,
+                'completed_this_month' => 0
+            ],
+            'recent_activities' => [],
+            'permissions' => ['view_candidates', 'edit_assigned']
+        ]);
+    });
+
+    Route::get('/dashboard/candidate', function (Request $request) {
+        $authUser = $request->auth_user;
+
+        if ($authUser['user_role'] !== 'candidate') {
+            return response()->json(['error' => 'Candidate access required'], 403);
+        }
+
+        // Calculate profile completion
+        $profile = DB::table('candidate_profiles')->where('candidate_id', $authUser['user_id'])->first();
+        $completedFields = 0;
+        $totalFields = 8; // Basic profile fields + education + experience + emergency contact
+
+        if ($profile) {
+            if ($profile->first_name) $completedFields++;
+            if ($profile->last_name) $completedFields++;
+            if ($profile->phone_primary) $completedFields++;
+            if ($profile->date_of_birth) $completedFields++;
+            if ($profile->gender) $completedFields++;
+        }
+
+        // Check for education, experience, and emergency contacts
+        $hasEducation = DB::table('candidate_education')
+            ->where('candidate_id', $authUser['user_id'])
+            ->exists();
+        $hasExperience = DB::table('candidate_experience')
+            ->where('candidate_id', $authUser['user_id'])
+            ->exists();
+        $hasEmergencyContact = DB::table('candidate_emergency_contacts')
+            ->where('candidate_id', $authUser['user_id'])
+            ->exists();
+
+        if ($hasEducation) $completedFields++;
+        if ($hasExperience) $completedFields++;
+        if ($hasEmergencyContact) $completedFields++;
+
+        $completionPercentage = round(($completedFields / $totalFields) * 100);
+
+        // Update profile_completed status in candidates table
+        DB::table('candidates')
+            ->where('id', $authUser['user_id'])
+            ->update(['profile_completed' => $completionPercentage >= 100]);
+
+        return response()->json([
+            'dashboard_type' => 'candidate',
+            'user' => $authUser,
+            'profile_completion' => $completionPercentage,
+            'application_status' => 'In Review',
+            'next_steps' => getNextSteps($profile, $hasEducation, $hasExperience, $hasEmergencyContact),
+            'permissions' => ['view_profile', 'edit_profile']
+        ]);
+    });
+
+    // Candidate Profile Management
+    Route::prefix('candidate')->group(function () {
+
+        // Get complete profile
+        Route::get('/profile', function (Request $request) {
+            $authUser = $request->auth_user;
+
+            try {
+                $candidate = DB::table('candidates')->find($authUser['user_id']);
+                $profile = DB::table('candidate_profiles')->where('candidate_id', $authUser['user_id'])->first();
+
+                if (!$candidate) {
+                    return response()->json(['error' => 'Candidate not found'], 404);
+                }
+
+                return response()->json([
+                    'status' => 'success',
+                    'candidate' => [
+                        'id' => $candidate->id,
+                        'email' => $candidate->email,
+                        'status' => $candidate->status,
+                        'profile_completed' => $candidate->profile_completed,
+                        'created_at' => $candidate->created_at,
+                    ],
+                    'profile' => $profile ? [
+                        'candidate_id' => $profile->candidate_id,
+                        'first_name' => $profile->first_name ?? '',
+                        'middle_name' => $profile->middle_name ?? '',
+                        'last_name' => $profile->last_name ?? '',
+                        'formal_name' => $profile->formal_name ?? '',
+                        'gender' => $profile->gender ?? '',
+                        'date_of_birth' => $profile->date_of_birth ?? '',
+                        'marital_status' => $profile->marital_status ?? '',
+                        'nationality' => $profile->nationality ?? 'Nigeria',
+                        'state_of_origin' => $profile->state_of_origin ?? '',
+                        'local_government' => $profile->local_government ?? '',
+                        'national_id_no' => $profile->national_id_no ?? '',
+                        'phone_primary' => $profile->phone_primary ?? '',
+                        'phone_secondary' => $profile->phone_secondary ?? '',
+                        'address_current' => $profile->address_current ?? '',
+                        'address_permanent' => $profile->address_permanent ?? '',
+                        'blood_group' => $profile->blood_group ?? '',
+                        'profile_picture' => $profile->profile_picture ?? null,
+                    ] : null
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to fetch profile: ' . $e->getMessage()
+                ], 500);
+            }
+        });
+
+        // Create or Update profile
+        Route::post('/profile', function (Request $request) {
+            $authUser = $request->auth_user;
+
+            $validated = $request->validate([
+                'first_name' => 'required|string|max:255',
+                'middle_name' => 'nullable|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'formal_name' => 'nullable|string|max:255',
+                'gender' => 'required|in:male,female',
+                'date_of_birth' => 'required|date|before:today',
+                'marital_status' => 'nullable|in:single,married,divorced,widowed',
+                'nationality' => 'nullable|string|max:255',
+                'state_of_origin' => 'nullable|string|max:255',
+                'local_government' => 'nullable|string|max:255',
+                'national_id_no' => 'nullable|string|max:255',
+                'phone_primary' => 'required|string|max:20',
+                'phone_secondary' => 'nullable|string|max:20',
+                'address_current' => 'nullable|string',
+                'address_permanent' => 'nullable|string',
+                'blood_group' => 'nullable|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
+            ]);
+
+            try {
+                $profile = DB::table('candidate_profiles')->where('candidate_id', $authUser['user_id'])->first();
+
+                if ($profile) {
+                    // Update existing profile
+                    DB::table('candidate_profiles')
+                        ->where('candidate_id', $authUser['user_id'])
+                        ->update(array_merge($validated, ['updated_at' => now()]));
+
+                    $message = 'Profile updated successfully';
+                } else {
+                    // Create new profile
+                    DB::table('candidate_profiles')->insert(
+                        array_merge($validated, [
+                            'candidate_id' => $authUser['user_id'],
+                            'created_at' => now(),
+                            'updated_at' => now()
+                        ])
+                    );
+
+                    $message = 'Profile created successfully';
+                }
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => $message
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to save profile: ' . $e->getMessage()
+                ], 500);
+            }
+        });
+
+        // Education endpoints
+        Route::get('/education', function (Request $request) {
+            $authUser = $request->auth_user;
+
+            $education = DB::table('candidate_education')
+                ->where('candidate_id', $authUser['user_id'])
+                ->orderBy('end_year', 'desc')
+                ->get();
+
             return response()->json([
-                'message' => 'HRM Dashboard data',
-                'modules' => ['employees', 'payroll', 'leaves', 'departments'],
-                'stats' => [
-                    'total_employees' => User::count(),
-                    'active_employees' => User::count(),
-                    'departments' => 0,
-                    'pending_leaves' => 0
-                ]
+                'status' => 'success',
+                'education' => $education
             ]);
         });
 
-        // Employee routes (placeholder for future development)
-        Route::get('/employees', function () {
+        Route::post('/education', function (Request $request) {
+            $authUser = $request->auth_user;
+
+            $validated = $request->validate([
+                'institution_name' => 'required|string|max:255',
+                'qualification_type' => 'required|string|max:255',
+                'field_of_study' => 'nullable|string|max:255',
+                'grade_result' => 'nullable|string|max:255',
+                'start_year' => 'required|integer|min:1950|max:' . date('Y'),
+                'end_year' => 'nullable|integer|min:1950|max:' . (date('Y') + 10),
+                'is_current' => 'boolean'
+            ]);
+
+            try {
+                $id = DB::table('candidate_education')->insertGetId(
+                    array_merge($validated, [
+                        'candidate_id' => $authUser['user_id'],
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ])
+                );
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Education record added successfully',
+                    'id' => $id
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to add education: ' . $e->getMessage()
+                ], 500);
+            }
+        });
+
+        Route::put('/education/{id}', function (Request $request, $id) {
+            $authUser = $request->auth_user;
+
+            $validated = $request->validate([
+                'institution_name' => 'required|string|max:255',
+                'qualification_type' => 'required|string|max:255',
+                'field_of_study' => 'nullable|string|max:255',
+                'grade_result' => 'nullable|string|max:255',
+                'start_year' => 'required|integer|min:1950|max:' . date('Y'),
+                'end_year' => 'nullable|integer|min:1950|max:' . (date('Y') + 10),
+                'is_current' => 'boolean'
+            ]);
+
+            try {
+                $updated = DB::table('candidate_education')
+                    ->where('id', $id)
+                    ->where('candidate_id', $authUser['user_id'])
+                    ->update(array_merge($validated, ['updated_at' => now()]));
+
+                if (!$updated) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Education record not found'
+                    ], 404);
+                }
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Education record updated successfully'
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to update education: ' . $e->getMessage()
+                ], 500);
+            }
+        });
+
+        Route::delete('/education/{id}', function ($id, Request $request) {
+            $authUser = $request->auth_user;
+
+            try {
+                $deleted = DB::table('candidate_education')
+                    ->where('id', $id)
+                    ->where('candidate_id', $authUser['user_id'])
+                    ->delete();
+
+                if (!$deleted) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Education record not found'
+                    ], 404);
+                }
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Education record deleted successfully'
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to delete education: ' . $e->getMessage()
+                ], 500);
+            }
+        });
+
+        // Experience endpoints
+        Route::get('/experience', function (Request $request) {
+            $authUser = $request->auth_user;
+
+            $experience = DB::table('candidate_experience')
+                ->where('candidate_id', $authUser['user_id'])
+                ->orderBy('start_date', 'desc')
+                ->get();
+
             return response()->json([
-                'employees' => User::all(),
-                'message' => 'Employee list (using users table for now)'
+                'status' => 'success',
+                'experience' => $experience
             ]);
         });
 
-        Route::get('/departments', function () {
+        Route::post('/experience', function (Request $request) {
+            $authUser = $request->auth_user;
+
+            $validated = $request->validate([
+                'company_name' => 'required|string|max:255',
+                'position' => 'required|string|max:255',
+                'job_description' => 'nullable|string',
+                'start_date' => 'required|date',
+                'end_date' => 'nullable|date|after:start_date',
+                'is_current' => 'boolean',
+                'reason_for_leaving' => 'nullable|string|max:255',
+                'last_salary' => 'nullable|numeric|min:0'
+            ]);
+
+            try {
+                // If is_current is true, clear end_date
+                if ($validated['is_current'] ?? false) {
+                    $validated['end_date'] = null;
+                }
+
+                $id = DB::table('candidate_experience')->insertGetId(
+                    array_merge($validated, [
+                        'candidate_id' => $authUser['user_id'],
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ])
+                );
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Experience record added successfully',
+                    'id' => $id
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to add experience: ' . $e->getMessage()
+                ], 500);
+            }
+        });
+
+        Route::put('/experience/{id}', function (Request $request, $id) {
+            $authUser = $request->auth_user;
+
+            $validated = $request->validate([
+                'company_name' => 'required|string|max:255',
+                'position' => 'required|string|max:255',
+                'job_description' => 'nullable|string',
+                'start_date' => 'required|date',
+                'end_date' => 'nullable|date|after:start_date',
+                'is_current' => 'boolean',
+                'reason_for_leaving' => 'nullable|string|max:255',
+                'last_salary' => 'nullable|numeric|min:0'
+            ]);
+
+            try {
+                // If is_current is true, clear end_date
+                if ($validated['is_current'] ?? false) {
+                    $validated['end_date'] = null;
+                }
+
+                $updated = DB::table('candidate_experience')
+                    ->where('id', $id)
+                    ->where('candidate_id', $authUser['user_id'])
+                    ->update(array_merge($validated, ['updated_at' => now()]));
+
+                if (!$updated) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Experience record not found'
+                    ], 404);
+                }
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Experience record updated successfully'
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to update experience: ' . $e->getMessage()
+                ], 500);
+            }
+        });
+
+        Route::delete('/experience/{id}', function ($id, Request $request) {
+            $authUser = $request->auth_user;
+
+            try {
+                $deleted = DB::table('candidate_experience')
+                    ->where('id', $id)
+                    ->where('candidate_id', $authUser['user_id'])
+                    ->delete();
+
+                if (!$deleted) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Experience record not found'
+                    ], 404);
+                }
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Experience record deleted successfully'
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to delete experience: ' . $e->getMessage()
+                ], 500);
+            }
+        });
+
+        // Emergency contacts endpoints
+        Route::get('/emergency-contacts', function (Request $request) {
+            $authUser = $request->auth_user;
+
+            $contacts = DB::table('candidate_emergency_contacts')
+                ->where('candidate_id', $authUser['user_id'])
+                ->orderBy('is_primary', 'desc')
+                ->orderBy('contact_type')
+                ->get();
+
             return response()->json([
-                'departments' => [],
-                'message' => 'Departments will be implemented when team finalizes structure'
+                'status' => 'success',
+                'contacts' => $contacts
             ]);
         });
 
-        Route::get('/payroll', function () {
-            return response()->json([
-                'payroll' => [],
-                'message' => 'Payroll module - coming soon'
+        Route::post('/emergency-contacts', function (Request $request) {
+            $authUser = $request->auth_user;
+
+            $validated = $request->validate([
+                'contact_type' => 'required|string|max:255',
+                'full_name' => 'required|string|max:255',
+                'relationship' => 'required|string|max:255',
+                'phone_primary' => 'required|string|max:20',
+                'phone_secondary' => 'nullable|string|max:20',
+                'email' => 'nullable|email|max:255',
+                'address' => 'nullable|string',
+                'is_primary' => 'boolean'
             ]);
+
+            try {
+                // If this is marked as primary, unset other primary contacts
+                if ($validated['is_primary'] ?? false) {
+                    DB::table('candidate_emergency_contacts')
+                        ->where('candidate_id', $authUser['user_id'])
+                        ->update(['is_primary' => false]);
+                }
+
+                $id = DB::table('candidate_emergency_contacts')->insertGetId(
+                    array_merge($validated, [
+                        'candidate_id' => $authUser['user_id'],
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ])
+                );
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Emergency contact added successfully',
+                    'id' => $id
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to add emergency contact: ' . $e->getMessage()
+                ], 500);
+            }
         });
 
-        Route::get('/leaves', function () {
-            return response()->json([
-                'leaves' => [],
-                'message' => 'Leave management - coming soon'
+        Route::put('/emergency-contacts/{id}', function (Request $request, $id) {
+            $authUser = $request->auth_user;
+
+            $validated = $request->validate([
+                'contact_type' => 'required|string|max:255',
+                'full_name' => 'required|string|max:255',
+                'relationship' => 'required|string|max:255',
+                'phone_primary' => 'required|string|max:20',
+                'phone_secondary' => 'nullable|string|max:20',
+                'email' => 'nullable|email|max:255',
+                'address' => 'nullable|string',
+                'is_primary' => 'boolean'
             ]);
+
+            try {
+                // If this is marked as primary, unset other primary contacts
+                if ($validated['is_primary'] ?? false) {
+                    DB::table('candidate_emergency_contacts')
+                        ->where('candidate_id', $authUser['user_id'])
+                        ->where('id', '!=', $id)
+                        ->update(['is_primary' => false]);
+                }
+
+                $updated = DB::table('candidate_emergency_contacts')
+                    ->where('id', $id)
+                    ->where('candidate_id', $authUser['user_id'])
+                    ->update(array_merge($validated, ['updated_at' => now()]));
+
+                if (!$updated) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Emergency contact not found'
+                    ], 404);
+                }
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Emergency contact updated successfully'
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to update emergency contact: ' . $e->getMessage()
+                ], 500);
+            }
+        });
+
+        Route::delete('/emergency-contacts/{id}', function ($id, Request $request) {
+            $authUser = $request->auth_user;
+
+            try {
+                $deleted = DB::table('candidate_emergency_contacts')
+                    ->where('id', $id)
+                    ->where('candidate_id', $authUser['user_id'])
+                    ->delete();
+
+                if (!$deleted) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Emergency contact not found'
+                    ], 404);
+                }
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Emergency contact deleted successfully'
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to delete emergency contact: ' . $e->getMessage()
+                ], 500);
+            }
+        });
+
+        // Profile completion status
+        Route::get('/profile-completion', function (Request $request) {
+            $authUser = $request->auth_user;
+
+            try {
+                $profile = DB::table('candidate_profiles')->where('candidate_id', $authUser['user_id'])->first();
+                $sections = [
+                    'basic_info' => false,
+                    'education' => false,
+                    'experience' => false,
+                    'emergency_contacts' => false
+                ];
+
+                // Check basic info
+                if (
+                    $profile && $profile->first_name && $profile->last_name && $profile->date_of_birth &&
+                    $profile->gender && $profile->phone_primary
+                ) {
+                    $sections['basic_info'] = true;
+                }
+
+                // Check education
+                $sections['education'] = DB::table('candidate_education')
+                    ->where('candidate_id', $authUser['user_id'])
+                    ->exists();
+
+                // Check experience
+                $sections['experience'] = DB::table('candidate_experience')
+                    ->where('candidate_id', $authUser['user_id'])
+                    ->exists();
+
+                // Check emergency contacts
+                $sections['emergency_contacts'] = DB::table('candidate_emergency_contacts')
+                    ->where('candidate_id', $authUser['user_id'])
+                    ->exists();
+
+                $completedSections = array_filter($sections);
+                $completionPercentage = round((count($completedSections) / count($sections)) * 100);
+
+                // Update profile_completed status
+                DB::table('candidates')
+                    ->where('id', $authUser['user_id'])
+                    ->update(['profile_completed' => $completionPercentage >= 100]);
+
+                return response()->json([
+                    'status' => 'success',
+                    'completion_percentage' => $completionPercentage,
+                    'sections' => $sections,
+                    'completed' => count($completedSections),
+                    'total' => count($sections)
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to calculate completion: ' . $e->getMessage()
+                ], 500);
+            }
+        });
+
+        // Upload profile picture
+        Route::post('/profile-picture', function (Request $request) {
+            $authUser = $request->auth_user;
+
+            $request->validate([
+                'profile_picture' => 'required|image|mimes:jpeg,png,jpg|max:2048'
+            ]);
+
+            try {
+                if ($request->hasFile('profile_picture')) {
+                    $file = $request->file('profile_picture');
+                    $filename = 'profile_' . $authUser['user_id'] . '_' . time() . '.' . $file->getClientOriginalExtension();
+                    $path = $file->storeAs('profile_pictures', $filename, 'public');
+
+                    DB::table('candidate_profiles')
+                        ->where('candidate_id', $authUser['user_id'])
+                        ->update([
+                            'profile_picture' => $path,
+                            'updated_at' => now()
+                        ]);
+
+                    return response()->json([
+                        'status' => 'success',
+                        'message' => 'Profile picture uploaded successfully',
+                        'path' => $path
+                    ]);
+                }
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No file uploaded'
+                ], 400);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to upload profile picture: ' . $e->getMessage()
+                ], 500);
+            }
         });
     });
 });
+
+// Helper function for next steps
+function getNextSteps($profile, $hasEducation, $hasExperience, $hasEmergencyContact)
+{
+    $steps = [];
+
+    if (
+        !$profile || !$profile->first_name || !$profile->last_name || !$profile->date_of_birth ||
+        !$profile->gender || !$profile->phone_primary
+    ) {
+        $steps[] = 'Complete your basic profile information';
+    }
+    if (!$hasEducation) {
+        $steps[] = 'Add your educational background';
+    }
+    if (!$hasExperience) {
+        $steps[] = 'Add your work experience';
+    }
+    if (!$hasEmergencyContact) {
+        $steps[] = 'Add emergency contact information';
+    }
+
+    if (empty($steps)) {
+        $steps[] = 'Your profile is complete! Wait for further instructions.';
+    }
+
+    return $steps;
+}

@@ -1,14 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
 
 const HRMLoginPage = () => {
+  const { login, loading: authLoading } = useAuth();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isAdminLogin, setIsAdminLogin] = useState(false);
-  const [loginType, setLoginType] = useState("staff"); // 'staff' or 'candidate'
+  const [loginType, setLoginType] = useState("candidate"); // Default to candidate
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [loginError, setLoginError] = useState("");
 
   const [formData, setFormData] = useState({
     staffId: "",
@@ -18,7 +21,7 @@ const HRMLoginPage = () => {
   });
 
   const [settings, setSettings] = useState({
-    theme: "light",
+    theme: "dark",
     primaryColor: "#6366f1",
     backgroundImage: "gradient1",
     language: "en",
@@ -70,56 +73,47 @@ const HRMLoginPage = () => {
 
   const handleLogin = async () => {
     setIsLoading(true);
+    setLoginError("");
+
+    // Basic validation
+    const identifier =
+      loginType === "staff" ? formData.staffId : formData.email;
+    if (!identifier || !formData.password) {
+      setLoginError("Please fill in all required fields");
+      setIsLoading(false);
+      return;
+    }
+
+    // Prepare login data matching your backend API
+    const loginPayload = {
+      loginType: loginType,
+      email: identifier, // Use 'email' field since your API expects it
+      identifier: identifier, // Keep both for compatibility
+      password: formData.password,
+      isAdminLogin: isAdminLogin,
+      theme: settings.theme,
+      language: settings.language,
+      primaryColor: settings.primaryColor,
+    };
+
+    console.log("Sending login request:", loginPayload); // Debug log
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const result = await login(loginPayload); // ← This calls your AuthContext
 
-      const loginPayload = {
-        loginType: loginType,
-        identifier: loginType === "staff" ? formData.staffId : formData.email,
-        password: formData.password,
-        isAdminLogin: isAdminLogin,
-        theme: settings.theme,
-        language: settings.language,
-      };
-
-      // Mock login logic based on login type
-      if (loginType === "staff") {
-        if (formData.staffId.includes("ADM") && isAdminLogin) {
-          showNotification(
-            "Welcome Admin! Redirecting to Admin Dashboard...",
-            "success"
-          );
-        } else if (formData.staffId.startsWith("STF")) {
-          showNotification(
-            "Welcome Staff! Redirecting to Staff Dashboard...",
-            "success"
-          );
-        } else {
-          showNotification(
-            "Invalid Staff ID. Please check your credentials.",
-            "error"
-          );
-        }
+      if (result.success) {
+        showNotification(
+          `Welcome! Redirecting to ${result.data.session.dashboard_type} dashboard...`,
+          "success"
+        );
       } else {
-        // Candidate login
-        if (
-          formData.email.includes("@") &&
-          formData.email.includes("candidate")
-        ) {
-          showNotification(
-            "Welcome! Redirecting to Candidate Dashboard...",
-            "success"
-          );
-        } else {
-          showNotification(
-            "Invalid email. Please check your credentials.",
-            "error"
-          );
-        }
+        setLoginError(result.error);
+        showNotification(result.error, "error");
       }
     } catch (error) {
-      showNotification("Login failed. Please try again.", "error");
+      const errorMessage = "Login failed. Please try again.";
+      setLoginError(errorMessage);
+      showNotification(errorMessage, "error");
     } finally {
       setIsLoading(false);
     }
@@ -131,10 +125,13 @@ const HRMLoginPage = () => {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+    // Clear error when user starts typing
+    if (loginError) setLoginError("");
   };
 
   const handleLoginTypeChange = (type) => {
     setLoginType(type);
+    setLoginError("");
     // Clear previous input when switching
     setFormData((prev) => ({
       ...prev,
@@ -335,6 +332,13 @@ const HRMLoginPage = () => {
                 Sign in to your account
               </p>
             </div>
+
+            {/* Login Error Display */}
+            {loginError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-600 text-sm">{loginError}</p>
+              </div>
+            )}
 
             <div className="mb-6">
               <div className="flex rounded-lg p-1 bg-gray-100 dark:bg-gray-700">
@@ -604,7 +608,7 @@ const HRMLoginPage = () => {
 
               <button
                 onClick={handleLogin}
-                disabled={isLoading}
+                disabled={isLoading || authLoading}
                 className="w-full py-3 rounded-lg text-white font-semibold text-lg transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 style={{ backgroundColor: settings.primaryColor }}
               >
@@ -676,6 +680,7 @@ const HRMLoginPage = () => {
         </div>
       </div>
 
+      {/* Settings Panel - keeping your original implementation */}
       <div
         className={
           "fixed top-0 right-0 h-full w-80 " +

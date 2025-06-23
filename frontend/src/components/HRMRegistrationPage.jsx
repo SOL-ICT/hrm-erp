@@ -1,14 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
 
 const HRMRegistrationPage = () => {
+  const { register, loading: authLoading } = useAuth();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
+  const [registrationError, setRegistrationError] = useState("");
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -122,30 +125,40 @@ const HRMRegistrationPage = () => {
     }
 
     setIsLoading(true);
+    setRegistrationError("");
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2500));
-
+      // Prepare registration data for our API
       const registrationData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+        name: `${formData.firstName} ${formData.lastName}`.trim(),
         email: formData.email,
         password: formData.password,
+        loginType: "candidate", // Ensure they're registered as candidates
+        firstName: formData.firstName,
+        lastName: formData.lastName,
         phone: formData.phone,
         subscribeNewsletter: formData.subscribeNewsletter,
         theme: settings.theme,
         language: settings.language,
+        primaryColor: settings.primaryColor,
       };
 
-      console.log("Registration data:", registrationData);
+      const result = await register(registrationData);
 
-      setCurrentStep(3);
-      showNotification(
-        "Registration successful! Please check your email for verification.",
-        "success"
-      );
+      if (result.success) {
+        setCurrentStep(3);
+        showNotification(
+          "Registration successful! You can now login to access your candidate dashboard.",
+          "success"
+        );
+      } else {
+        setRegistrationError(result.error);
+        showNotification(result.error, "error");
+      }
     } catch (error) {
-      showNotification("Registration failed. Please try again.", "error");
+      const errorMessage = "Registration failed. Please try again.";
+      setRegistrationError(errorMessage);
+      showNotification(errorMessage, "error");
     } finally {
       setIsLoading(false);
     }
@@ -158,8 +171,12 @@ const HRMRegistrationPage = () => {
       [name]: type === "checkbox" ? checked : value,
     }));
 
+    // Clear errors when user starts typing
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+    if (registrationError) {
+      setRegistrationError("");
     }
   };
 
@@ -204,8 +221,8 @@ const HRMRegistrationPage = () => {
               Registration Successful!
             </h2>
             <p className={currentTheme.textSecondary + " mb-6"}>
-              We've sent a verification email to{" "}
-              <strong>{formData.email}</strong>
+              Welcome to Strategic Outsourcing Limited! Your candidate account
+              has been created.
             </p>
           </div>
 
@@ -213,7 +230,7 @@ const HRMRegistrationPage = () => {
             <h3
               className={"font-semibold " + currentTheme.textPrimary + " mb-2"}
             >
-              Next Steps:
+              What's Next:
             </h3>
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2">
@@ -229,7 +246,7 @@ const HRMRegistrationPage = () => {
                   />
                 </svg>
                 <span className={currentTheme.textSecondary}>
-                  Check your email inbox
+                  Login with your credentials
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -245,7 +262,7 @@ const HRMRegistrationPage = () => {
                   />
                 </svg>
                 <span className={currentTheme.textSecondary}>
-                  Click the verification link
+                  Access your candidate dashboard
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -261,7 +278,7 @@ const HRMRegistrationPage = () => {
                   />
                 </svg>
                 <span className={currentTheme.textSecondary}>
-                  Complete your profile
+                  Complete your profile information
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -277,7 +294,7 @@ const HRMRegistrationPage = () => {
                   />
                 </svg>
                 <span className={currentTheme.textSecondary}>
-                  Start applying for jobs
+                  Start applying for opportunities
                 </span>
               </div>
             </div>
@@ -289,23 +306,17 @@ const HRMRegistrationPage = () => {
               className="w-full py-3 rounded-lg text-white font-semibold transition-all duration-200 hover:shadow-lg"
               style={{ backgroundColor: settings.primaryColor }}
             >
-              Go to Login
+              Login to Dashboard
             </button>
-            <button
-              onClick={() =>
-                showNotification("Verification email resent!", "success")
-              }
-              className={
-                "w-full py-3 rounded-lg border-2 font-semibold transition-all duration-200 " +
-                currentTheme.textPrimary
-              }
-              style={{
-                borderColor: settings.primaryColor,
-                color: settings.primaryColor,
-              }}
-            >
-              Resend Verification Email
-            </button>
+            <div className={currentTheme.inputBg + " p-3 rounded-lg"}>
+              <p className={"text-sm " + currentTheme.textSecondary}>
+                <strong>Your Login Details:</strong>
+                <br />
+                Email: {formData.email}
+                <br />
+                Use the password you just created
+              </p>
+            </div>
           </div>
         </div>
       );
@@ -313,6 +324,13 @@ const HRMRegistrationPage = () => {
 
     return (
       <div className="space-y-6">
+        {/* Registration Error Display */}
+        {registrationError && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-600 text-sm">{registrationError}</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label
@@ -746,7 +764,7 @@ const HRMRegistrationPage = () => {
 
         <button
           onClick={handleRegistration}
-          disabled={isLoading}
+          disabled={isLoading || authLoading}
           className="w-full py-3 rounded-lg text-white font-semibold text-lg transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           style={{ backgroundColor: settings.primaryColor }}
         >
@@ -1053,6 +1071,7 @@ const HRMRegistrationPage = () => {
         </div>
       </div>
 
+      {/* Settings Panel */}
       <div
         className={
           "fixed top-0 right-0 h-full w-80 " +

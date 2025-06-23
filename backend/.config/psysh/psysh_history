@@ -1,0 +1,103 @@
+Schema::getTableListing()
+Schema::getTableListing()
+Schema::getTableListing()
+User::count()
+use App\Models\User; $user = User::create(['name' => 'Test', 'email' => 'test@test.com', 'password' => bcrypt('password')]);
+Schema::getColumnListing('users')
+exit
+Schema::dropIfExists('users');~c
+Schema::dropIfExists('users');
+Schema::create('users', function ($table) {$table->id(); $table->string('name'); $table->string('email')->unique(); $table->timestamp('email_verified_at')->nullable(); $table->string('password'); $table->rememberToken(); $table->timestamps();}); exit
+use App\Models\user; $user = User::create(['name' => 'Test', 'email' => 'test@test.com', 'password' => bcrypt('password')]); $user exit
+exit
+exit
+use App\Models\User;
+User::all()
+use App\Models\User;
+$user = User::find(1);
+$token = $user->createToken('test-token');
+$token$token->plainTextToken
+$token->plainTextToken
+exit
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+$user = User::create([
+    'name' => 'John Candidate',
+    'email' => 'candidate@test.com',
+    'password' => Hash::make('password123')
+]);
+echo "Test candidate created successfully!\n";
+echo "Email: candidate@test.com\n";
+echo "Password: password123\n";
+echo "User ID: " . $user->id . "\n";
+exit
+use App\Models\User;
+$user = User::where('email', 'candidate@test.com')->first();
+if ($user) {
+    echo "User found: " . $user->name . " (ID: " . $user->id . ")\n";
+    echo "Email: " . $user->email . "\n";
+} else {
+    echo "User not found!\n";
+}
+exit
+// Check if we have any candidates
+DB::table('candidates')->count()
+// Check the candidates table structure
+Schema::getColumnListing('candidates')
+exit
+use Illuminate\Support\Facades\Hash;
+// Create candidate in the candidates table
+$candidate = DB::table('candidates')->insert([
+    'email' => 'candidate@test.com',
+    'password' => Hash::make('password123'),
+    'profile_completed' => false,
+    'status' => 'active',
+    'created_at' => now(),
+    'updated_at' => now()
+]);
+echo "Candidate created in candidates table!\n";
+exit
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+// Create user for authentication
+$user = User::create([
+    'name' => 'John Candidate',
+    'email' => 'candidate@test.com',
+    'password' => Hash::make('password123')
+]);
+// Create candidate profile (linked to user)
+DB::table('candidates')->insert([
+    'email' => 'candidate@test.com',  // Link to user by email
+    'password' => Hash::make('password123'), // Same password
+    'profile_completed' => false,
+    'status' => 'active',
+    'created_at' => now(),
+    'updated_at' => now()
+]);
+echo "User and Candidate created!\n";
+echo "Email: candidate@test.com\n";
+echo "Password: password123\n";
+exit
+use Illuminate\Support\Facades\DB;
+// Check if candidate exists
+$candidate = DB::table('candidates')->where('email', 'candidate@test.com')->first();
+if ($candidate) {
+    echo "Candidate found with ID: " . $candidate->id . "\n";
+    echo "Email: " . $candidate->email . "\n";
+    echo "Status: " . $candidate->status . "\n";
+    echo "Profile completed: " . ($candidate->profile_completed ? 'Yes' : 'No') . "\n";
+} else {
+    echo "No candidate found!\n";
+}
+exit
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+// Create a fresh test user
+$user = User::create([
+    'name' => 'Test Candidate',
+    'email' => 'test@candidate.com',
+    'password' => Hash::make('password123')
+]);
+echo "Created user: test@candidate.com\n";
+echo "Password: password123\n";
+exit
