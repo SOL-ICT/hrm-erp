@@ -17,26 +17,58 @@ export const AuthProvider = ({ children }) => {
   });
   const router = useRouter();
 
-  // Sanctum CSRF setup
-  const sanctumRequest = async (url, options = {}) => {
-    // Get CSRF cookie first for stateful requests
-    if (
-      options.method &&
-      ["POST", "PUT", "DELETE", "PATCH"].includes(options.method.toUpperCase())
-    ) {
-      await fetch("http://localhost:8000/sanctum/csrf-cookie", {
-        credentials: "include",
-      });
+  // Enhanced cookie helper with URL decoding
+  const getCookie = (name) => {
+    if (typeof document === "undefined") return null;
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) {
+      const cookieValue = parts.pop().split(";").shift();
+      // URL decode the cookie value
+      return decodeURIComponent(cookieValue);
     }
+    return null;
+  };
+
+  // Enhanced Sanctum CSRF setup
+  const sanctumRequest = async (url, options = {}) => {
+    const method = options.method?.toUpperCase();
+
+    // Get CSRF cookie first for stateful requests
+    if (method && ["POST", "PUT", "DELETE", "PATCH"].includes(method)) {
+      try {
+        await fetch("http://localhost:8000/sanctum/csrf-cookie", {
+          credentials: "include",
+        });
+
+        // Small delay to ensure cookie is set
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error("Failed to fetch CSRF cookie:", error);
+      }
+    }
+
+    // Get the CSRF token
+    const csrfToken = getCookie("XSRF-TOKEN");
+
+    const headers = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-Requested-With": "XMLHttpRequest",
+      ...options.headers,
+    };
+
+    // Add CSRF token to headers if available
+    if (csrfToken) {
+      headers["X-XSRF-TOKEN"] = csrfToken;
+    }
+
+    console.log("Making request with headers:", headers);
+    console.log("CSRF Token:", csrfToken);
 
     return fetch(url, {
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-        ...options.headers,
-      },
+      headers,
       ...options,
     });
   };
@@ -74,10 +106,15 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (loginData) => {
     try {
-      // Get CSRF cookie first
+      // First, ensure we get a fresh CSRF cookie
+      console.log("Getting CSRF cookie...");
       await fetch("http://localhost:8000/sanctum/csrf-cookie", {
+        method: "GET",
         credentials: "include",
       });
+
+      // Wait a bit for cookie to be set
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const {
         email,
@@ -98,14 +135,34 @@ export const AuthProvider = ({ children }) => {
         theme,
       });
 
+      // Get the CSRF token and decode it properly
+      const csrfToken = getCookie("XSRF-TOKEN");
+      console.log("Raw CSRF Token from cookie:", csrfToken);
+
+      if (!csrfToken) {
+        console.error("No CSRF token found in cookies");
+        // Try to get cookies again
+        const allCookies = document.cookie;
+        console.log("All cookies:", allCookies);
+      }
+
+      const headers = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      };
+
+      // Add CSRF token if available
+      if (csrfToken) {
+        headers["X-XSRF-TOKEN"] = csrfToken;
+      }
+
+      console.log("Login request headers:", headers);
+
       const response = await fetch("http://localhost:8000/api/login", {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "X-Requested-With": "XMLHttpRequest",
-        },
+        headers,
         body: JSON.stringify({
           identifier: loginIdentifier,
           password,

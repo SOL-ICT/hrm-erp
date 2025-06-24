@@ -18,24 +18,27 @@ use Laravel\Sanctum\Http\Controllers\CsrfCookieController;
 |
 */
 
-Route::put('/user/preferences', [AuthController::class, 'updatePreferences'])->middleware('auth');
+// Routes that need CSRF protection (stateful)
+Route::middleware(['web'])->group(function () {
+    // 1) Sanctum CSRF endpoint (must come before any stateful routes)
+    Route::get('/sanctum/csrf-cookie', [CsrfCookieController::class, 'show']);
 
-// 1) Sanctum CSRF endpoint (must come before any stateful routes)
-Route::get('/sanctum/csrf-cookie', [CsrfCookieController::class, 'show']);
+    // 3) Public auth endpoints
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/register', [AuthController::class, 'register']);
+});
 
-// 2) Health check (so your front-end can see “API ✓ Running”)
+// 2) Health check (no CSRF needed)
 Route::get('/health', function () {
     return response()->json(['status' => 'ok']);
 });
 
-// 3) Public auth endpoints
-Route::post('/login',    [AuthController::class, 'login']);
-Route::post('/register', [AuthController::class, 'register']);
-
 // 4) All protected routes live here
 Route::middleware('auth:sanctum')->group(function () {
-    // “Am I logged in?” endpoint 
-    Route::get('/user',   [AuthController::class, 'user']);
+    Route::put('/user/preferences', [AuthController::class, 'updatePreferences']);
+
+    // "Am I logged in?" endpoint 
+    Route::get('/user', [AuthController::class, 'user']);
 
     // Logout
     Route::post('/logout', [AuthController::class, 'logout']);

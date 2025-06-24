@@ -157,8 +157,8 @@ return [
     */
 
     'domain'   => env('SESSION_DOMAIN', null),
-    'same_site' => 'none',    // so the cookie is sent from your React app
-    'secure'   => false,     // set to true only if you’re running HTTPS locally
+    'same_site' => env('SESSION_SAME_SITE', 'lax'),    // so the cookie is sent from your React app
+    'secure'   => env('SESSION_SECURE_COOKIE', false),     // set to true only if you’re running HTTPS locally
 
     /*
     |--------------------------------------------------------------------------
