@@ -2,32 +2,27 @@
 
 namespace App\Models;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
      */
     protected $fillable = [
         'name',
         'email',
         'password',
         'role',
-        'preferences', // Add this
+        'preferences',
     ];
 
     /**
      * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
      */
     protected $hidden = [
         'password',
@@ -36,15 +31,13 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /**
      * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'preferences' => 'array', // Cast JSON to array automatically
+            'preferences' => 'array', // Automatically handle JSON
         ];
     }
 
@@ -59,12 +52,32 @@ class User extends Authenticatable implements MustVerifyEmail
             'primary_color' => '#6366f1',
         ];
 
+        // If value is null or empty, return defaults
         if (!$value) {
             return $defaults;
         }
 
-        $preferences = is_string($value) ? json_decode($value, true) : $value;
+        // If it's already an array (from cast), merge with defaults
+        if (is_array($value)) {
+            return array_merge($defaults, $value);
+        }
 
+        // If it's a JSON string, decode and merge
+        $preferences = json_decode($value, true);
         return array_merge($defaults, $preferences ?: []);
+    }
+
+    /**
+     * Set preferences - ensure it's always stored as JSON
+     */
+    public function setPreferencesAttribute($value)
+    {
+        if (is_array($value)) {
+            $this->attributes['preferences'] = json_encode($value);
+        } elseif (is_string($value)) {
+            $this->attributes['preferences'] = $value;
+        } else {
+            $this->attributes['preferences'] = json_encode([]);
+        }
     }
 }

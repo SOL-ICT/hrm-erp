@@ -101,3 +101,15 @@ $user = User::create([
 echo "Created user: test@candidate.com\n";
 echo "Password: password123\n";
 exit
+// Create a test user to verify the model works
+$user = new App\Models\User();
+$user->email = "test@example.com";
+$user->password = "password123";
+$user->role = "candidate";
+$user->preferences = ['theme' => 'dark', 'primary_color' => '#ff0000'];
+// Try to save - this should work now
+$user->save();
+// Test if preferences work
+$user->preferences; // Should return array with defaults merged
+// Exit tinker
+exit

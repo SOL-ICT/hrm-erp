@@ -5,30 +5,43 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Laravel\Sanctum\Http\Controllers\CsrfCookieController;
 
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
+|
+| No inline Closures in any middleware() call—only string middleware names
+| and controller actions. This guarantees Laravel never tries to cast a
+| Closure to a string.
+|
 */
 
-// Public routes
-Route::get('/health', [AuthController::class, 'health']);
-Route::get('/', [AuthController::class, 'index']);
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/register', [AuthController::class, 'register']);
-Route::get('/auth/check', [AuthController::class, 'checkAuth']);
-Route::post('/logout', [AuthController::class, 'logout']);
+Route::put('/user/preferences', [AuthController::class, 'updatePreferences'])->middleware('auth');
 
-// Protected routes - require authentication
-Route::middleware(function ($request, $next) {
-    $authUser = session('auth_user');
-    if (!$authUser) {
-        return response()->json(['error' => 'Unauthorized'], 401);
-    }
-    $request->merge(['auth_user' => $authUser]);
-    return $next($request);
-})->group(function () {
+// 1) Sanctum CSRF endpoint (must come before any stateful routes)
+Route::get('/sanctum/csrf-cookie', [CsrfCookieController::class, 'show']);
+
+// 2) Health check (so your front-end can see “API ✓ Running”)
+Route::get('/health', function () {
+    return response()->json(['status' => 'ok']);
+});
+
+// 3) Public auth endpoints
+Route::post('/login',    [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register']);
+
+// 4) All protected routes live here
+Route::middleware('auth:sanctum')->group(function () {
+    // “Am I logged in?” endpoint 
+    Route::get('/user',   [AuthController::class, 'user']);
+
+    // Logout
+    Route::post('/logout', [AuthController::class, 'logout']);
+
+    // Add other protected routes below
+    // Route::get('/dashboard', [DashboardController::class, 'index']);
 
     // Dashboard routes
     Route::get('/dashboard/admin', function (Request $request) {
@@ -713,31 +726,3 @@ Route::middleware(function ($request, $next) {
         });
     });
 });
-
-// Helper function for next steps
-function getNextSteps($profile, $hasEducation, $hasExperience, $hasEmergencyContact)
-{
-    $steps = [];
-
-    if (
-        !$profile || !$profile->first_name || !$profile->last_name || !$profile->date_of_birth ||
-        !$profile->gender || !$profile->phone_primary
-    ) {
-        $steps[] = 'Complete your basic profile information';
-    }
-    if (!$hasEducation) {
-        $steps[] = 'Add your educational background';
-    }
-    if (!$hasExperience) {
-        $steps[] = 'Add your work experience';
-    }
-    if (!$hasEmergencyContact) {
-        $steps[] = 'Add emergency contact information';
-    }
-
-    if (empty($steps)) {
-        $steps[] = 'Your profile is complete! Wait for further instructions.';
-    }
-
-    return $steps;
-}

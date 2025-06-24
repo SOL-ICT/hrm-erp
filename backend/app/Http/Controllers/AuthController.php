@@ -4,270 +4,303 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    /**
+     * Handle a login request for all user types.
+     */
     public function login(Request $request)
     {
-        $loginType = $request->input('loginType', 'staff');
-        $identifier = $request->input('identifier') ?: $request->input('email');
-        $password = $request->input('password');
-        $isAdminLogin = $request->input('isAdminLogin', false);
-        $theme = $request->input('theme', 'light');
-        $language = $request->input('language', 'en');
-
-        if (!$identifier || !$password) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Identifier and password are required'
-            ], 400);
-        }
-
-        // Handle candidate login - use candidates table
-        if ($loginType === 'candidate') {
-            $candidate = DB::table('candidates')->where('email', $identifier)->first();
-
-            if (!$candidate || !Hash::check($password, $candidate->password)) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Invalid credentials'
-                ], 401);
-            }
-
-            // Create session data for candidate
-            $sessionData = [
-                'user_id' => $candidate->id,
-                'email' => $candidate->email,
-                'login_type' => 'candidate',
-                'user_role' => 'candidate',
-                'dashboard_type' => 'candidate',
-                'is_admin' => false,
-                'preferences' => [
-                    'theme' => $theme,
-                    'language' => $language,
-                    'primary_color' => $request->input('primaryColor', '#6366f1')
-                ],
-                'login_time' => now()
-            ];
-
-            session(['auth_user' => $sessionData]);
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Login successful',
-                'user' => [
-                    'id' => $candidate->id,
-                    'email' => $candidate->email,
-                    'role' => 'candidate',
-                    'dashboard_type' => 'candidate'
-                ],
-                'session' => $sessionData,
-                'redirect_to' => "/dashboard/candidate"
+        try {
+            $data = $request->validate([
+                'identifier' => 'required|string',    // email or username
+                'password'   => 'required|string',
+                // Theme preference fields
+                'login_type' => 'sometimes|in:candidate,staff,admin',
+                'preferences' => 'sometimes|array',
+                'preferences.theme' => 'sometimes|string|in:light,dark,transparent',
+                'preferences.language' => 'sometimes|string',
+                'preferences.primary_color' => 'sometimes|string',
             ]);
-        }
 
-        // Handle staff/admin login - use users table
-        if ($loginType === 'staff') {
-            $user = User::where('email', $identifier . '@sol.com')->first() ??
-                User::where('name', $identifier)->first();
+            // Decide whether they're logging in with email or username
+            $field = filter_var($data['identifier'], FILTER_VALIDATE_EMAIL)
+                ? 'email'
+                : 'username';
 
-            if (!$user || !Hash::check($password, $user->password)) {
+            // Attempt authentication using the users table
+            if (!Auth::attempt([$field => $data['identifier'], 'password' => $data['password']])) {
                 return response()->json([
-                    'status' => 'error',
-                    'message' => 'Invalid credentials'
+                    'success' => false,
+                    'message' => 'Invalid credentials',
                 ], 401);
             }
 
-            // Determine user role
-            $userRole = 'staff';
-            $dashboardType = 'staff';
+            $user = Auth::user();
 
-            if (str_contains($identifier, 'ADM') && $isAdminLogin) {
-                $userRole = 'admin';
-                $dashboardType = 'admin';
+            // Check if user is active
+            if (!$user->is_active) {
+                Auth::logout();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Account is inactive. Please contact administrator.',
+                ], 401);
             }
 
-            $sessionData = [
-                'user_id' => $user->id,
-                'email' => $user->email,
-                'login_type' => 'staff',
-                'user_role' => $userRole,
+            // Handle theme preferences if provided
+            if (isset($data['preferences'])) {
+                $currentPreferences = $this->getUserPreferences($user);
+                $newPreferences = array_merge($currentPreferences, $data['preferences']);
+
+                // Save preferences using direct database update
+                DB::table('users')
+                    ->where('id', $user->id)
+                    ->update(['preferences' => json_encode($newPreferences)]);
+            }
+
+            // Regenerate session for security
+            $request->session()->regenerate();
+
+            // Get final preferences
+            $preferences = $this->getUserPreferences($user);
+
+            // Determine dashboard type based on user_type or login_type
+            $dashboardType = $data['login_type'] ?? $user->user_type ?? $user->role ?? 'candidate';
+
+            // Build response payload
+            $responseData = [
+                'id'             => $user->id,
+                'username'       => $user->{$field},
+                'name'           => $user->name,
+                'email'          => $user->email,
+                'user_role'      => $user->role,
+                'user_type'      => $user->user_type,
                 'dashboard_type' => $dashboardType,
-                'is_admin' => $isAdminLogin && $userRole === 'admin',
-                'preferences' => [
-                    'theme' => $theme,
-                    'language' => $language,
-                    'primary_color' => $request->input('primaryColor', '#6366f1')
-                ],
-                'login_time' => now(),
-                'staff_id' => $identifier
+                'is_active'      => $user->is_active,
+                'preferences'    => $preferences,
             ];
 
-            session(['auth_user' => $sessionData]);
-
             return response()->json([
-                'status' => 'success',
+                'success' => true,
                 'message' => 'Login successful',
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $userRole,
-                    'dashboard_type' => $dashboardType,
-                    'staff_id' => $identifier
-                ],
-                'session' => $sessionData,
-                'redirect_to' => "/dashboard/{$dashboardType}"
+                'user'    => $responseData,
             ]);
-        }
-
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Invalid login type'
-        ], 400);
-    }
-
-    public function register(Request $request)
-    {
-        $name = $request->input('name');
-        $email = $request->input('email');
-        $password = $request->input('password');
-        $loginType = $request->input('loginType', 'candidate');
-
-        if (!$name || !$email || !$password) {
+        } catch (ValidationException $e) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'Name, email and password are required'
-            ], 400);
-        }
-
-        if (strlen($password) < 8) {
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'Password must be at least 8 characters'
-            ], 400);
+                'success' => false,
+                'message' => 'Login failed: ' . $e->getMessage(),
+            ], 500);
         }
-
-        if (User::where('email', $email)->exists()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Email already exists'
-            ], 400);
-        }
-
-        $user = User::create([
-            'name' => $name,
-            'email' => $email,
-            'password' => Hash::make($password),
-        ]);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'User created successfully',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $loginType === 'staff' ? 'staff' : 'candidate'
-            ]
-        ]);
     }
 
-    public function checkAuth(Request $request)
-    {
-        $authUser = session('auth_user');
-
-        if (!$authUser) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Not authenticated'
-            ], 401);
-        }
-
-        return response()->json([
-            'status' => 'success',
-            'authenticated' => true,
-            'user' => $authUser
-        ]);
-    }
-
-    public function logout(Request $request)
-    {
-        session()->forget('auth_user');
-        session()->flush();
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Logged out successfully'
-        ]);
-    }
-
-    public function health()
-    {
-        return response()->json([
-            'status' => 'ok',
-            'database' => 'connected',
-            'api' => 'running'
-        ]);
-    }
-
-    public function index()
-    {
-        return response()->json([
-            'message' => 'HRM ERP API',
-            'status' => 'running'
-        ]);
-    }
-
-    public function createTestCandidate()
+    /**
+     * Return the currently authenticated user.
+     */
+    public function user(Request $request)
     {
         try {
-            // Check if candidates table exists
-            if (!DB::getSchemaBuilder()->hasTable('candidates')) {
-                // Create the table if it doesn't exist
-                DB::statement('
-                    CREATE TABLE candidates (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        email VARCHAR(255) UNIQUE NOT NULL,
-                        password VARCHAR(255) NOT NULL,
-                        first_name VARCHAR(255),
-                        last_name VARCHAR(255),
-                        phone VARCHAR(255),
-                        status VARCHAR(255) DEFAULT "active",
-                        email_verified_at TIMESTAMP NULL,
-                        remember_token VARCHAR(100),
-                        created_at TIMESTAMP,
-                        updated_at TIMESTAMP
-                    )
-                ');
-            }
+            $user = Auth::user();
 
-            // Create test candidate
-            DB::table('candidates')->insert([
-                'email' => 'candidate@test.com',
-                'password' => Hash::make('password123'),
-                'first_name' => 'Test',
-                'last_name' => 'Candidate',
-                'created_at' => now(),
-                'updated_at' => now()
-            ]);
+            if (!$user) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Unauthenticated',
+                ], 401);
+            }
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Test candidate created successfully',
-                'credentials' => [
-                    'email' => 'candidate@test.com',
-                    'password' => 'password123',
-                    'login_type' => 'candidate'
-                ]
+                'user'   => [
+                    'id'             => $user->id,
+                    'username'       => $user->username ?? $user->email,
+                    'name'           => $user->name,
+                    'email'          => $user->email,
+                    'user_role'      => $user->role,
+                    'user_type'      => $user->user_type,
+                    'dashboard_type' => $user->user_type ?? $user->role ?? 'candidate',
+                    'is_active'      => $user->is_active,
+                    'preferences'    => $this->getUserPreferences($user),
+                ],
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'Failed to create test candidate: ' . $e->getMessage()
+                'status'  => 'error',
+                'message' => 'Error: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Update user preferences.
+     */
+    public function updatePreferences(Request $request)
+    {
+        try {
+            $request->validate([
+                'theme' => 'sometimes|string|in:light,dark,transparent',
+                'language' => 'sometimes|string',
+                'primary_color' => 'sometimes|string',
+            ]);
+
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Not authenticated'
+                ], 401);
+            }
+
+            $currentPreferences = $this->getUserPreferences($user);
+            $newPreferences = array_merge($currentPreferences, $request->only(['theme', 'language', 'primary_color']));
+
+            // Update preferences in database
+            DB::table('users')
+                ->where('id', $user->id)
+                ->update(['preferences' => json_encode($newPreferences)]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Preferences updated successfully',
+                'preferences' => $newPreferences
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update preferences: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Log the user out and invalidate the session.
+     */
+    public function logout(Request $request)
+    {
+        try {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Logged out successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Logout failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Register a new candidate.
+     */
+    public function register(Request $request)
+    {
+        try {
+            $data = $request->validate([
+                'email'    => 'required|email|unique:users,email',
+                'password' => 'required|string|min:8|confirmed',
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'phone' => 'sometimes|string|max:20',
+            ]);
+
+            DB::beginTransaction();
+
+            // Create candidate record
+            $candidateId = DB::table('candidates')->insertGetId([
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'phone' => $data['phone'] ?? null,
+                'profile_completed' => false,
+                'status' => 'pending',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Create user record
+            $userId = DB::table('users')->insertGetId([
+                'name' => $data['first_name'] . ' ' . $data['last_name'],
+                'email' => $data['email'],
+                'username' => strtolower($data['first_name'] . '.' . $data['last_name']),
+                'password' => Hash::make($data['password']),
+                'role' => 'candidate',
+                'user_type' => 'candidate',
+                'profile_id' => $candidateId,
+                'is_active' => true,
+                'preferences' => json_encode([
+                    'theme' => 'light',
+                    'language' => 'en',
+                    'primary_color' => '#6366f1'
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $user = User::find($userId);
+            Auth::login($user);
+            $request->session()->regenerate();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Registration successful',
+                'user' => [
+                    'id' => $user->id,
+                    'username' => $user->username,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'user_role' => $user->role,
+                    'user_type' => $user->user_type,
+                    'dashboard_type' => 'candidate',
+                    'preferences' => $this->getUserPreferences($user),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Registration failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get user preferences with defaults.
+     */
+    private function getUserPreferences($user)
+    {
+        $defaults = [
+            'theme' => 'light',
+            'language' => 'en',
+            'primary_color' => '#6366f1',
+        ];
+
+        // Get fresh preferences from database
+        $freshUser = DB::table('users')->where('id', $user->id)->first();
+
+        if (empty($freshUser->preferences)) {
+            return $defaults;
+        }
+
+        $preferences = json_decode($freshUser->preferences, true);
+        return array_merge($defaults, $preferences ?: []);
     }
 }

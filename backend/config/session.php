@@ -129,7 +129,7 @@ return [
 
     'cookie' => env(
         'SESSION_COOKIE',
-        Str::slug(env('APP_NAME', 'laravel'), '_').'_session'
+        Str::slug(env('APP_NAME', 'laravel'), '_') . '_session'
     ),
 
     /*
@@ -156,7 +156,9 @@ return [
     |
     */
 
-    'domain' => env('SESSION_DOMAIN'),
+    'domain'   => env('SESSION_DOMAIN', null),
+    'same_site' => 'none',    // so the cookie is sent from your React app
+    'secure'   => false,     // set to true only if you’re running HTTPS locally
 
     /*
     |--------------------------------------------------------------------------

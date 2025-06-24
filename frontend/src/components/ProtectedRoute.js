@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "./AuthContext";
+// ← fix the relative path to point at src/contexts/AuthContext.js
+import { useAuth } from "@/contexts/AuthContext";
 
 const ProtectedRoute = ({
   children,
@@ -21,7 +22,7 @@ const ProtectedRoute = ({
       }
 
       if (requiredRole && !hasRole(requiredRole)) {
-        // Redirect to appropriate dashboard if wrong role
+        // Redirect to whichever dashboard they belong on
         const userDashboard = `/dashboard/${
           user?.dashboard_type || "candidate"
         }`;
@@ -55,19 +56,17 @@ const ProtectedRoute = ({
     );
   }
 
-  if (!isAuthenticated) {
-    return null; // Will redirect via useEffect
+  // If not authenticated or lacking role/permission, render nothing (we already navigated away)
+  if (
+    !isAuthenticated ||
+    (requiredRole && !hasRole(requiredRole)) ||
+    (requiredPermission && !hasPermission(requiredPermission))
+  ) {
+    return null;
   }
 
-  if (requiredRole && !hasRole(requiredRole)) {
-    return null; // Will redirect via useEffect
-  }
-
-  if (requiredPermission && !hasPermission(requiredPermission)) {
-    return null; // Will redirect via useEffect
-  }
-
-  return children;
+  // Authorized—render children
+  return <>{children}</>;
 };
 
 export default ProtectedRoute;

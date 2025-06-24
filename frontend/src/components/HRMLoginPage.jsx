@@ -71,11 +71,13 @@ const HRMLoginPage = () => {
     setTimeout(() => setNotification(null), 4000);
   };
 
-  const handleLogin = async () => {
-    setIsLoading(true);
-    setLoginError("");
+  // Update the handleLogin function in your HRMLoginPage.jsx
 
-    // Basic validation
+  const handleLogin = async () => {
+    setLoginError(null);
+    setIsLoading(true);
+
+    // Determine identifier and password
     const identifier =
       loginType === "staff" ? formData.staffId : formData.email;
     if (!identifier || !formData.password) {
@@ -84,33 +86,33 @@ const HRMLoginPage = () => {
       return;
     }
 
-    // Prepare login data matching your backend API
+    // Prepare login data with theme preferences
     const loginPayload = {
-      loginType: loginType,
-      email: identifier, // Use 'email' field since your API expects it
-      identifier: identifier, // Keep both for compatibility
+      email: identifier,
+      identifier,
       password: formData.password,
-      isAdminLogin: isAdminLogin,
+      loginType,
+      isAdminLogin,
       theme: settings.theme,
       language: settings.language,
       primaryColor: settings.primaryColor,
     };
 
-    console.log("Sending login request:", loginPayload); // Debug log
+    console.log("Sending login request with theme preferences:", loginPayload);
 
     try {
-      const result = await login(loginPayload); // ← This calls your AuthContext
+      const result = await login(loginPayload);
+      console.log("Login result:", result);
 
       if (result.success) {
-        showNotification(
-          `Welcome! Redirecting to ${result.data.session.dashboard_type} dashboard...`,
-          "success"
-        );
+        showNotification("Welcome! Redirecting…", "success");
+        // Navigation is handled in AuthContext
       } else {
         setLoginError(result.error);
         showNotification(result.error, "error");
       }
     } catch (error) {
+      console.log("Caught error:", error);
       const errorMessage = "Login failed. Please try again.";
       setLoginError(errorMessage);
       showNotification(errorMessage, "error");
