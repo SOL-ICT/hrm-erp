@@ -4,34 +4,99 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import ProfileEdit from "./ProfileEdit";
+import EducationModal from "./EducationModal";
+import ExperienceModal from "./ExperienceModal";
+import EmergencyContactModal from "./EmergencyContactModal";
 
-export default function CandidateDashboard() {
-  const {
-    user,
-    loading,
-    isAuthenticated,
-    logout,
-    getUserPreferences,
-    updatePreferences,
-  } = useAuth();
+const CandidateDashboard = () => {
+  const { user, loading, isAuthenticated, logout, getUserPreferences } =
+    useAuth();
   const [activeSection, setActiveSection] = useState("overview");
   const [candidateProfile, setCandidateProfile] = useState(null);
   const [profileCompletion, setProfileCompletion] = useState(0);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [dashboardStats, setDashboardStats] = useState({
-    applications: 3,
-    interviews: 1,
+    applications: 0,
+    interviews: 0,
     offers: 0,
-    profileViews: 47,
+    profileViews: 0,
   });
-  const [recentActivity, setRecentActivity] = useState([]);
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [candidateEducation, setCandidateEducation] = useState([]);
   const [candidateExperience, setCandidateExperience] = useState([]);
   const [emergencyContacts, setEmergencyContacts] = useState([]);
-  const [dashboardData, setDashboardData] = useState(null);
+  const [statesLgas, setStatesLgas] = useState([]);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Modal states
+  const [educationModal, setEducationModal] = useState({
+    isOpen: false,
+    editingEducation: null,
+  });
+  const [experienceModal, setExperienceModal] = useState({
+    isOpen: false,
+    editingExperience: null,
+  });
+  const [contactModal, setContactModal] = useState({
+    isOpen: false,
+    editingContact: null,
+  });
+
   const router = useRouter();
 
-  const preferences = getUserPreferences();
+  // Get user preferences from login
+  const preferences = getUserPreferences() || {
+    theme: "dark",
+    primaryColor: "#6366f1",
+    language: "en",
+  };
+
+  // Theme configurations matching your login page
+  const themes = {
+    light: {
+      bg: "bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50",
+      cardBg: "bg-white/95",
+      sidebarBg: "bg-white/90",
+      headerBg: "bg-white/95",
+      textPrimary: "text-gray-900",
+      textSecondary: "text-gray-600",
+      textMuted: "text-gray-500",
+      border: "border-gray-200",
+      hover: "hover:bg-gray-50",
+    },
+    dark: {
+      bg: "bg-gradient-to-br from-slate-900 via-gray-900 to-black",
+      cardBg: "bg-slate-800/95",
+      sidebarBg: "bg-slate-800/90",
+      headerBg: "bg-slate-800/95",
+      textPrimary: "text-white",
+      textSecondary: "text-gray-300",
+      textMuted: "text-gray-400",
+      border: "border-gray-700",
+      hover: "hover:bg-slate-700/50",
+    },
+    transparent: {
+      bg: "bg-gradient-to-br from-indigo-900/80 via-purple-900/80 to-slate-900/80",
+      cardBg: "bg-white/10 backdrop-blur-md",
+      sidebarBg: "bg-white/10 backdrop-blur-md",
+      headerBg: "bg-white/10 backdrop-blur-md",
+      textPrimary: "text-white",
+      textSecondary: "text-white/80",
+      textMuted: "text-white/60",
+      border: "border-white/20",
+      hover: "hover:bg-white/20",
+    },
+  };
+
+  const currentTheme = themes[preferences.theme] || themes.dark;
+
+  // Update current time every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -40,87 +105,163 @@ export default function CandidateDashboard() {
     }
 
     if (user) {
-      fetchCandidateData();
-      fetchRecentActivity();
+      fetchAllCandidateData();
     }
   }, [user, loading, isAuthenticated, router]);
 
-  const fetchCandidateData = async () => {
+  const fetchAllCandidateData = async () => {
+    setIsLoading(true);
     try {
-      // Fetch dashboard data
-      const dashboardResponse = await fetch(
-        "http://localhost:8000/api/dashboard/candidate",
+      await Promise.all([
+        fetchCandidateProfile(),
+        fetchCandidateEducation(),
+        fetchCandidateExperience(),
+        fetchEmergencyContacts(),
+        fetchStatesLgas(),
+        fetchDashboardStats(),
+      ]);
+    } catch (error) {
+      console.error("Failed to fetch candidate data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchCandidateProfile = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/candidates/${user.id}/profile`,
         {
           credentials: "include",
           headers: { "Content-Type": "application/json" },
         }
       );
 
-      if (dashboardResponse.ok) {
-        const data = await dashboardResponse.json();
-        setDashboardData(data);
+      if (response.ok) {
+        const data = await response.json();
+        setCandidateProfile(data.profile);
+        calculateProfileCompletion(data.profile);
+      } else {
+        // Default profile structure
+        const defaultProfile = {
+          candidate_id: user.id,
+          first_name: "",
+          middle_name: "",
+          last_name: "",
+          formal_name: "",
+          gender: "",
+          date_of_birth: "",
+          marital_status: "",
+          nationality: "Nigeria",
+          state_of_origin: "",
+          local_government: "",
+          phone_primary: "",
+          address_current: "",
+          blood_group: "",
+          position: "Candidate",
+          department: "Human Resources",
+          employee_id: `CAND${user.id}`,
+        };
+        setCandidateProfile(defaultProfile);
+        calculateProfileCompletion(defaultProfile);
       }
-
-      // Mock profile data - replace with actual API call
-      const mockProfile = {
-        candidate_id: user.id,
-        first_name: "John",
-        middle_name: "Michael",
-        last_name: "Doe",
-        formal_name: "Mr. John Michael Doe",
-        gender: "Male",
-        date_of_birth: "1990-05-15",
-        marital_status: "Single",
-        nationality: "Nigerian",
-        state_of_origin: "Lagos",
-        local_government: "Ikeja",
-        national_id_no: "",
-        phone_primary: "+234801234567",
-        phone_secondary: "",
-        address_current: "123 Lagos Street, Ikeja",
-        address_permanent: "123 Lagos Street, Ikeja",
-        profile_picture: null,
-        blood_group: "O+",
-      };
-
-      setCandidateProfile(mockProfile);
-      calculateProfileCompletion(mockProfile);
     } catch (error) {
-      console.error("Failed to fetch candidate data:", error);
+      console.error("Failed to fetch candidate profile:", error);
     }
   };
 
-  const fetchRecentActivity = () => {
-    // Mock recent activity data
-    setRecentActivity([
-      {
-        id: 1,
-        type: "application",
-        title: "Application Submitted",
-        description: "Software Developer Position",
-        time: "2 hours ago",
-        icon: "📝",
-        color: "bg-blue-500",
-      },
-      {
-        id: 2,
-        type: "profile",
-        title: "Profile Updated",
-        description: "Added work experience",
-        time: "1 day ago",
-        icon: "👤",
-        color: "bg-green-500",
-      },
-      {
-        id: 3,
-        type: "interview",
-        title: "Interview Scheduled",
-        description: "Technical interview on Friday",
-        time: "3 days ago",
-        icon: "🎯",
-        color: "bg-purple-500",
-      },
-    ]);
+  const fetchCandidateEducation = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/candidates/${user.id}/education`,
+        {
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setCandidateEducation(data.education || []);
+      }
+    } catch (error) {
+      setCandidateEducation([]);
+    }
+  };
+
+  const fetchCandidateExperience = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/candidates/${user.id}/experience`,
+        {
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setCandidateExperience(data.experience || []);
+      }
+    } catch (error) {
+      setCandidateExperience([]);
+    }
+  };
+
+  const fetchEmergencyContacts = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/candidates/${user.id}/emergency-contacts`,
+        {
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setEmergencyContacts(data.contacts || []);
+      }
+    } catch (error) {
+      setEmergencyContacts([]);
+    }
+  };
+
+  const fetchStatesLgas = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/api/states-lgas", {
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setStatesLgas(data.states_lgas || []);
+      }
+    } catch (error) {
+      setStatesLgas([]);
+    }
+  };
+
+  const fetchDashboardStats = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/candidates/${user.id}/dashboard-stats`,
+        {
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setDashboardStats(
+          data.stats || {
+            applications: 0,
+            interviews: 0,
+            offers: 0,
+            profileViews: 0,
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Failed to fetch dashboard stats:", error);
+    }
   };
 
   const calculateProfileCompletion = (profile) => {
@@ -150,22 +291,86 @@ export default function CandidateDashboard() {
     setProfileCompletion(completion);
   };
 
+  const handleProfileSave = async (updatedProfile) => {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/candidates/${user.id}/profile`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedProfile),
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setCandidateProfile(data.profile);
+        calculateProfileCompletion(data.profile);
+        setIsEditingProfile(false);
+      }
+    } catch (error) {
+      console.error("Failed to save profile:", error);
+    }
+  };
+
+  const handleEducationSave = (newEducation) => {
+    setCandidateEducation((prev) => {
+      if (educationModal.editingEducation) {
+        return prev.map((edu) =>
+          edu.id === educationModal.editingEducation.id ? newEducation : edu
+        );
+      } else {
+        return [newEducation, ...prev];
+      }
+    });
+    setEducationModal({ isOpen: false, editingEducation: null });
+  };
+
+  const handleExperienceSave = (newExperience) => {
+    setCandidateExperience((prev) => {
+      if (experienceModal.editingExperience) {
+        return prev.map((exp) =>
+          exp.id === experienceModal.editingExperience.id ? newExperience : exp
+        );
+      } else {
+        return [newExperience, ...prev];
+      }
+    });
+    setExperienceModal({ isOpen: false, editingExperience: null });
+  };
+
+  const handleContactSave = (newContact) => {
+    setEmergencyContacts((prev) => {
+      if (contactModal.editingContact) {
+        return prev.map((contact) =>
+          contact.id === contactModal.editingContact.id ? newContact : contact
+        );
+      } else {
+        return [newContact, ...prev];
+      }
+    });
+    setContactModal({ isOpen: false, editingContact: null });
+  };
+
   const handleLogout = () => {
     logout();
   };
 
-  const handleProfileSave = (updatedProfile) => {
-    setCandidateProfile(updatedProfile);
-    calculateProfileCompletion(updatedProfile);
-    setIsEditingProfile(false);
-  };
-
-  if (loading) {
+  if (loading || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your dashboard...</p>
+      <div
+        className={`min-h-screen ${currentTheme.bg} flex items-center justify-center`}
+      >
+        <div
+          className={`text-center ${currentTheme.cardBg} backdrop-blur-md rounded-3xl p-12 border ${currentTheme.border} shadow-2xl`}
+        >
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+          <h3 className={`text-2xl font-bold ${currentTheme.textPrimary} mb-2`}>
+            Loading Dashboard
+          </h3>
+          <p className={currentTheme.textSecondary}>
+            Preparing your workspace...
+          </p>
         </div>
       </div>
     );
@@ -175,68 +380,110 @@ export default function CandidateDashboard() {
     return null;
   }
 
-  const applicationStatus =
-    dashboardData?.application_status || "Profile Setup";
-  const nextSteps = dashboardData?.next_steps || [
-    "Complete personal information",
-    "Add education details",
-    "Upload required documents",
-  ];
-
   const navigationItems = [
-    { id: "overview", name: "Overview", icon: "📊", count: null },
-    { id: "profile", name: "Personal Info", icon: "👤", count: null },
+    { id: "overview", name: "Dashboard", icon: "🏠", section: "MAIN" },
+    { id: "profile", name: "Profile", icon: "👤", section: "MAIN" },
     {
       id: "education",
       name: "Education",
       icon: "🎓",
+      section: "MAIN",
       count: candidateEducation.length,
     },
     {
       id: "experience",
       name: "Experience",
       icon: "💼",
+      section: "MAIN",
       count: candidateExperience.length,
     },
     {
       id: "emergency",
       name: "Emergency Contacts",
       icon: "📞",
+      section: "MAIN",
       count: emergencyContacts.length,
     },
-    { id: "documents", name: "Documents", icon: "📄", count: 0 },
     {
       id: "applications",
       name: "Applications",
       icon: "📋",
+      section: "MAIN",
       count: dashboardStats.applications,
     },
+    {
+      id: "interviews",
+      name: "Interviews",
+      icon: "🎯",
+      section: "MAIN",
+      count: dashboardStats.interviews,
+    },
+    { id: "documents", name: "Documents", icon: "📄", section: "TOOLS" },
+    { id: "calendar", name: "Calendar", icon: "📅", section: "TOOLS" },
+    {
+      id: "messages",
+      name: "Messages",
+      icon: "💬",
+      section: "TOOLS",
+      count: 3,
+    },
+    { id: "settings", name: "Settings", icon: "⚙️", section: "TOOLS" },
   ];
 
   return (
-    <div
-      className="min-h-screen bg-gray-50"
-      style={{
-        backgroundColor: preferences.theme === "dark" ? "#1f2937" : "#f9fafb",
-      }}
-    >
-      {/* Header */}
+    <div className={`min-h-screen ${currentTheme.bg}`}>
+      {/* Decorative Background Pattern */}
+      <div className="fixed inset-0 opacity-5 pointer-events-none">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23${
+              preferences.primaryColor?.replace("#", "") || "6366f1"
+            }' fill-opacity='0.1'%3E%3Cpath d='m36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }}
+        ></div>
+      </div>
+
+      {/* Top Navigation Header */}
       <header
-        className="bg-white shadow-sm border-b"
-        style={{
-          backgroundColor: preferences.theme === "dark" ? "#374151" : "#ffffff",
-          borderColor: preferences.theme === "dark" ? "#4b5563" : "#e5e7eb",
-        }}
+        className={`${currentTheme.headerBg} backdrop-blur-md border-b ${currentTheme.border} shadow-xl relative z-10`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            {/* Brand Section */}
+            <div className="flex items-center space-x-4">
               <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center text-white mr-3"
-                style={{ backgroundColor: preferences.primary_color }}
+                className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg"
+                style={{
+                  background: `linear-gradient(135deg, ${
+                    preferences.primaryColor || "#6366f1"
+                  }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                }}
               >
+                <span className="font-bold text-lg">S</span>
+              </div>
+              <div>
+                <h1
+                  className={`text-2xl font-bold ${currentTheme.textPrimary}`}
+                >
+                  Strategic Outsourcing
+                </h1>
+                <p className={`text-sm ${currentTheme.textSecondary}`}>
+                  Human Resource Management System
+                </p>
+              </div>
+            </div>
+
+            {/* Search Bar */}
+            <div className="flex-1 max-w-xl mx-8">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search applications, documents, or contacts..."
+                  className={`w-full ${currentTheme.cardBg} ${currentTheme.border} rounded-xl px-4 py-3 pl-12 ${currentTheme.textPrimary} placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent backdrop-blur-sm`}
+                />
                 <svg
-                  className="h-6 w-6"
+                  className={`w-5 h-5 ${currentTheme.textMuted} absolute left-4 top-4`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -245,35 +492,41 @@ export default function CandidateDashboard() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
               </div>
-              <div>
-                <h1
-                  className="text-xl font-semibold"
-                  style={{
-                    color: preferences.theme === "dark" ? "#f9fafb" : "#111827",
-                  }}
-                >
-                  Candidate Portal
-                </h1>
-                <p
-                  className="text-sm"
-                  style={{
-                    color: preferences.theme === "dark" ? "#d1d5db" : "#6b7280",
-                  }}
-                >
-                  Strategic Outsourcing Limited
-                </p>
-              </div>
             </div>
 
+            {/* Header Actions */}
             <div className="flex items-center space-x-4">
+              {/* Date & Time */}
+              <div
+                className={`text-right px-4 py-2 ${currentTheme.cardBg} rounded-xl ${currentTheme.border} backdrop-blur-sm`}
+              >
+                <p
+                  className={`text-sm font-medium ${currentTheme.textPrimary}`}
+                >
+                  {currentTime.toLocaleDateString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </p>
+                <p className={`text-xs ${currentTheme.textMuted}`}>
+                  {currentTime.toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
+
               {/* Notifications */}
-              <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
+              <button
+                className={`relative p-3 ${currentTheme.cardBg} rounded-xl ${currentTheme.border} ${currentTheme.hover} transition-all backdrop-blur-sm`}
+              >
                 <svg
-                  className="h-5 w-5 text-gray-600"
+                  className={`w-6 h-6 ${currentTheme.textSecondary}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -284,39 +537,57 @@ export default function CandidateDashboard() {
                     strokeWidth={2}
                     d="M15 17h5l-5 5v-5z"
                   />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"
+                  />
                 </svg>
-                <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center text-xs text-white">
-                  2
+                <span
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs text-white flex items-center justify-center font-bold"
+                  style={{
+                    backgroundColor: preferences.primaryColor || "#6366f1",
+                  }}
+                >
+                  3
                 </span>
               </button>
 
-              {/* User Info */}
-              <div className="text-right">
-                <p
-                  className="text-sm font-medium"
+              {/* User Profile */}
+              <div
+                className={`flex items-center space-x-3 px-4 py-2 ${currentTheme.cardBg} rounded-xl ${currentTheme.border} backdrop-blur-sm`}
+              >
+                <div className="text-right">
+                  <p
+                    className={`text-sm font-semibold ${currentTheme.textPrimary}`}
+                  >
+                    {candidateProfile?.first_name} {candidateProfile?.last_name}
+                  </p>
+                  <p className={`text-xs ${currentTheme.textMuted}`}>
+                    {candidateProfile?.position || "Candidate"}
+                  </p>
+                </div>
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-semibold shadow-lg"
                   style={{
-                    color: preferences.theme === "dark" ? "#f9fafb" : "#111827",
+                    background: `linear-gradient(135deg, ${
+                      preferences.primaryColor || "#6366f1"
+                    }, ${preferences.primaryColor || "#6366f1"}dd)`,
                   }}
                 >
-                  Welcome, {candidateProfile?.first_name || "Candidate"}
-                </p>
-                <p
-                  className="text-xs"
-                  style={{
-                    color: preferences.theme === "dark" ? "#d1d5db" : "#6b7280",
-                  }}
-                >
-                  {user?.username || "Complete your profile"}
-                </p>
+                  {candidateProfile?.first_name?.[0] || "C"}
+                  {candidateProfile?.last_name?.[0] || ""}
+                </div>
               </div>
 
-              {/* Logout Button */}
+              {/* Logout */}
               <button
                 onClick={handleLogout}
-                className="flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                className={`p-3 ${currentTheme.cardBg} rounded-xl ${currentTheme.border} ${currentTheme.hover} transition-all backdrop-blur-sm group`}
               >
                 <svg
-                  className="h-4 w-4 mr-1"
+                  className={`w-6 h-6 ${currentTheme.textMuted} group-hover:text-red-500 transition-colors`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -328,727 +599,1143 @@ export default function CandidateDashboard() {
                     d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
                   />
                 </svg>
-                Logout
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar Navigation */}
-          <div className="lg:col-span-1">
-            <nav
-              className="bg-white rounded-lg shadow p-4"
-              style={{
-                backgroundColor:
-                  preferences.theme === "dark" ? "#374151" : "#ffffff",
-              }}
-            >
-              <div className="space-y-2">
-                {navigationItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveSection(item.id)}
-                    className={`w-full flex items-center justify-between px-3 py-3 text-left rounded-lg transition-all duration-200 ${
-                      activeSection === item.id
-                        ? "text-white shadow-md"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                    }`}
-                    style={
-                      activeSection === item.id
-                        ? {
-                            backgroundColor: preferences.primary_color,
-                          }
-                        : {}
-                    }
-                  >
-                    <div className="flex items-center">
-                      <span className="mr-3 text-lg">{item.icon}</span>
-                      <span className="font-medium">{item.name}</span>
-                    </div>
-                    {item.count !== null && (
-                      <span
-                        className={`px-2 py-1 text-xs rounded-full ${
-                          activeSection === item.id
-                            ? "bg-white/20 text-white"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {item.count}
-                      </span>
-                    )}
-                  </button>
-                ))}
+      <div className="flex">
+        {/* Professional Sidebar */}
+        <aside
+          className={`w-72 ${currentTheme.sidebarBg} backdrop-blur-md border-r ${currentTheme.border} min-h-screen sticky top-0 shadow-xl`}
+        >
+          {/* User Profile Section */}
+          <div className={`p-6 border-b ${currentTheme.border}`}>
+            <div className="flex items-center space-x-4">
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-xl"
+                style={{
+                  background: `linear-gradient(135deg, ${
+                    preferences.primaryColor || "#6366f1"
+                  }, ${preferences.primaryColor || "#6366f1"}cc)`,
+                }}
+              >
+                {candidateProfile?.first_name?.[0] || "C"}
+                {candidateProfile?.last_name?.[0] || ""}
               </div>
-            </nav>
+              <div className="flex-1">
+                <h3 className={`font-bold text-lg ${currentTheme.textPrimary}`}>
+                  {candidateProfile?.first_name} {candidateProfile?.last_name}
+                </h3>
+                <p className={`text-sm ${currentTheme.textSecondary} mb-1`}>
+                  {candidateProfile?.position || "Candidate"}
+                </p>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                  <span className="text-green-500 text-xs font-medium">
+                    Active
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <div
+                className={`text-center p-3 ${currentTheme.cardBg} rounded-xl ${currentTheme.border}`}
+              >
+                <p className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
+                  {profileCompletion}%
+                </p>
+                <p className={`text-xs ${currentTheme.textMuted}`}>Profile</p>
+              </div>
+              <div
+                className={`text-center p-3 ${currentTheme.cardBg} rounded-xl ${currentTheme.border}`}
+              >
+                <p
+                  className="text-2xl font-bold"
+                  style={{ color: preferences.primaryColor || "#6366f1" }}
+                >
+                  {dashboardStats.applications}
+                </p>
+                <p className={`text-xs ${currentTheme.textMuted}`}>Applied</p>
+              </div>
+            </div>
           </div>
 
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            {activeSection === "overview" && (
-              <div className="space-y-6">
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  {[
-                    {
-                      title: "Applications",
-                      value: dashboardStats.applications,
-                      icon: "📋",
-                      color: "bg-blue-500",
-                      change: "+2",
-                    },
-                    {
-                      title: "Interviews",
-                      value: dashboardStats.interviews,
-                      icon: "🎯",
-                      color: "bg-green-500",
-                      change: "+1",
-                    },
-                    {
-                      title: "Offers",
-                      value: dashboardStats.offers,
-                      icon: "🎉",
-                      color: "bg-purple-500",
-                      change: "0",
-                    },
-                    {
-                      title: "Profile Views",
-                      value: dashboardStats.profileViews,
-                      icon: "👁️",
-                      color: "bg-orange-500",
-                      change: "+12",
-                    },
-                  ].map((stat, index) => (
-                    <div
-                      key={index}
-                      className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
+          {/* Navigation Menu */}
+          <nav className="p-4">
+            {/* Main Section */}
+            <div className="mb-6">
+              <p
+                className={`text-xs font-bold uppercase tracking-wider ${currentTheme.textMuted} mb-4 px-2`}
+              >
+                MAIN MENU
+              </p>
+              <div className="space-y-1">
+                {navigationItems
+                  .filter((item) => item.section === "MAIN")
+                  .map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveSection(item.id)}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group ${
+                        activeSection === item.id
+                          ? "text-white shadow-lg"
+                          : `${currentTheme.textSecondary} ${currentTheme.hover}`
+                      }`}
+                      style={
+                        activeSection === item.id
+                          ? {
+                              background: `linear-gradient(135deg, ${
+                                preferences.primaryColor || "#6366f1"
+                              }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                            }
+                          : {}
+                      }
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600">
-                            {stat.title}
-                          </p>
-                          <p className="text-3xl font-bold text-gray-900 mt-1">
-                            {stat.value}
-                          </p>
-                          <p className="text-sm text-green-600 mt-1">
-                            {stat.change} this week
+                      <div className="flex items-center space-x-3">
+                        <span className="text-lg">{item.icon}</span>
+                        <span className="font-medium">{item.name}</span>
+                      </div>
+                      {item.count !== undefined && (
+                        <span
+                          className={`px-2 py-1 text-xs rounded-full font-bold ${
+                            activeSection === item.id
+                              ? "bg-white/20 text-white"
+                              : "bg-gray-500/10 text-gray-500"
+                          }`}
+                        >
+                          {item.count}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+              </div>
+            </div>
+
+            {/* Tools Section */}
+            <div>
+              <p
+                className={`text-xs font-bold uppercase tracking-wider ${currentTheme.textMuted} mb-4 px-2`}
+              >
+                TOOLS
+              </p>
+              <div className="space-y-1">
+                {navigationItems
+                  .filter((item) => item.section === "TOOLS")
+                  .map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveSection(item.id)}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group ${
+                        activeSection === item.id
+                          ? "text-white shadow-lg"
+                          : `${currentTheme.textSecondary} ${currentTheme.hover}`
+                      }`}
+                      style={
+                        activeSection === item.id
+                          ? {
+                              background: `linear-gradient(135deg, ${
+                                preferences.primaryColor || "#6366f1"
+                              }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                            }
+                          : {}
+                      }
+                    >
+                      <div className="flex items-center space-x-3">
+                        <span className="text-lg">{item.icon}</span>
+                        <span className="font-medium">{item.name}</span>
+                      </div>
+                      {item.count && (
+                        <span
+                          className={`px-2 py-1 text-xs rounded-full font-bold ${
+                            activeSection === item.id
+                              ? "bg-white/20 text-white"
+                              : "bg-gray-500/10 text-gray-500"
+                          }`}
+                        >
+                          {item.count}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </nav>
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex-1 p-8">
+          {activeSection === "overview" && (
+            <div className="space-y-8">
+              {/* Page Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1
+                    className={`text-4xl font-bold ${currentTheme.textPrimary} mb-2`}
+                  >
+                    Welcome back, {candidateProfile?.first_name || "Candidate"}!
+                    👋
+                  </h1>
+                  <p className={`text-xl ${currentTheme.textSecondary}`}>
+                    Here&apos;s your application overview and recent activity.
+                  </p>
+                </div>
+
+                <div className="flex space-x-4">
+                  <button
+                    className="px-6 py-3 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                    style={{
+                      background: `linear-gradient(135deg, ${
+                        preferences.primaryColor || "#6366f1"
+                      }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                    }}
+                  >
+                    Apply for Position
+                  </button>
+                  <button
+                    onClick={() => setActiveSection("profile")}
+                    className={`px-6 py-3 ${currentTheme.cardBg} ${currentTheme.textPrimary} ${currentTheme.border} rounded-xl font-semibold ${currentTheme.hover} transition-all`}
+                  >
+                    Update Profile
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats Dashboard */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[
+                  {
+                    title: "Total Applications",
+                    value: dashboardStats.applications,
+                    change: "+0 this week",
+                    trend: "up",
+                    icon: "📋",
+                    color: "blue",
+                  },
+                  {
+                    title: "Interviews Scheduled",
+                    value: dashboardStats.interviews,
+                    change: "+0 this week",
+                    trend: "up",
+                    icon: "🎯",
+                    color: "green",
+                  },
+                  {
+                    title: "Offers Received",
+                    value: dashboardStats.offers,
+                    change: "+0 this week",
+                    trend: "up",
+                    icon: "🏆",
+                    color: "purple",
+                  },
+                  {
+                    title: "Profile Views",
+                    value: dashboardStats.profileViews,
+                    change: "+0 this week",
+                    trend: "up",
+                    icon: "👁️",
+                    color: "orange",
+                  },
+                ].map((stat, index) => (
+                  <div
+                    key={index}
+                    className={`${currentTheme.cardBg} backdrop-blur-md rounded-2xl p-6 ${currentTheme.border} shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1`}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div
+                        className="w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-lg"
+                        style={{
+                          background: `linear-gradient(135deg, ${
+                            stat.color === "blue"
+                              ? "#3b82f6"
+                              : stat.color === "green"
+                              ? "#10b981"
+                              : stat.color === "purple"
+                              ? "#8b5cf6"
+                              : "#f59e0b"
+                          }, ${
+                            stat.color === "blue"
+                              ? "#1d4ed8"
+                              : stat.color === "green"
+                              ? "#047857"
+                              : stat.color === "purple"
+                              ? "#7c3aed"
+                              : "#d97706"
+                          })`,
+                        }}
+                      >
+                        {stat.icon}
+                      </div>
+                      <div className="text-right">
+                        <p
+                          className={`${currentTheme.textMuted} text-sm font-medium`}
+                        >
+                          {stat.title}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <p
+                          className={`text-3xl font-bold ${currentTheme.textPrimary} mb-1`}
+                        >
+                          {stat.value}
+                        </p>
+                        <div className="flex items-center">
+                          <svg
+                            className="w-4 h-4 text-green-500 mr-1"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span className="text-green-500 text-sm font-medium">
+                            {stat.change}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Profile Completion Card */}
+              <div
+                className={`${currentTheme.cardBg} backdrop-blur-md rounded-2xl p-8 ${currentTheme.border} shadow-xl`}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h3
+                    className={`text-2xl font-bold ${currentTheme.textPrimary}`}
+                  >
+                    Profile Completion
+                  </h3>
+                  <div className="text-right">
+                    <span
+                      className="text-3xl font-bold"
+                      style={{ color: preferences.primaryColor || "#6366f1" }}
+                    >
+                      {profileCompletion}%
+                    </span>
+                    <p className={`text-sm ${currentTheme.textMuted}`}>
+                      Complete
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <div className="w-full bg-gray-700/30 rounded-full h-4 mb-4 overflow-hidden">
+                    <div
+                      className="h-4 rounded-full transition-all duration-1000 shadow-lg relative overflow-hidden"
+                      style={{
+                        width: `${profileCompletion}%`,
+                        background: `linear-gradient(90deg, ${
+                          preferences.primaryColor || "#6366f1"
+                        }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                      }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent animate-pulse"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <button
+                    onClick={() => setActiveSection("profile")}
+                    className="px-6 py-3 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                    style={{
+                      background: `linear-gradient(135deg, ${
+                        preferences.primaryColor || "#6366f1"
+                      }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                    }}
+                  >
+                    Complete Your Profile
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Profile Section */}
+          {activeSection === "profile" && (
+            <div className="space-y-8">
+              {isEditingProfile ? (
+                <ProfileEdit
+                  candidateProfile={candidateProfile}
+                  statesLgas={statesLgas}
+                  onSave={handleProfileSave}
+                  onCancel={() => setIsEditingProfile(false)}
+                />
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h1
+                        className={`text-4xl font-bold ${currentTheme.textPrimary} mb-2`}
+                      >
+                        Profile Information
+                      </h1>
+                      <p className={`text-xl ${currentTheme.textSecondary}`}>
+                        Manage your personal information and professional
+                        details
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setIsEditingProfile(true)}
+                      className="px-8 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                      style={{
+                        background: `linear-gradient(135deg, ${
+                          preferences.primaryColor || "#6366f1"
+                        }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                      }}
+                    >
+                      Edit Profile
+                    </button>
+                  </div>
+
+                  {candidateProfile && (
+                    <div
+                      className={`${currentTheme.cardBg} backdrop-blur-md rounded-2xl p-8 ${currentTheme.border} shadow-xl`}
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[
+                          {
+                            label: "Full Name",
+                            value: `${candidateProfile.first_name || ""} ${
+                              candidateProfile.middle_name || ""
+                            } ${candidateProfile.last_name || ""}`.trim(),
+                            icon: "👤",
+                          },
+                          {
+                            label: "Employee ID",
+                            value: candidateProfile.employee_id,
+                            icon: "🏷️",
+                          },
+                          {
+                            label: "Position",
+                            value: candidateProfile.position,
+                            icon: "💼",
+                          },
+                          {
+                            label: "Department",
+                            value: candidateProfile.department,
+                            icon: "🏢",
+                          },
+                          {
+                            label: "Gender",
+                            value: candidateProfile.gender,
+                            icon: "⚡",
+                          },
+                          {
+                            label: "Date of Birth",
+                            value: candidateProfile.date_of_birth,
+                            icon: "📅",
+                          },
+                          {
+                            label: "Marital Status",
+                            value: candidateProfile.marital_status,
+                            icon: "💑",
+                          },
+                          {
+                            label: "Nationality",
+                            value: candidateProfile.nationality,
+                            icon: "🌍",
+                          },
+                          {
+                            label: "State of Origin",
+                            value: candidateProfile.state_of_origin,
+                            icon: "📍",
+                          },
+                          {
+                            label: "Local Government",
+                            value: candidateProfile.local_government,
+                            icon: "🏛️",
+                          },
+                          {
+                            label: "Phone Number",
+                            value: candidateProfile.phone_primary,
+                            icon: "📱",
+                          },
+                          {
+                            label: "Blood Group",
+                            value: candidateProfile.blood_group,
+                            icon: "🩸",
+                          },
+                        ].map((field, index) => (
+                          <div
+                            key={index}
+                            className={`${currentTheme.cardBg} rounded-xl p-5 ${currentTheme.border} hover:shadow-md transition-all group`}
+                          >
+                            <div className="flex items-center mb-3">
+                              <span className="text-xl mr-3">{field.icon}</span>
+                              <label
+                                className={`text-xs font-bold uppercase tracking-wide ${currentTheme.textMuted}`}
+                              >
+                                {field.label}
+                              </label>
+                            </div>
+                            <p
+                              className={`text-lg font-semibold ${currentTheme.textPrimary} transition-colors`}
+                            >
+                              {field.value || (
+                                <span
+                                  className={`${currentTheme.textMuted} italic text-sm`}
+                                >
+                                  Not provided
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        ))}
+
+                        <div
+                          className={`md:col-span-2 lg:col-span-3 ${currentTheme.cardBg} rounded-xl p-5 ${currentTheme.border} hover:shadow-md transition-all group`}
+                        >
+                          <div className="flex items-center mb-3">
+                            <span className="text-xl mr-3">🏠</span>
+                            <label
+                              className={`text-xs font-bold uppercase tracking-wide ${currentTheme.textMuted}`}
+                            >
+                              Current Address
+                            </label>
+                          </div>
+                          <p
+                            className={`text-lg font-semibold ${currentTheme.textPrimary} transition-colors`}
+                          >
+                            {candidateProfile.address_current || (
+                              <span
+                                className={`${currentTheme.textMuted} italic text-sm`}
+                              >
+                                Not provided
+                              </span>
+                            )}
                           </p>
                         </div>
-                        <div
-                          className={`w-12 h-12 ${stat.color} rounded-lg flex items-center justify-center text-white text-xl`}
-                        >
-                          {stat.icon}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Education Section */}
+          {activeSection === "education" && (
+            <div className="space-y-8">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1
+                    className={`text-4xl font-bold ${currentTheme.textPrimary} mb-2 flex items-center`}
+                  >
+                    <span className="mr-3">🎓</span>
+                    Education
+                  </h1>
+                  <p className={`text-xl ${currentTheme.textSecondary}`}>
+                    Manage your educational qualifications and certifications
+                  </p>
+                </div>
+
+                <button
+                  onClick={() =>
+                    setEducationModal({
+                      isOpen: true,
+                      editingEducation: null,
+                    })
+                  }
+                  className="px-8 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                  style={{
+                    background: `linear-gradient(135deg, ${
+                      preferences.primaryColor || "#6366f1"
+                    }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                  }}
+                >
+                  Add Education
+                </button>
+              </div>
+
+              {candidateEducation.length > 0 ? (
+                <div className="space-y-6">
+                  {candidateEducation.map((education, index) => (
+                    <div
+                      key={education.id || index}
+                      className={`${currentTheme.cardBg} backdrop-blur-md rounded-2xl p-6 ${currentTheme.border} shadow-xl hover:shadow-2xl transition-all duration-300`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3
+                            className={`text-2xl font-bold ${currentTheme.textPrimary} mb-2`}
+                          >
+                            {education.qualification_type}
+                          </h3>
+                          <p
+                            className={`text-lg ${currentTheme.textSecondary} mb-2`}
+                          >
+                            {education.institution_name}
+                          </p>
+                          <p
+                            className={`text-sm ${currentTheme.textMuted} mb-2`}
+                          >
+                            {education.field_of_study} • {education.start_year}
+                            {education.end_year
+                              ? ` - ${education.end_year}`
+                              : " - Present"}
+                          </p>
+                          {education.grade_result && (
+                            <p
+                              className={`text-sm ${currentTheme.textSecondary} font-medium`}
+                            >
+                              Grade: {education.grade_result}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={() =>
+                              setEducationModal({
+                                isOpen: true,
+                                editingEducation: education,
+                              })
+                            }
+                            className={`p-3 ${currentTheme.cardBg} rounded-xl ${currentTheme.border} ${currentTheme.hover} transition-all`}
+                          >
+                            <svg
+                              className={`h-5 w-5 ${currentTheme.textSecondary}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                              />
+                            </svg>
+                          </button>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
+              ) : (
+                <div
+                  className={`${currentTheme.cardBg} backdrop-blur-md rounded-2xl p-16 ${currentTheme.border} shadow-xl text-center`}
+                >
+                  <div className="max-w-md mx-auto">
+                    <div
+                      className="w-24 h-24 mx-auto rounded-full flex items-center justify-center text-4xl mb-6 shadow-2xl"
+                      style={{
+                        background: `linear-gradient(135deg, ${
+                          preferences.primaryColor || "#6366f1"
+                        }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                      }}
+                    >
+                      🎓
+                    </div>
+                    <h3
+                      className={`text-3xl font-bold ${currentTheme.textPrimary} mb-4`}
+                    >
+                      No Education Records
+                    </h3>
+                    <p
+                      className={`text-lg ${currentTheme.textSecondary} mb-8 leading-relaxed`}
+                    >
+                      Add your educational qualifications to complete your
+                      profile and improve your chances with employers.
+                    </p>
+                    <button
+                      onClick={() =>
+                        setEducationModal({
+                          isOpen: true,
+                          editingEducation: null,
+                        })
+                      }
+                      className="px-8 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                      style={{
+                        background: `linear-gradient(135deg, ${
+                          preferences.primaryColor || "#6366f1"
+                        }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                      }}
+                    >
+                      Add Your First Education
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
-                {/* Welcome Card with Profile Completion */}
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                        Welcome back,{" "}
-                        {candidateProfile?.first_name || "Candidate"}! 👋
-                      </h2>
-                      <p className="text-gray-600 mb-6">
-                        Complete your profile to get better job matches and
-                        increase your visibility to employers.
+          {/* Experience Section */}
+          {activeSection === "experience" && (
+            <div className="space-y-8">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1
+                    className={`text-4xl font-bold ${currentTheme.textPrimary} mb-2 flex items-center`}
+                  >
+                    <span className="mr-3">💼</span>
+                    Work Experience
+                  </h1>
+                  <p className={`text-xl ${currentTheme.textSecondary}`}>
+                    Showcase your professional background and career
+                    achievements
+                  </p>
+                </div>
+                <button
+                  onClick={() =>
+                    setExperienceModal({
+                      isOpen: true,
+                      editingExperience: null,
+                    })
+                  }
+                  className="px-8 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                  style={{
+                    background: `linear-gradient(135deg, ${
+                      preferences.primaryColor || "#6366f1"
+                    }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                  }}
+                >
+                  Add Experience
+                </button>
+              </div>
+
+              {candidateExperience.length > 0 ? (
+                <div className="space-y-6">
+                  {candidateExperience.map((experience, index) => (
+                    <div
+                      key={experience.id || index}
+                      className={`${currentTheme.cardBg} backdrop-blur-md rounded-2xl p-6 ${currentTheme.border} shadow-xl hover:shadow-2xl transition-all duration-300`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3
+                            className={`text-2xl font-bold ${currentTheme.textPrimary} mb-2`}
+                          >
+                            {experience.position}
+                          </h3>
+                          <p
+                            className={`text-lg ${currentTheme.textSecondary} mb-2`}
+                          >
+                            {experience.company_name}
+                          </p>
+                          <p
+                            className={`text-sm ${currentTheme.textMuted} mb-3`}
+                          >
+                            {new Date(
+                              experience.start_date
+                            ).toLocaleDateString()}
+                            {experience.end_date
+                              ? ` - ${new Date(
+                                  experience.end_date
+                                ).toLocaleDateString()}`
+                              : " - Present"}
+                          </p>
+                          {experience.job_description && (
+                            <p
+                              className={`text-sm ${currentTheme.textSecondary} mb-3`}
+                            >
+                              {experience.job_description}
+                            </p>
+                          )}
+                          {experience.last_salary && (
+                            <p
+                              className={`text-sm ${currentTheme.textSecondary} font-medium`}
+                            >
+                              Last Salary: ₦
+                              {experience.last_salary.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={() =>
+                              setExperienceModal({
+                                isOpen: true,
+                                editingExperience: experience,
+                              })
+                            }
+                            className={`p-3 ${currentTheme.cardBg} rounded-xl ${currentTheme.border} ${currentTheme.hover} transition-all`}
+                          >
+                            <svg
+                              className={`h-5 w-5 ${currentTheme.textSecondary}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div
+                  className={`${currentTheme.cardBg} backdrop-blur-md rounded-2xl p-16 ${currentTheme.border} shadow-xl text-center`}
+                >
+                  <div className="max-w-md mx-auto">
+                    <div
+                      className="w-24 h-24 mx-auto rounded-full flex items-center justify-center text-4xl mb-6 shadow-2xl"
+                      style={{
+                        background: `linear-gradient(135deg, ${
+                          preferences.primaryColor || "#6366f1"
+                        }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                      }}
+                    >
+                      💼
+                    </div>
+                    <h3
+                      className={`text-3xl font-bold ${currentTheme.textPrimary} mb-4`}
+                    >
+                      No Work Experience
+                    </h3>
+                    <p
+                      className={`text-lg ${currentTheme.textSecondary} mb-8 leading-relaxed`}
+                    >
+                      Add your work history to showcase your professional
+                      background and attract potential employers.
+                    </p>
+                    <button
+                      onClick={() =>
+                        setExperienceModal({
+                          isOpen: true,
+                          editingExperience: null,
+                        })
+                      }
+                      className="px-8 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                      style={{
+                        background: `linear-gradient(135deg, ${
+                          preferences.primaryColor || "#6366f1"
+                        }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                      }}
+                    >
+                      Add Your First Experience
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Emergency Contacts Section */}
+          {activeSection === "emergency" && (
+            <div className="space-y-8">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1
+                    className={`text-4xl font-bold ${currentTheme.textPrimary} mb-2 flex items-center`}
+                  >
+                    <span className="mr-3">📞</span>
+                    Emergency Contacts
+                  </h1>
+                  <p className={`text-xl ${currentTheme.textSecondary}`}>
+                    Manage your emergency contacts and guarantors
+                  </p>
+                </div>
+                <button
+                  onClick={() =>
+                    setContactModal({ isOpen: true, editingContact: null })
+                  }
+                  className="px-8 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                  style={{
+                    background: `linear-gradient(135deg, ${
+                      preferences.primaryColor || "#6366f1"
+                    }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                  }}
+                >
+                  Add Emergency Contact
+                </button>
+              </div>
+
+              {emergencyContacts.length > 0 ? (
+                <div className="space-y-6">
+                  {emergencyContacts.map((contact, index) => (
+                    <div
+                      key={contact.id || index}
+                      className={`${currentTheme.cardBg} backdrop-blur-md rounded-2xl p-6 ${currentTheme.border} shadow-xl hover:shadow-2xl transition-all duration-300`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center mb-2">
+                            <h3
+                              className={`text-2xl font-bold ${currentTheme.textPrimary}`}
+                            >
+                              {contact.full_name}
+                            </h3>
+                            {contact.is_primary && (
+                              <span className="ml-3 px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full font-medium">
+                                Primary
+                              </span>
+                            )}
+                          </div>
+                          <p
+                            className={`text-lg ${currentTheme.textSecondary} mb-2`}
+                          >
+                            {contact.relationship}
+                          </p>
+                          <p
+                            className={`text-sm ${currentTheme.textMuted} mb-3`}
+                          >
+                            {contact.contact_type}
+                          </p>
+                          <div className="space-y-2">
+                            <p
+                              className={`text-sm ${currentTheme.textSecondary}`}
+                            >
+                              📞 {contact.phone_primary}
+                            </p>
+                            {contact.phone_secondary && (
+                              <p
+                                className={`text-sm ${currentTheme.textSecondary}`}
+                              >
+                                📱 {contact.phone_secondary}
+                              </p>
+                            )}
+                            {contact.email && (
+                              <p
+                                className={`text-sm ${currentTheme.textSecondary}`}
+                              >
+                                ✉️ {contact.email}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={() =>
+                              setContactModal({
+                                isOpen: true,
+                                editingContact: contact,
+                              })
+                            }
+                            className={`p-3 ${currentTheme.cardBg} rounded-xl ${currentTheme.border} ${currentTheme.hover} transition-all`}
+                          >
+                            <svg
+                              className={`h-5 w-5 ${currentTheme.textSecondary}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div
+                  className={`${currentTheme.cardBg} backdrop-blur-md rounded-2xl p-16 ${currentTheme.border} shadow-xl text-center`}
+                >
+                  <div className="max-w-md mx-auto">
+                    <div
+                      className="w-24 h-24 mx-auto rounded-full flex items-center justify-center text-4xl mb-6 shadow-2xl"
+                      style={{
+                        background: `linear-gradient(135deg, ${
+                          preferences.primaryColor || "#6366f1"
+                        }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                      }}
+                    >
+                      📞
+                    </div>
+                    <h3
+                      className={`text-3xl font-bold ${currentTheme.textPrimary} mb-4`}
+                    >
+                      No Emergency Contacts
+                    </h3>
+                    <p
+                      className={`text-lg ${currentTheme.textSecondary} mb-8 leading-relaxed`}
+                    >
+                      Add emergency contacts and guarantors for safety and
+                      verification purposes.
+                    </p>
+                    <button
+                      onClick={() =>
+                        setContactModal({ isOpen: true, editingContact: null })
+                      }
+                      className="px-8 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                      style={{
+                        background: `linear-gradient(135deg, ${
+                          preferences.primaryColor || "#6366f1"
+                        }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                      }}
+                    >
+                      Add Your First Contact
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Other sections with professional empty states */}
+          {[
+            "applications",
+            "interviews",
+            "documents",
+            "calendar",
+            "messages",
+            "settings",
+          ].map(
+            (section) =>
+              activeSection === section && (
+                <div key={section} className="space-y-8">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h1
+                        className={`text-4xl font-bold ${currentTheme.textPrimary} mb-2 capitalize flex items-center`}
+                      >
+                        <span className="mr-3">
+                          {section === "applications" && "📋"}
+                          {section === "interviews" && "🎯"}
+                          {section === "documents" && "📄"}
+                          {section === "calendar" && "📅"}
+                          {section === "messages" && "💬"}
+                          {section === "settings" && "⚙️"}
+                        </span>
+                        {section}
+                      </h1>
+                      <p className={`text-xl ${currentTheme.textSecondary}`}>
+                        {section === "applications" &&
+                          "Track and manage all your job applications"}
+                        {section === "interviews" &&
+                          "Schedule and prepare for upcoming interviews"}
+                        {section === "documents" &&
+                          "Upload and organize your professional documents"}
+                        {section === "calendar" &&
+                          "Manage your schedule and appointments"}
+                        {section === "messages" &&
+                          "Communicate with HR representatives and hiring managers"}
+                        {section === "settings" &&
+                          "Configure your account preferences and privacy settings"}
+                      </p>
+                    </div>
+                    <button
+                      className="px-8 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                      style={{
+                        background: `linear-gradient(135deg, ${
+                          preferences.primaryColor || "#6366f1"
+                        }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                      }}
+                    >
+                      {section === "applications" && "New Application"}
+                      {section === "interviews" && "Schedule Interview"}
+                      {section === "documents" && "Upload Document"}
+                      {section === "calendar" && "Add Event"}
+                      {section === "messages" && "New Message"}
+                      {section === "settings" && "Edit Settings"}
+                    </button>
+                  </div>
+
+                  <div
+                    className={`${currentTheme.cardBg} backdrop-blur-md rounded-2xl p-16 ${currentTheme.border} shadow-xl text-center`}
+                  >
+                    <div className="max-w-md mx-auto">
+                      <div
+                        className="w-24 h-24 mx-auto rounded-full flex items-center justify-center text-4xl mb-6 shadow-2xl"
+                        style={{
+                          background: `linear-gradient(135deg, ${
+                            preferences.primaryColor || "#6366f1"
+                          }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                        }}
+                      >
+                        {section === "applications" && "📋"}
+                        {section === "interviews" && "🎯"}
+                        {section === "documents" && "📄"}
+                        {section === "calendar" && "📅"}
+                        {section === "messages" && "💬"}
+                        {section === "settings" && "⚙️"}
+                      </div>
+
+                      <h3
+                        className={`text-3xl font-bold ${currentTheme.textPrimary} mb-4 capitalize`}
+                      >
+                        {section} Module
+                      </h3>
+
+                      <p
+                        className={`text-lg ${currentTheme.textSecondary} mb-8 leading-relaxed`}
+                      >
+                        This feature is currently under development. We&apos;re
+                        working hard to bring you a comprehensive {section}{" "}
+                        management system that will enhance your experience.
                       </p>
 
-                      {/* Profile Completion */}
-                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 mb-6">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-sm font-semibold text-gray-800">
-                            Profile Completion
-                          </span>
-                          <span className="text-sm font-bold text-indigo-600">
-                            {profileCompletion}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
-                          <div
-                            className="h-3 rounded-full transition-all duration-500"
-                            style={{
-                              width: `${profileCompletion}%`,
-                              backgroundColor: preferences.primary_color,
-                            }}
-                          ></div>
-                        </div>
-                        <p className="text-xs text-gray-600">
-                          {profileCompletion >= 80
-                            ? "🎉 Excellent! Your profile is almost complete."
-                            : profileCompletion >= 50
-                            ? "📈 Good progress! Add more details to improve your profile."
-                            : "🚀 Get started by completing your basic information."}
-                        </p>
-                      </div>
-
-                      {/* Application Status */}
-                      <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg mb-6">
-                        <div className="flex items-center">
-                          <svg
-                            className="h-5 w-5 text-blue-600 mr-3"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                          <span className="text-sm font-medium text-blue-800">
-                            Application Status
-                          </span>
-                        </div>
-                        <span
-                          className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                            applicationStatus === "In Review"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : applicationStatus === "Approved"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
+                      <div className="space-y-4">
+                        <button
+                          className="w-full py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                          style={{
+                            background: `linear-gradient(135deg, ${
+                              preferences.primaryColor || "#6366f1"
+                            }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                          }}
                         >
-                          {applicationStatus}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Next Steps */}
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Recommended Next Steps
-                  </h3>
-                  <div className="space-y-3">
-                    {nextSteps.map((step, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center p-3 bg-amber-50 rounded-lg border border-amber-200"
-                      >
-                        <div className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center mr-3">
-                          <span className="text-xs font-semibold text-amber-600">
-                            {index + 1}
-                          </span>
-                        </div>
-                        <span className="text-amber-800">{step}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Quick Actions */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <button
-                    onClick={() => setActiveSection("profile")}
-                    className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow text-left"
-                  >
-                    <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center mb-3">
-                      <svg
-                        className="h-5 w-5 text-indigo-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                        />
-                      </svg>
-                    </div>
-                    <h4 className="font-medium text-gray-900">Personal Info</h4>
-                    <p className="text-sm text-gray-600">
-                      Complete basic details
-                    </p>
-                  </button>
-
-                  <button
-                    onClick={() => setActiveSection("education")}
-                    className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow text-left"
-                  >
-                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mb-3">
-                      <svg
-                        className="h-5 w-5 text-green-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 14l9-5-9-5-9 5 9 5z"
-                        />
-                      </svg>
-                    </div>
-                    <h4 className="font-medium text-gray-900">Education</h4>
-                    <p className="text-sm text-gray-600">
-                      Add your qualifications
-                    </p>
-                  </button>
-
-                  <button
-                    onClick={() => setActiveSection("experience")}
-                    className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow text-left"
-                  >
-                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mb-3">
-                      <svg
-                        className="h-5 w-5 text-purple-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0H8m8 0v2a2 2 0 002 2v8a2 2 0 01-2 2H8a2 2 0 01-2-2v-8a2 2 0 012-2V6"
-                        />
-                      </svg>
-                    </div>
-                    <h4 className="font-medium text-gray-900">Experience</h4>
-                    <p className="text-sm text-gray-600">Add work history</p>
-                  </button>
-                </div>
-
-                {/* Recent Activity */}
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Recent Activity
-                  </h3>
-                  <div className="space-y-4">
-                    {recentActivity.map((activity) => (
-                      <div
-                        key={activity.id}
-                        className="flex items-start space-x-4 p-3 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <div
-                          className={`w-10 h-10 rounded-lg flex items-center justify-center text-white ${activity.color}`}
+                          Get Notified When Available
+                        </button>
+                        <button
+                          onClick={() => setActiveSection("overview")}
+                          className={`w-full py-4 ${currentTheme.cardBg} ${currentTheme.textPrimary} ${currentTheme.border} rounded-xl font-semibold ${currentTheme.hover} transition-all`}
                         >
-                          {activity.icon}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">
-                            {activity.title}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {activity.description}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            {activity.time}
-                          </p>
-                        </div>
+                          Return to Dashboard
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeSection === "profile" && (
-              <>
-                {isEditingProfile ? (
-                  <ProfileEdit
-                    candidateProfile={candidateProfile}
-                    onSave={handleProfileSave}
-                    onCancel={() => setIsEditingProfile(false)}
-                  />
-                ) : (
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-2xl font-bold text-gray-900">
-                        Personal Information
-                      </h2>
-                      <button
-                        onClick={() => setIsEditingProfile(true)}
-                        className="flex items-center px-4 py-2 text-white rounded-lg hover:opacity-90 transition-opacity"
-                        style={{ backgroundColor: preferences.primary_color }}
-                      >
-                        <svg
-                          className="h-4 w-4 mr-2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                          />
-                        </svg>
-                        Edit Profile
-                      </button>
                     </div>
-
-                    {candidateProfile && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            First Name
-                          </label>
-                          <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
-                            {candidateProfile.first_name || "Not provided"}
-                          </p>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Last Name
-                          </label>
-                          <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
-                            {candidateProfile.last_name || "Not provided"}
-                          </p>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Middle Name
-                          </label>
-                          <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
-                            {candidateProfile.middle_name || "Not provided"}
-                          </p>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Gender
-                          </label>
-                          <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
-                            {candidateProfile.gender || "Not provided"}
-                          </p>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Date of Birth
-                          </label>
-                          <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
-                            {candidateProfile.date_of_birth || "Not provided"}
-                          </p>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Nationality
-                          </label>
-                          <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
-                            {candidateProfile.nationality || "Not provided"}
-                          </p>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            State of Origin
-                          </label>
-                          <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
-                            {candidateProfile.state_of_origin || "Not provided"}
-                          </p>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Local Government
-                          </label>
-                          <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
-                            {candidateProfile.local_government ||
-                              "Not provided"}
-                          </p>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Primary Phone
-                          </label>
-                          <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
-                            {candidateProfile.phone_primary || "Not provided"}
-                          </p>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Blood Group
-                          </label>
-                          <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
-                            {candidateProfile.blood_group || "Not provided"}
-                          </p>
-                        </div>
-
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Current Address
-                          </label>
-                          <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
-                            {candidateProfile.address_current || "Not provided"}
-                          </p>
-                        </div>
-                      </div>
-                    )}
                   </div>
-                )}
-              </>
-            )}
-
-            {activeSection === "education" && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Education History
-                  </h2>
-                  <button
-                    className="flex items-center px-4 py-2 text-white rounded-lg hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: preferences.primary_color }}
-                  >
-                    <svg
-                      className="h-4 w-4 mr-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    Add Education
-                  </button>
                 </div>
-
-                <div className="text-center py-12 text-gray-500">
-                  <svg
-                    className="h-16 w-16 mx-auto mb-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 14l9-5-9-5-9 5 9 5z"
-                    />
-                  </svg>
-                  <p className="text-lg mb-2">No Education Records</p>
-                  <p className="text-sm">
-                    Add your educational qualifications to complete your
-                    profile.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {activeSection === "experience" && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Work Experience
-                  </h2>
-                  <button
-                    className="flex items-center px-4 py-2 text-white rounded-lg hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: preferences.primary_color }}
-                  >
-                    <svg
-                      className="h-4 w-4 mr-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    Add Experience
-                  </button>
-                </div>
-
-                <div className="text-center py-12 text-gray-500">
-                  <svg
-                    className="h-16 w-16 mx-auto mb-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0H8m8 0v2a2 2 0 002 2v8a2 2 0 01-2 2H8a2 2 0 01-2-2v-8a2 2 0 012-2V6"
-                    />
-                  </svg>
-                  <p className="text-lg mb-2">No Work Experience</p>
-                  <p className="text-sm">
-                    Add your work history to showcase your professional
-                    background.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {activeSection === "emergency" && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Emergency Contacts
-                  </h2>
-                  <button
-                    className="flex items-center px-4 py-2 text-white rounded-lg hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: preferences.primary_color }}
-                  >
-                    <svg
-                      className="h-4 w-4 mr-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    Add Contact
-                  </button>
-                </div>
-
-                <div className="text-center py-12 text-gray-500">
-                  <svg
-                    className="h-16 w-16 mx-auto mb-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                    />
-                  </svg>
-                  <p className="text-lg mb-2">No Emergency Contacts</p>
-                  <p className="text-sm">
-                    Add emergency contact information for safety purposes.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {activeSection === "documents" && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Documents
-                  </h2>
-                  <button
-                    className="flex items-center px-4 py-2 text-white rounded-lg hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: preferences.primary_color }}
-                  >
-                    <svg
-                      className="h-4 w-4 mr-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                      />
-                    </svg>
-                    Upload Document
-                  </button>
-                </div>
-
-                <div className="text-center py-12 text-gray-500">
-                  <svg
-                    className="h-16 w-16 mx-auto mb-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707L16.414 6.293A1 1 0 0016 6H4a2 2 0 00-2 2v11a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <p className="text-lg mb-2">No Documents Uploaded</p>
-                  <p className="text-sm">
-                    Upload your CV, certificates, and other required documents.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {activeSection === "applications" && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    My Applications
-                  </h2>
-                  <button
-                    className="flex items-center px-4 py-2 text-white rounded-lg hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: preferences.primary_color }}
-                  >
-                    <svg
-                      className="h-4 w-4 mr-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                      />
-                    </svg>
-                    Browse Jobs
-                  </button>
-                </div>
-
-                <div className="text-center py-12 text-gray-500">
-                  <svg
-                    className="h-16 w-16 mx-auto mb-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  <p className="text-lg mb-2">No Applications Yet</p>
-                  <p className="text-sm">
-                    Start applying for jobs to see your applications here.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+              )
+          )}
+        </main>
       </div>
+
+      {/* Modals */}
+      <EducationModal
+        isOpen={educationModal.isOpen}
+        onClose={() =>
+          setEducationModal({ isOpen: false, editingEducation: null })
+        }
+        onSave={handleEducationSave}
+        education={educationModal.editingEducation}
+        candidateId={user?.id}
+      />
+
+      <ExperienceModal
+        isOpen={experienceModal.isOpen}
+        onClose={() =>
+          setExperienceModal({ isOpen: false, editingExperience: null })
+        }
+        onSave={handleExperienceSave}
+        experience={experienceModal.editingExperience}
+        candidateId={user?.id}
+      />
+
+      <EmergencyContactModal
+        isOpen={contactModal.isOpen}
+        onClose={() => setContactModal({ isOpen: false, editingContact: null })}
+        onSave={handleContactSave}
+        contact={contactModal.editingContact}
+        candidateId={user?.id}
+      />
     </div>
   );
-}
+};
+
+export default CandidateDashboard;

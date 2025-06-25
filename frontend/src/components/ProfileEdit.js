@@ -3,8 +3,15 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
-export default function ProfileEdit({ candidateProfile, onSave, onCancel }) {
+export default function ProfileEdit({
+  candidateProfile,
+  statesLgas,
+  onSave,
+  onCancel,
+}) {
   const { getUserPreferences } = useAuth();
+  const preferences = getUserPreferences();
+
   const [formData, setFormData] = useState({
     first_name: "",
     middle_name: "",
@@ -13,9 +20,11 @@ export default function ProfileEdit({ candidateProfile, onSave, onCancel }) {
     gender: "",
     date_of_birth: "",
     marital_status: "",
-    nationality: "",
+    nationality: "Nigeria",
     state_of_origin: "",
     local_government: "",
+    state_of_residence: "",
+    local_government_residence: "",
     national_id_no: "",
     phone_primary: "",
     phone_secondary: "",
@@ -23,66 +32,112 @@ export default function ProfileEdit({ candidateProfile, onSave, onCancel }) {
     address_permanent: "",
     blood_group: "",
   });
-  const [loading, setLoading] = useState(false);
+
+  const [selectedOriginState, setSelectedOriginState] = useState("");
+  const [selectedResidenceState, setSelectedResidenceState] = useState("");
+  const [availableOriginLgas, setAvailableOriginLgas] = useState([]);
+  const [availableResidenceLgas, setAvailableResidenceLgas] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  const preferences = getUserPreferences();
+  // Get unique states from statesLgas
+  const uniqueStates = [...new Set(statesLgas.map((item) => item.state_name))]
+    .map((stateName) => {
+      const stateData = statesLgas.find(
+        (item) => item.state_name === stateName
+      );
+      return {
+        name: stateName,
+        code: stateData?.state_code || "",
+        zone: stateData?.zone || "",
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Debug: Log statesLgas data
+  useEffect(() => {
+    console.log("States/LGAs data received:", statesLgas);
+    console.log("Unique states processed:", uniqueStates);
+  }, [statesLgas]);
 
   useEffect(() => {
     if (candidateProfile) {
-      setFormData(candidateProfile);
+      setFormData({
+        first_name: candidateProfile.first_name || "",
+        middle_name: candidateProfile.middle_name || "",
+        last_name: candidateProfile.last_name || "",
+        formal_name: candidateProfile.formal_name || "",
+        gender: candidateProfile.gender || "",
+        date_of_birth: candidateProfile.date_of_birth || "",
+        marital_status: candidateProfile.marital_status || "",
+        nationality: candidateProfile.nationality || "Nigeria",
+        state_of_origin: candidateProfile.state_of_origin || "",
+        local_government: candidateProfile.local_government || "",
+        state_of_residence: candidateProfile.state_of_residence || "",
+        local_government_residence:
+          candidateProfile.local_government_residence || "",
+        national_id_no: candidateProfile.national_id_no || "",
+        phone_primary: candidateProfile.phone_primary || "",
+        phone_secondary: candidateProfile.phone_secondary || "",
+        address_current: candidateProfile.address_current || "",
+        address_permanent: candidateProfile.address_permanent || "",
+        blood_group: candidateProfile.blood_group || "",
+      });
+
+      // Set up origin state and LGAs
+      if (candidateProfile.state_of_origin) {
+        setSelectedOriginState(candidateProfile.state_of_origin);
+        updateAvailableLgas(candidateProfile.state_of_origin, "origin");
+      }
+
+      // Set up residence state and LGAs
+      if (candidateProfile.state_of_residence) {
+        setSelectedResidenceState(candidateProfile.state_of_residence);
+        updateAvailableLgas(candidateProfile.state_of_residence, "residence");
+      }
     }
-  }, [candidateProfile]);
+  }, [candidateProfile, statesLgas]);
 
-  const nigerianStates = [
-    "Abia",
-    "Adamawa",
-    "Akwa Ibom",
-    "Anambra",
-    "Bauchi",
-    "Bayelsa",
-    "Benue",
-    "Borno",
-    "Cross River",
-    "Delta",
-    "Ebonyi",
-    "Edo",
-    "Ekiti",
-    "Enugu",
-    "FCT",
-    "Gombe",
-    "Imo",
-    "Jigawa",
-    "Kaduna",
-    "Kano",
-    "Katsina",
-    "Kebbi",
-    "Kogi",
-    "Kwara",
-    "Lagos",
-    "Nasarawa",
-    "Niger",
-    "Ogun",
-    "Ondo",
-    "Osun",
-    "Oyo",
-    "Plateau",
-    "Rivers",
-    "Sokoto",
-    "Taraba",
-    "Yobe",
-    "Zamfara",
-  ];
+  const updateAvailableLgas = (stateName, type) => {
+    const lgas = statesLgas
+      .filter((item) => item.state_name === stateName)
+      .map((item) => ({
+        name: item.lga_name,
+        code: item.lga_code,
+        isCapital: item.is_capital,
+      }))
+      .sort((a, b) => {
+        if (a.isCapital && !b.isCapital) return -1;
+        if (!a.isCapital && b.isCapital) return 1;
+        return a.name.localeCompare(b.name);
+      });
 
-  const bloodGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
-  const maritalStatuses = [
-    "Single",
-    "Married",
-    "Divorced",
-    "Widowed",
-    "Separated",
-  ];
-  const genders = ["Male", "Female", "Other"];
+    if (type === "origin") {
+      setAvailableOriginLgas(lgas);
+    } else {
+      setAvailableResidenceLgas(lgas);
+    }
+  };
+
+  const handleOriginStateChange = (stateName) => {
+    setSelectedOriginState(stateName);
+    setFormData((prev) => ({
+      ...prev,
+      state_of_origin: stateName,
+      local_government: "",
+    }));
+    updateAvailableLgas(stateName, "origin");
+  };
+
+  const handleResidenceStateChange = (stateName) => {
+    setSelectedResidenceState(stateName);
+    setFormData((prev) => ({
+      ...prev,
+      state_of_residence: stateName,
+      local_government_residence: "",
+    }));
+    updateAvailableLgas(stateName, "residence");
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -91,29 +146,75 @@ export default function ProfileEdit({ candidateProfile, onSave, onCancel }) {
       [name]: value,
     }));
 
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
         [name]: "",
       }));
     }
+
+    // Auto-generate formal name
+    if (
+      name === "first_name" ||
+      name === "middle_name" ||
+      name === "last_name"
+    ) {
+      const firstName = name === "first_name" ? value : formData.first_name;
+      const middleName = name === "middle_name" ? value : formData.middle_name;
+      const lastName = name === "last_name" ? value : formData.last_name;
+
+      let formalName = "";
+      if (firstName && lastName) {
+        const prefix =
+          formData.gender === "male"
+            ? "Mr."
+            : formData.gender === "female"
+            ? "Ms."
+            : "";
+        formalName = `${prefix} ${firstName}${
+          middleName ? ` ${middleName}` : ""
+        } ${lastName}`.trim();
+        setFormData((prev) => ({
+          ...prev,
+          formal_name: formalName,
+        }));
+      }
+    }
   };
 
   const validateForm = () => {
     const newErrors = {};
+    const requiredFields = [
+      "first_name",
+      "last_name",
+      "gender",
+      "date_of_birth",
+      "nationality",
+      "phone_primary",
+    ];
 
-    if (!formData.first_name.trim())
-      newErrors.first_name = "First name is required";
-    if (!formData.last_name.trim())
-      newErrors.last_name = "Last name is required";
-    if (!formData.gender) newErrors.gender = "Gender is required";
-    if (!formData.date_of_birth)
-      newErrors.date_of_birth = "Date of birth is required";
-    if (!formData.phone_primary.trim())
-      newErrors.phone_primary = "Phone number is required";
-    if (!formData.nationality.trim())
-      newErrors.nationality = "Nationality is required";
+    requiredFields.forEach((field) => {
+      if (!formData[field] || formData[field].trim() === "") {
+        newErrors[field] = "This field is required";
+      }
+    });
+
+    if (
+      formData.phone_primary &&
+      !/^(\+234|0)[0-9]{10}$/.test(formData.phone_primary.replace(/\s/g, ""))
+    ) {
+      newErrors.phone_primary = "Please enter a valid Nigerian phone number";
+    }
+
+    if (formData.date_of_birth) {
+      const birthDate = new Date(formData.date_of_birth);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+
+      if (age < 16 || age > 100) {
+        newErrors.date_of_birth = "Age must be between 16 and 100 years";
+      }
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -121,378 +222,462 @@ export default function ProfileEdit({ candidateProfile, onSave, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
 
-    if (!validateForm()) {
-      return;
-    }
-
-    setLoading(true);
-
+    setIsLoading(true);
     try {
-      // Here you would typically make an API call to save the profile
-      const response = await fetch(
-        "http://localhost:8000/api/candidate/profile",
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(formData),
-        }
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        onSave(result.profile);
-      } else {
-        const error = await response.json();
-        console.error("Failed to save profile:", error);
-      }
+      await onSave(formData);
     } catch (error) {
-      console.error("Error saving profile:", error);
+      console.error("Failed to save profile:", error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
+  };
+
+  const copyCurrentToPermanent = () => {
+    setFormData((prev) => ({
+      ...prev,
+      address_permanent: prev.address_current,
+    }));
+  };
+
+  const copyOriginToResidence = () => {
+    setFormData((prev) => ({
+      ...prev,
+      state_of_residence: prev.state_of_origin,
+      local_government_residence: prev.local_government,
+    }));
+    setSelectedResidenceState(selectedOriginState);
+    setAvailableResidenceLgas(availableOriginLgas);
   };
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900">
           Edit Personal Information
         </h2>
-        <button
-          onClick={onCancel}
-          className="text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <svg
-            className="h-6 w-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* First Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              First Name *
-            </label>
-            <input
-              type="text"
-              name="first_name"
-              value={formData.first_name}
-              onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50 ${
-                errors.first_name
-                  ? "border-red-300 focus:ring-red-500"
-                  : "border-gray-300 focus:ring-indigo-500"
-              }`}
-              placeholder="Enter first name"
-            />
-            {errors.first_name && (
-              <p className="text-red-500 text-xs mt-1">{errors.first_name}</p>
-            )}
-          </div>
-
-          {/* Middle Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Middle Name
-            </label>
-            <input
-              type="text"
-              name="middle_name"
-              value={formData.middle_name}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
-              placeholder="Enter middle name"
-            />
-          </div>
-
-          {/* Last Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Last Name *
-            </label>
-            <input
-              type="text"
-              name="last_name"
-              value={formData.last_name}
-              onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50 ${
-                errors.last_name
-                  ? "border-red-300 focus:ring-red-500"
-                  : "border-gray-300 focus:ring-indigo-500"
-              }`}
-              placeholder="Enter last name"
-            />
-            {errors.last_name && (
-              <p className="text-red-500 text-xs mt-1">{errors.last_name}</p>
-            )}
-          </div>
-
-          {/* Gender */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Gender *
-            </label>
-            <select
-              name="gender"
-              value={formData.gender}
-              onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50 ${
-                errors.gender
-                  ? "border-red-300 focus:ring-red-500"
-                  : "border-gray-300 focus:ring-indigo-500"
-              }`}
-            >
-              <option value="">Select Gender</option>
-              {genders.map((gender) => (
-                <option key={gender} value={gender}>
-                  {gender}
-                </option>
-              ))}
-            </select>
-            {errors.gender && (
-              <p className="text-red-500 text-xs mt-1">{errors.gender}</p>
-            )}
-          </div>
-
-          {/* Date of Birth */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Date of Birth *
-            </label>
-            <input
-              type="date"
-              name="date_of_birth"
-              value={formData.date_of_birth}
-              onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50 ${
-                errors.date_of_birth
-                  ? "border-red-300 focus:ring-red-500"
-                  : "border-gray-300 focus:ring-indigo-500"
-              }`}
-            />
-            {errors.date_of_birth && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.date_of_birth}
-              </p>
-            )}
-          </div>
-
-          {/* Marital Status */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Marital Status
-            </label>
-            <select
-              name="marital_status"
-              value={formData.marital_status}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
-            >
-              <option value="">Select Marital Status</option>
-              {maritalStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Nationality */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nationality *
-            </label>
-            <input
-              type="text"
-              name="nationality"
-              value={formData.nationality}
-              onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50 ${
-                errors.nationality
-                  ? "border-red-300 focus:ring-red-500"
-                  : "border-gray-300 focus:ring-indigo-500"
-              }`}
-              placeholder="e.g., Nigerian"
-            />
-            {errors.nationality && (
-              <p className="text-red-500 text-xs mt-1">{errors.nationality}</p>
-            )}
-          </div>
-
-          {/* State of Origin */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              State of Origin
-            </label>
-            <select
-              name="state_of_origin"
-              value={formData.state_of_origin}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
-            >
-              <option value="">Select State</option>
-              {nigerianStates.map((state) => (
-                <option key={state} value={state}>
-                  {state}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Local Government */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Local Government
-            </label>
-            <input
-              type="text"
-              name="local_government"
-              value={formData.local_government}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
-              placeholder="Enter local government"
-            />
-          </div>
-
-          {/* Primary Phone */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Primary Phone *
-            </label>
-            <input
-              type="tel"
-              name="phone_primary"
-              value={formData.phone_primary}
-              onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50 ${
-                errors.phone_primary
-                  ? "border-red-300 focus:ring-red-500"
-                  : "border-gray-300 focus:ring-indigo-500"
-              }`}
-              placeholder="+234 801 234 5678"
-            />
-            {errors.phone_primary && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.phone_primary}
-              </p>
-            )}
-          </div>
-
-          {/* Secondary Phone */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Secondary Phone
-            </label>
-            <input
-              type="tel"
-              name="phone_secondary"
-              value={formData.phone_secondary}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
-              placeholder="+234 801 234 5678"
-            />
-          </div>
-
-          {/* Blood Group */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Blood Group
-            </label>
-            <select
-              name="blood_group"
-              value={formData.blood_group}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
-            >
-              <option value="">Select Blood Group</option>
-              {bloodGroups.map((group) => (
-                <option key={group} value={group}>
-                  {group}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Address Fields */}
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Current Address
-            </label>
-            <textarea
-              name="address_current"
-              value={formData.address_current}
-              onChange={handleInputChange}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
-              placeholder="Enter your current address"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Permanent Address
-            </label>
-            <textarea
-              name="address_permanent"
-              value={formData.address_permanent}
-              onChange={handleInputChange}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
-              placeholder="Enter your permanent address"
-            />
-          </div>
-        </div>
-
-        {/* Form Actions */}
-        <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
+        <div className="flex space-x-3">
           <button
-            type="button"
             onClick={onCancel}
-            className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
           <button
-            type="submit"
-            disabled={loading}
-            className="px-6 py-2 text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            onClick={handleSubmit}
+            disabled={isLoading}
+            className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
             style={{ backgroundColor: preferences.primary_color }}
           >
-            {loading && (
-              <svg
-                className="animate-spin h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-            )}
-            <span>{loading ? "Saving..." : "Save Profile"}</span>
+            {isLoading ? "Saving..." : "Save Changes"}
           </button>
+        </div>
+      </div>
+
+      {/* Debug Information */}
+      {statesLgas.length === 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p className="text-red-800 font-medium">
+            ⚠️ No States/LGAs Data Found
+          </p>
+          <p className="text-red-600 text-sm mt-1">
+            Please check if the states_lgas table has data and the API endpoint
+            is working.
+          </p>
+          <p className="text-red-600 text-sm">
+            API URL: <code>http://localhost:8000/api/states-lgas</code>
+          </p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Basic Information */}
+        <div className="border-b border-gray-200 pb-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Basic Information
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                First Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="first_name"
+                value={formData.first_name}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.first_name ? "border-red-500" : "border-gray-300"
+                }`}
+                placeholder="Enter your first name"
+              />
+              {errors.first_name && (
+                <p className="text-red-500 text-xs mt-1">{errors.first_name}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Middle Name
+              </label>
+              <input
+                type="text"
+                name="middle_name"
+                value={formData.middle_name}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your middle name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Last Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="last_name"
+                value={formData.last_name}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.last_name ? "border-red-500" : "border-gray-300"
+                }`}
+                placeholder="Enter your last name"
+              />
+              {errors.last_name && (
+                <p className="text-red-500 text-xs mt-1">{errors.last_name}</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Personal Details */}
+        <div className="border-b border-gray-200 pb-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Personal Details
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Gender <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="gender"
+                value={formData.gender}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.gender ? "border-red-500" : "border-gray-300"
+                }`}
+              >
+                <option value="">Select Gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+              {errors.gender && (
+                <p className="text-red-500 text-xs mt-1">{errors.gender}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date of Birth <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                name="date_of_birth"
+                value={formData.date_of_birth}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.date_of_birth ? "border-red-500" : "border-gray-300"
+                }`}
+              />
+              {errors.date_of_birth && (
+                <p className="text-red-500 text-xs mt-1">
+                  {errors.date_of_birth}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Marital Status
+              </label>
+              <select
+                name="marital_status"
+                value={formData.marital_status}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select Marital Status</option>
+                <option value="single">Single</option>
+                <option value="married">Married</option>
+                <option value="divorced">Divorced</option>
+                <option value="widowed">Widowed</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Blood Group
+              </label>
+              <select
+                name="blood_group"
+                value={formData.blood_group}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select Blood Group</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Location Information - STATE OF ORIGIN */}
+        <div className="border-b border-gray-200 pb-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            State of Origin
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nationality
+              </label>
+              <input
+                type="text"
+                name="nationality"
+                value={formData.nationality}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Nigeria"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                State of Origin
+              </label>
+              <select
+                name="state_of_origin"
+                value={formData.state_of_origin}
+                onChange={(e) => handleOriginStateChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">
+                  {uniqueStates.length > 0
+                    ? "Select State"
+                    : "Loading states..."}
+                </option>
+                {uniqueStates.map((state) => (
+                  <option key={state.code} value={state.name}>
+                    {state.name}
+                  </option>
+                ))}
+              </select>
+              {uniqueStates.length === 0 && (
+                <p className="text-red-500 text-xs mt-1">No states available</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Local Government Area
+              </label>
+              <select
+                name="local_government"
+                value={formData.local_government}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={!selectedOriginState}
+              >
+                <option value="">
+                  {selectedOriginState ? "Select LGA" : "Select state first"}
+                </option>
+                {availableOriginLgas.map((lga) => (
+                  <option key={lga.code} value={lga.name}>
+                    {lga.name} {lga.isCapital && "(Capital)"}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Contact Information */}
+        <div className="border-b border-gray-200 pb-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Contact Information
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Primary Phone <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                name="phone_primary"
+                value={formData.phone_primary}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.phone_primary ? "border-red-500" : "border-gray-300"
+                }`}
+                placeholder="+234 801 234 5678"
+              />
+              {errors.phone_primary && (
+                <p className="text-red-500 text-xs mt-1">
+                  {errors.phone_primary}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Secondary Phone
+              </label>
+              <input
+                type="tel"
+                name="phone_secondary"
+                value={formData.phone_secondary}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="+234 801 234 5678"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                National ID Number
+              </label>
+              <input
+                type="text"
+                name="national_id_no"
+                value={formData.national_id_no}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your National ID number"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Address Information with State of Residence */}
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Address Information
+          </h3>
+
+          {/* State of Residence */}
+          <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-md font-medium text-gray-800">
+                State of Residence
+              </h4>
+              <button
+                type="button"
+                onClick={copyOriginToResidence}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                Same as state of origin
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  State of Residence
+                </label>
+                <select
+                  name="state_of_residence"
+                  value={formData.state_of_residence}
+                  onChange={(e) => handleResidenceStateChange(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">
+                    {uniqueStates.length > 0
+                      ? "Select State"
+                      : "Loading states..."}
+                  </option>
+                  {uniqueStates.map((state) => (
+                    <option key={`res-${state.code}`} value={state.name}>
+                      {state.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Local Government Area
+                </label>
+                <select
+                  name="local_government_residence"
+                  value={formData.local_government_residence}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={!selectedResidenceState}
+                >
+                  <option value="">
+                    {selectedResidenceState
+                      ? "Select LGA"
+                      : "Select state first"}
+                  </option>
+                  {availableResidenceLgas.map((lga) => (
+                    <option key={`res-${lga.code}`} value={lga.name}>
+                      {lga.name} {lga.isCapital && "(Capital)"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Address Fields */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Current Address
+              </label>
+              <textarea
+                name="address_current"
+                value={formData.address_current}
+                onChange={handleInputChange}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your current residential address"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  Permanent Address
+                </label>
+                <button
+                  type="button"
+                  onClick={copyCurrentToPermanent}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Same as current address
+                </button>
+              </div>
+              <textarea
+                name="address_permanent"
+                value={formData.address_permanent}
+                onChange={handleInputChange}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your permanent address"
+              />
+            </div>
+          </div>
         </div>
       </form>
     </div>

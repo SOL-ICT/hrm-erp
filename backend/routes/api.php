@@ -3,8 +3,10 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CandidateController;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Http\Controllers\CsrfCookieController;
 
 /*
@@ -17,6 +19,36 @@ use Laravel\Sanctum\Http\Controllers\CsrfCookieController;
 | Closure to a string.
 |
 */
+
+// Helper function for next steps calculation
+if (!function_exists('getNextSteps')) {
+    function getNextSteps($profile, $hasEducation, $hasExperience, $hasEmergencyContact)
+    {
+        $steps = [];
+
+        if (!$profile || !$profile->first_name || !$profile->last_name) {
+            $steps[] = "Complete basic profile information";
+        }
+
+        if (!$hasEducation) {
+            $steps[] = "Add educational qualifications";
+        }
+
+        if (!$hasExperience) {
+            $steps[] = "Add work experience";
+        }
+
+        if (!$hasEmergencyContact) {
+            $steps[] = "Add emergency contact information";
+        }
+
+        if (empty($steps)) {
+            $steps[] = "Profile complete! Wait for review.";
+        }
+
+        return $steps;
+    }
+}
 
 // Routes that need CSRF protection (stateful)
 Route::middleware(['web'])->group(function () {
@@ -33,6 +65,9 @@ Route::get('/health', function () {
     return response()->json(['status' => 'ok']);
 });
 
+// Public endpoints (no authentication required)
+Route::get('/states-lgas', [CandidateController::class, 'getStatesLgas']);
+
 // 4) All protected routes live here
 Route::middleware('auth:sanctum')->group(function () {
     Route::put('/user/preferences', [AuthController::class, 'updatePreferences']);
@@ -42,9 +77,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Logout
     Route::post('/logout', [AuthController::class, 'logout']);
-
-    // Add other protected routes below
-    // Route::get('/dashboard', [DashboardController::class, 'index']);
 
     // Dashboard routes
     Route::get('/dashboard/admin', function (Request $request) {
@@ -176,6 +208,8 @@ Route::middleware('auth:sanctum')->group(function () {
                         'nationality' => $profile->nationality ?? 'Nigeria',
                         'state_of_origin' => $profile->state_of_origin ?? '',
                         'local_government' => $profile->local_government ?? '',
+                        'state_of_residence' => $profile->state_of_residence ?? '',
+                        'local_government_residence' => $profile->local_government_residence ?? '',
                         'national_id_no' => $profile->national_id_no ?? '',
                         'phone_primary' => $profile->phone_primary ?? '',
                         'phone_secondary' => $profile->phone_secondary ?? '',
@@ -208,6 +242,8 @@ Route::middleware('auth:sanctum')->group(function () {
                 'nationality' => 'nullable|string|max:255',
                 'state_of_origin' => 'nullable|string|max:255',
                 'local_government' => 'nullable|string|max:255',
+                'state_of_residence' => 'nullable|string|max:255',
+                'local_government_residence' => 'nullable|string|max:255',
                 'national_id_no' => 'nullable|string|max:255',
                 'phone_primary' => 'required|string|max:20',
                 'phone_secondary' => 'nullable|string|max:20',
@@ -726,6 +762,277 @@ Route::middleware('auth:sanctum')->group(function () {
                     'message' => 'Failed to upload profile picture: ' . $e->getMessage()
                 ], 500);
             }
+        });
+
+        // Dashboard stats for candidate
+        Route::get('/dashboard-stats', function (Request $request) {
+            $authUser = $request->auth_user;
+
+            try {
+                $profile = DB::table('candidate_profiles')->where('candidate_id', $authUser['user_id'])->first();
+                $candidate = DB::table('candidates')->find($authUser['user_id']);
+
+                // Calculate profile completion
+                $completedFields = 0;
+                $totalFields = 8;
+
+                if ($profile) {
+                    if ($profile->first_name) $completedFields++;
+                    if ($profile->last_name) $completedFields++;
+                    if ($profile->phone_primary) $completedFields++;
+                    if ($profile->date_of_birth) $completedFields++;
+                    if ($profile->gender) $completedFields++;
+                }
+
+                $hasEducation = DB::table('candidate_education')->where('candidate_id', $authUser['user_id'])->exists();
+                $hasExperience = DB::table('candidate_experience')->where('candidate_id', $authUser['user_id'])->exists();
+                $hasEmergencyContact = DB::table('candidate_emergency_contacts')->where('candidate_id', $authUser['user_id'])->exists();
+
+                if ($hasEducation) $completedFields++;
+                if ($hasExperience) $completedFields++;
+                if ($hasEmergencyContact) $completedFields++;
+
+                $completionPercentage = round(($completedFields / $totalFields) * 100);
+
+                return response()->json([
+                    'status' => 'success',
+                    'stats' => [
+                        'profile_completion' => $completionPercentage,
+                        'application_status' => $candidate->status ?? 'pending',
+                        'total_education_records' => DB::table('candidate_education')->where('candidate_id', $authUser['user_id'])->count(),
+                        'total_experience_records' => DB::table('candidate_experience')->where('candidate_id', $authUser['user_id'])->count(),
+                        'total_emergency_contacts' => DB::table('candidate_emergency_contacts')->where('candidate_id', $authUser['user_id'])->count(),
+                        'days_since_registration' => now()->diffInDays($candidate->created_at),
+                        'last_profile_update' => $profile ? $profile->updated_at : null
+                    ],
+                    'next_steps' => getNextSteps($profile, $hasEducation, $hasExperience, $hasEmergencyContact)
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to fetch dashboard stats: ' . $e->getMessage()
+                ], 500);
+            }
+        });
+
+        // Document upload routes
+        Route::post('/documents', function (Request $request) {
+            $authUser = $request->auth_user;
+
+            $request->validate([
+                'document' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120', // 5MB max
+                'document_type' => 'required|string|in:cv,certificate,id_card,passport,cover_letter,transcript'
+            ]);
+
+            try {
+                if ($request->hasFile('document')) {
+                    $file = $request->file('document');
+                    $filename = $request->document_type . '_' . $authUser['user_id'] . '_' . time() . '.' . $file->getClientOriginalExtension();
+                    $path = $file->storeAs('candidate_documents', $filename, 'public');
+
+                    // Store document info in database (if table exists)
+                    try {
+                        DB::table('candidate_documents')->insert([
+                            'candidate_id' => $authUser['user_id'],
+                            'document_type' => $request->document_type,
+                            'file_path' => $path,
+                            'original_name' => $file->getClientOriginalName(),
+                            'file_size' => $file->getSize(),
+                            'created_at' => now(),
+                            'updated_at' => now()
+                        ]);
+                    } catch (\Exception $e) {
+                        // Table might not exist yet, that's ok
+                    }
+
+                    return response()->json([
+                        'status' => 'success',
+                        'message' => 'Document uploaded successfully',
+                        'path' => $path,
+                        'original_name' => $file->getClientOriginalName()
+                    ]);
+                }
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No file uploaded'
+                ], 400);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to upload document: ' . $e->getMessage()
+                ], 500);
+            }
+        });
+
+        Route::get('/documents', function (Request $request) {
+            $authUser = $request->auth_user;
+
+            try {
+                $documents = DB::table('candidate_documents')
+                    ->where('candidate_id', $authUser['user_id'])
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+
+                return response()->json([
+                    'status' => 'success',
+                    'documents' => $documents
+                ]);
+            } catch (\Exception $e) {
+                // Table might not exist yet
+                return response()->json([
+                    'status' => 'success',
+                    'documents' => []
+                ]);
+            }
+        });
+
+        Route::delete('/documents/{id}', function ($id, Request $request) {
+            $authUser = $request->auth_user;
+
+            try {
+                $document = DB::table('candidate_documents')
+                    ->where('id', $id)
+                    ->where('candidate_id', $authUser['user_id'])
+                    ->first();
+
+                if (!$document) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Document not found'
+                    ], 404);
+                }
+
+                // Delete file from storage
+                if (Storage::disk('public')->exists($document->file_path)) {
+                    Storage::disk('public')->delete($document->file_path);
+                }
+
+                // Delete from database
+                DB::table('candidate_documents')
+                    ->where('id', $id)
+                    ->where('candidate_id', $authUser['user_id'])
+                    ->delete();
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Document deleted successfully'
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Failed to delete document: ' . $e->getMessage()
+                ], 500);
+            }
+        });
+    });
+
+    // Admin routes for managing candidates
+    Route::prefix('admin')->middleware(function ($request, $next) {
+        if ($request->auth_user['user_role'] !== 'admin') {
+            return response()->json(['error' => 'Admin access required'], 403);
+        }
+        return $next($request);
+    })->group(function () {
+
+        // Get all candidates
+        Route::get('/candidates', function (Request $request) {
+            $candidates = DB::table('candidates')
+                ->leftJoin('candidate_profiles', 'candidates.id', '=', 'candidate_profiles.candidate_id')
+                ->select(
+                    'candidates.*',
+                    'candidate_profiles.first_name',
+                    'candidate_profiles.last_name',
+                    'candidate_profiles.phone_primary'
+                )
+                ->orderBy('candidates.created_at', 'desc')
+                ->paginate(20);
+
+            return response()->json([
+                'status' => 'success',
+                'candidates' => $candidates
+            ]);
+        });
+
+        // Get single candidate details
+        Route::get('/candidates/{id}', function ($id) {
+            $candidate = DB::table('candidates')->find($id);
+            if (!$candidate) {
+                return response()->json(['error' => 'Candidate not found'], 404);
+            }
+
+            $profile = DB::table('candidate_profiles')->where('candidate_id', $id)->first();
+            $education = DB::table('candidate_education')->where('candidate_id', $id)->get();
+            $experience = DB::table('candidate_experience')->where('candidate_id', $id)->get();
+            $emergencyContacts = DB::table('candidate_emergency_contacts')->where('candidate_id', $id)->get();
+
+            return response()->json([
+                'status' => 'success',
+                'candidate' => $candidate,
+                'profile' => $profile,
+                'education' => $education,
+                'experience' => $experience,
+                'emergency_contacts' => $emergencyContacts
+            ]);
+        });
+
+        // Update candidate status
+        Route::put('/candidates/{id}/status', function (Request $request, $id) {
+            $validated = $request->validate([
+                'status' => 'required|in:pending,approved,rejected,interview,hired'
+            ]);
+
+            $updated = DB::table('candidates')
+                ->where('id', $id)
+                ->update([
+                    'status' => $validated['status'],
+                    'updated_at' => now()
+                ]);
+
+            if (!$updated) {
+                return response()->json(['error' => 'Candidate not found'], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Candidate status updated successfully'
+            ]);
+        });
+    });
+
+    // Staff routes
+    Route::prefix('staff')->middleware(function ($request, $next) {
+        if (!in_array($request->auth_user['user_role'], ['staff', 'admin'])) {
+            return response()->json(['error' => 'Staff access required'], 403);
+        }
+        return $next($request);
+    })->group(function () {
+
+        // Get assigned candidates
+        Route::get('/candidates', function (Request $request) {
+            $authUser = $request->auth_user;
+
+            // If admin, show all candidates. If staff, show only assigned ones
+            $query = DB::table('candidates')
+                ->leftJoin('candidate_profiles', 'candidates.id', '=', 'candidate_profiles.candidate_id')
+                ->select(
+                    'candidates.*',
+                    'candidate_profiles.first_name',
+                    'candidate_profiles.last_name',
+                    'candidate_profiles.phone_primary'
+                );
+
+            if ($authUser['user_role'] === 'staff') {
+                // Add condition for assigned candidates (you'll need to implement assignment logic)
+                // $query->where('candidates.assigned_to', $authUser['user_id']);
+            }
+
+            $candidates = $query->orderBy('candidates.created_at', 'desc')->paginate(20);
+
+            return response()->json([
+                'status' => 'success',
+                'candidates' => $candidates
+            ]);
         });
     });
 });
