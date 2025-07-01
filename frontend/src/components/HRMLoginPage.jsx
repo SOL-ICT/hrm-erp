@@ -21,16 +21,16 @@ const HRMLoginPage = () => {
   });
 
   const [settings, setSettings] = useState({
-    theme: "dark",
+    theme: "light",
     primaryColor: "#6366f1",
-    backgroundImage: "gradient1",
+    backgroundImage: "gradient2",
     language: "en",
     deviceType: "auto",
   });
 
   const themes = {
     light: {
-      bg: "from-indigo-600 via-purple-600 to-blue-600",
+      bg: "from-red-700 via-blue-700 to-blue-600",
       cardBg: "bg-white",
       textPrimary: "text-gray-900",
       textSecondary: "text-gray-600",
@@ -671,7 +671,7 @@ const HRMLoginPage = () => {
               <button className="p-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors">
                 <span className="text-sm">f</span>
               </button>
-              <button className="p-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 transition-all">
+              <button className="p-2 rounded-full bg-gradient-to-r from-blue-500 to-red-500 text-white hover:from-pblue-600 hover:to-pink-600 transition-all">
                 <span className="text-sm">ig</span>
               </button>
               <button className="p-2 rounded-full bg-sky-500 text-white hover:bg-sky-600 transition-colors">

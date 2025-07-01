@@ -12,6 +12,39 @@ class VerifyCsrfToken extends Middleware
      * @var array<int, string>
      */
     protected $except = [
-        'api/*', // Exclude all API routes from CSRF verification
+        'api/*',
+        '/api/*',
+        'sanctum/*',
+        '/sanctum/*',
     ];
+
+    /**
+     * ✅ FINAL SOLUTION: Override handle method directly
+     */
+    public function handle($request, \Closure $next)
+    {
+        // Get the current path
+        $path = $request->path();
+
+        // Always bypass CSRF for API routes
+        if (str_starts_with($path, 'api/') || str_starts_with($path, '/api/')) {
+            return $next($request);
+        }
+
+        // Always bypass CSRF for requests with XMLHttpRequest header
+        if (
+            $request->hasHeader('X-Requested-With') &&
+            $request->header('X-Requested-With') === 'XMLHttpRequest'
+        ) {
+            return $next($request);
+        }
+
+        // Always bypass CSRF for JSON requests
+        if ($request->expectsJson()) {
+            return $next($request);
+        }
+
+        // For all other requests, use normal CSRF protection
+        return parent::handle($request, $next);
+    }
 }

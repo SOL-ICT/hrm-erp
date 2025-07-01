@@ -3,15 +3,11 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
-export default function ProfileEdit({
-  candidateProfile,
-  statesLgas,
-  onSave,
-  onCancel,
-}) {
+export default function ProfileEdit({ candidateProfile, onSave, onCancel }) {
   const { getUserPreferences } = useAuth();
   const preferences = getUserPreferences();
 
+  // Form data state
   const [formData, setFormData] = useState({
     first_name: "",
     middle_name: "",
@@ -33,14 +29,41 @@ export default function ProfileEdit({
     blood_group: "",
   });
 
+  // Component state
+  const [statesLgas, setStatesLgas] = useState([]);
   const [selectedOriginState, setSelectedOriginState] = useState("");
   const [selectedResidenceState, setSelectedResidenceState] = useState("");
   const [availableOriginLgas, setAvailableOriginLgas] = useState([]);
   const [availableResidenceLgas, setAvailableResidenceLgas] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingStates, setIsLoadingStates] = useState(true);
   const [errors, setErrors] = useState({});
 
-  // Get unique states from statesLgas
+  // Helper function to update available LGAs
+  const updateAvailableLgas = (stateName, type) => {
+    if (!stateName || !statesLgas.length) return;
+
+    const lgas = statesLgas
+      .filter((item) => item.state_name === stateName)
+      .map((item) => ({
+        name: item.lga_name,
+        code: item.lga_code,
+        isCapital: item.is_capital,
+      }))
+      .sort((a, b) => {
+        if (a.isCapital && !b.isCapital) return -1;
+        if (!a.isCapital && b.isCapital) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+    if (type === "origin") {
+      setAvailableOriginLgas(lgas);
+    } else {
+      setAvailableResidenceLgas(lgas);
+    }
+  };
+
+  // Calculate unique states
   const uniqueStates = [...new Set(statesLgas.map((item) => item.state_name))]
     .map((stateName) => {
       const stateData = statesLgas.find(
@@ -49,17 +72,79 @@ export default function ProfileEdit({
       return {
         name: stateName,
         code: stateData?.state_code || "",
-        zone: stateData?.zone || "",
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Debug: Log statesLgas data
+  // Fetch states/LGAs data
   useEffect(() => {
-    console.log("States/LGAs data received:", statesLgas);
-    console.log("Unique states processed:", uniqueStates);
-  }, [statesLgas]);
+    const fetchStatesLgas = async () => {
+      try {
+        setIsLoadingStates(true);
+        console.log("Fetching states/LGAs from API...");
 
+        const response = await fetch("http://localhost:8000/api/states-lgas", {
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        });
+
+        console.log("API Response status:", response.status);
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log("API Response data:", result);
+
+          // Based on your actual API response structure
+          if (result.status === "success" && Array.isArray(result.states)) {
+            // Flatten the nested structure
+            const flattenedData = [];
+            result.states.forEach((stateObj) => {
+              if (stateObj.lgas && Array.isArray(stateObj.lgas)) {
+                stateObj.lgas.forEach((lga) => {
+                  flattenedData.push({
+                    state_name: stateObj.state,
+                    state_code: stateObj.code,
+                    lga_name: lga.name,
+                    lga_code: lga.code,
+                    is_capital: lga.isCapital || false,
+                  });
+                });
+              }
+            });
+
+            setStatesLgas(flattenedData);
+            console.log(
+              "States loaded successfully:",
+              flattenedData.length,
+              "LGA records"
+            );
+          } else {
+            console.error("Unexpected API response structure:", result);
+            setStatesLgas([]);
+          }
+        } else {
+          console.error(
+            "API request failed:",
+            response.status,
+            response.statusText
+          );
+          setStatesLgas([]);
+        }
+      } catch (error) {
+        console.error("Error fetching states/LGAs:", error);
+        setStatesLgas([]);
+      } finally {
+        setIsLoadingStates(false);
+      }
+    };
+
+    fetchStatesLgas();
+  }, []);
+
+  // Populate form data when candidateProfile changes
   useEffect(() => {
     if (candidateProfile) {
       setFormData({
@@ -87,38 +172,28 @@ export default function ProfileEdit({
       // Set up origin state and LGAs
       if (candidateProfile.state_of_origin) {
         setSelectedOriginState(candidateProfile.state_of_origin);
-        updateAvailableLgas(candidateProfile.state_of_origin, "origin");
       }
 
       // Set up residence state and LGAs
       if (candidateProfile.state_of_residence) {
         setSelectedResidenceState(candidateProfile.state_of_residence);
-        updateAvailableLgas(candidateProfile.state_of_residence, "residence");
       }
     }
-  }, [candidateProfile, statesLgas]);
+  }, [candidateProfile]);
 
-  const updateAvailableLgas = (stateName, type) => {
-    const lgas = statesLgas
-      .filter((item) => item.state_name === stateName)
-      .map((item) => ({
-        name: item.lga_name,
-        code: item.lga_code,
-        isCapital: item.is_capital,
-      }))
-      .sort((a, b) => {
-        if (a.isCapital && !b.isCapital) return -1;
-        if (!a.isCapital && b.isCapital) return 1;
-        return a.name.localeCompare(b.name);
-      });
-
-    if (type === "origin") {
-      setAvailableOriginLgas(lgas);
-    } else {
-      setAvailableResidenceLgas(lgas);
+  // Update LGAs when states data is loaded or selected states change
+  useEffect(() => {
+    if (statesLgas.length > 0) {
+      if (selectedOriginState) {
+        updateAvailableLgas(selectedOriginState, "origin");
+      }
+      if (selectedResidenceState) {
+        updateAvailableLgas(selectedResidenceState, "residence");
+      }
     }
-  };
+  }, [statesLgas, selectedOriginState, selectedResidenceState]);
 
+  // Handle state changes
   const handleOriginStateChange = (stateName) => {
     setSelectedOriginState(stateName);
     setFormData((prev) => ({
@@ -139,6 +214,7 @@ export default function ProfileEdit({
     updateAvailableLgas(stateName, "residence");
   };
 
+  // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -146,6 +222,7 @@ export default function ProfileEdit({
       [name]: value,
     }));
 
+    // Clear errors when user starts typing
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
@@ -182,6 +259,7 @@ export default function ProfileEdit({
     }
   };
 
+  // Form validation
   const validateForm = () => {
     const newErrors = {};
     const requiredFields = [
@@ -199,6 +277,7 @@ export default function ProfileEdit({
       }
     });
 
+    // Phone validation
     if (
       formData.phone_primary &&
       !/^(\+234|0)[0-9]{10}$/.test(formData.phone_primary.replace(/\s/g, ""))
@@ -206,6 +285,7 @@ export default function ProfileEdit({
       newErrors.phone_primary = "Please enter a valid Nigerian phone number";
     }
 
+    // Age validation
     if (formData.date_of_birth) {
       const birthDate = new Date(formData.date_of_birth);
       const today = new Date();
@@ -220,6 +300,7 @@ export default function ProfileEdit({
     return Object.keys(newErrors).length === 0;
   };
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -234,6 +315,7 @@ export default function ProfileEdit({
     }
   };
 
+  // Helper functions
   const copyCurrentToPermanent = () => {
     setFormData((prev) => ({
       ...prev,
@@ -268,7 +350,7 @@ export default function ProfileEdit({
             onClick={handleSubmit}
             disabled={isLoading}
             className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
-            style={{ backgroundColor: preferences.primary_color }}
+            style={{ backgroundColor: preferences.primaryColor || "#6366f1" }}
           >
             {isLoading ? "Saving..." : "Save Changes"}
           </button>
@@ -276,7 +358,7 @@ export default function ProfileEdit({
       </div>
 
       {/* Debug Information */}
-      {statesLgas.length === 0 && (
+      {statesLgas.length === 0 && !isLoadingStates && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <p className="text-red-800 font-medium">
             ⚠️ No States/LGAs Data Found
@@ -472,9 +554,11 @@ export default function ProfileEdit({
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">
-                  {uniqueStates.length > 0
+                  {isLoadingStates
+                    ? "Loading states..."
+                    : uniqueStates.length > 0
                     ? "Select State"
-                    : "Loading states..."}
+                    : "No states available"}
                 </option>
                 {uniqueStates.map((state) => (
                   <option key={state.code} value={state.name}>
@@ -482,7 +566,7 @@ export default function ProfileEdit({
                   </option>
                 ))}
               </select>
-              {uniqueStates.length === 0 && (
+              {uniqueStates.length === 0 && !isLoadingStates && (
                 <p className="text-red-500 text-xs mt-1">No states available</p>
               )}
             </div>
@@ -601,9 +685,11 @@ export default function ProfileEdit({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">
-                    {uniqueStates.length > 0
+                    {isLoadingStates
+                      ? "Loading states..."
+                      : uniqueStates.length > 0
                       ? "Select State"
-                      : "Loading states..."}
+                      : "No states available"}
                   </option>
                   {uniqueStates.map((state) => (
                     <option key={`res-${state.code}`} value={state.name}>

@@ -113,3 +113,9 @@ $user->save();
 $user->preferences; // Should return array with defaults merged
 // Exit tinker
 exit
+DB::table('candidate_profiles')->insert([
+    'candidate_id' => 1,
+    'created_at' => now(),
+    'updated_at' => now()
+]);
+exit

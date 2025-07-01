@@ -27,14 +27,7 @@ export default function EmergencyContactModal({
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  const contactTypes = [
-    "Emergency Contact",
-    "Next of Kin",
-    "Medical Emergency Contact",
-    "Work Emergency Contact",
-    "Family Contact",
-    "Reference Contact",
-  ];
+  const contactTypes = ["Emergency Contact", "Next of Kin", "Family Contact"];
 
   const relationships = [
     "Parent",

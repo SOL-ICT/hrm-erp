@@ -140,10 +140,15 @@ export default function EducationModal({
 
       const method = education ? "PUT" : "POST";
 
+      // ✅ Simple request - no CSRF cookie fetching needed
       const response = await fetch(url, {
         method,
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
         body: JSON.stringify(formData),
       });
 
@@ -152,14 +157,25 @@ export default function EducationModal({
         onSave(data.education);
         onClose();
       } else {
-        const errorData = await response.json();
-        if (errorData.errors) {
-          setErrors(errorData.errors);
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          if (errorData.errors) {
+            setErrors(errorData.errors);
+          }
+        } else {
+          const htmlError = await response.text();
+          console.error("HTML Error Response:", htmlError);
+          setErrors({
+            general: `Server error (${response.status}). Check console for details.`,
+          });
         }
       }
     } catch (error) {
       console.error("Failed to save education:", error);
-      setErrors({ general: "Failed to save. Please try again." });
+      setErrors({
+        general: "Network error. Please check your connection and try again.",
+      });
     } finally {
       setIsLoading(false);
     }

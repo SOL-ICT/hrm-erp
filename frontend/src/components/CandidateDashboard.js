@@ -968,10 +968,9 @@ const CandidateDashboard = () => {
             <div className="space-y-8">
               {isEditingProfile ? (
                 <ProfileEdit
-                  candidateProfile={candidateProfile}
-                  statesLgas={statesLgas}
-                  onSave={handleProfileSave}
-                  onCancel={() => setIsEditingProfile(false)}
+                  candidateProfile={candidateProfile} // ✅ Fixed: using correct variable name
+                  onSave={handleProfileSave} // ✅ Fixed: using correct function name
+                  onCancel={() => setIsEditingProfile(false)} // ✅ Fixed: using correct function
                 />
               ) : (
                 <>

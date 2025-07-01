@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import API from "@/services/api";
 
 const HRMRegistrationPage = () => {
   const { register, loading: authLoading } = useAuth();
@@ -118,6 +119,8 @@ const HRMRegistrationPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Replace your handleRegistration function in HRMRegistrationPage.jsx with this:
+
   const handleRegistration = async () => {
     if (!validateForm()) {
       showNotification("Please fix the errors in the form.", "error");
@@ -128,22 +131,26 @@ const HRMRegistrationPage = () => {
     setRegistrationError("");
 
     try {
-      // Prepare registration data for our API
+      // ✅ FIXED: Correct field mapping matching your AuthController validation rules
       const registrationData = {
-        name: `${formData.firstName} ${formData.lastName}`.trim(),
         email: formData.email,
         password: formData.password,
-        loginType: "candidate", // Ensure they're registered as candidates
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+        password_confirmation: formData.confirmPassword, // ← Laravel expects this exact field name
+        first_name: formData.firstName, // ← Laravel expects first_name (not firstName)
+        last_name: formData.lastName, // ← Laravel expects last_name (not lastName)
         phone: formData.phone,
-        subscribeNewsletter: formData.subscribeNewsletter,
+        // Theme preferences
         theme: settings.theme,
         language: settings.language,
-        primaryColor: settings.primaryColor,
+        primary_color: settings.primaryColor,
       };
 
-      const result = await register(registrationData);
+      console.log("🚀 Sending registration data:", registrationData);
+
+      // Use the API service instead of the auth context
+      const result = await API.register(registrationData);
+
+      console.log("📊 Registration result:", result);
 
       if (result.success) {
         setCurrentStep(3);
@@ -152,11 +159,26 @@ const HRMRegistrationPage = () => {
           "success"
         );
       } else {
-        setRegistrationError(result.error);
-        showNotification(result.error, "error");
+        const errorMessage =
+          result.message || "Registration failed. Please try again.";
+        setRegistrationError(errorMessage);
+        showNotification(errorMessage, "error");
       }
     } catch (error) {
-      const errorMessage = "Registration failed. Please try again.";
+      console.error("💥 Registration error:", error);
+
+      // Handle different types of errors
+      let errorMessage = "Registration failed. Please try again.";
+
+      if (error.message.includes("422")) {
+        errorMessage = "Please check your information and try again.";
+      } else if (error.message.includes("419")) {
+        errorMessage =
+          "Security token expired. Please refresh the page and try again.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       setRegistrationError(errorMessage);
       showNotification(errorMessage, "error");
     } finally {
