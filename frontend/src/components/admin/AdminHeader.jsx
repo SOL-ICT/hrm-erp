@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Search, Bell, Settings, LogOut, Menu, X } from "lucide-react";
+
+// File: frontend/src/components/admin/AdminHeader.jsx
 
 const AdminHeader = ({
   currentTheme,
@@ -11,194 +14,168 @@ const AdminHeader = ({
   onToggleSidebar,
 }) => {
   const { logout } = useAuth();
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [showNotifications, setShowNotifications] = useState(false);
 
-  // Update time every second
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    if (window.confirm("Are you sure you want to logout?")) {
+      await logout();
+    }
   };
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 ${currentTheme.headerBg} backdrop-blur-md border-b ${currentTheme.border} shadow-xl z-40`}
+      className={`sticky top-0 z-50 ${currentTheme.headerBg} ${currentTheme.border} backdrop-blur-lg shadow-lg`}
     >
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
-          {/* Left Section - Brand & Toggle */}
+          {/* Left Section */}
           <div className="flex items-center space-x-4">
-            {/* Sidebar Toggle - Using SVG instead of Heroicons */}
+            {/* Sidebar Toggle */}
             <button
               onClick={onToggleSidebar}
-              className={`p-2 rounded-lg ${currentTheme.hover} transition-colors`}
+              className={`p-2 rounded-lg ${currentTheme.hover} transition-colors lg:hidden`}
             >
-              <svg
-                className={`w-6 h-6 ${currentTheme.textPrimary}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
+              {isSidebarCollapsed ? (
+                <Menu className={`w-5 h-5 ${currentTheme.textSecondary}`} />
+              ) : (
+                <X className={`w-5 h-5 ${currentTheme.textSecondary}`} />
+              )}
             </button>
 
-            {/* SOL Brand */}
+            {/* Logo & Title */}
             <div className="flex items-center space-x-3">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg"
-                style={{
-                  background: `linear-gradient(135deg, ${
-                    preferences.primaryColor || "#6366f1"
-                  }, ${preferences.primaryColor || "#6366f1"}dd)`,
-                }}
-              >
-                <span className="font-bold text-sm">SOL</span>
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold">
+                SOL
               </div>
-              <div>
-                <h1 className={`text-xl font-bold ${currentTheme.textPrimary}`}>
+              <div className="hidden md:block">
+                <h1 className={`text-lg font-bold ${currentTheme.textPrimary}`}>
                   Strategic Outsourcing Limited
                 </h1>
-                <p className={`text-xs ${currentTheme.textSecondary}`}>
+                <p className={`text-xs ${currentTheme.textMuted}`}>
                   Enterprise Resource Planning System
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Center - Search Bar */}
-          <div className="flex-1 max-w-xl mx-8">
-            <div className="relative">
+          {/* Center Search */}
+          <div className="hidden lg:flex flex-1 max-w-lg mx-8">
+            <div className="relative w-full">
+              <Search
+                className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${currentTheme.textMuted}`}
+              />
               <input
                 type="text"
                 placeholder="Search modules, clients, staff..."
-                className={`w-full ${currentTheme.cardBg} ${currentTheme.border} rounded-xl px-4 py-3 pl-12 ${currentTheme.textPrimary} placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent backdrop-blur-sm`}
+                className={`w-full pl-10 pr-4 py-2 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all`}
               />
-              <svg
-                className={`w-5 h-5 ${currentTheme.textMuted} absolute left-4 top-4`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
             </div>
           </div>
 
-          {/* Right Section - Time, Notifications, Profile */}
-          <div className="flex items-center space-x-4">
-            {/* Current Date */}
-            <div
-              className={`flex items-center space-x-2 px-4 py-2 ${currentTheme.cardBg} rounded-xl ${currentTheme.border}`}
-            >
-              <svg
-                className="w-5 h-5 text-blue-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-              <span
-                className={`text-sm font-medium ${currentTheme.textPrimary}`}
-              >
-                {currentTime.toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </span>
-            </div>
-
+          {/* Right Section */}
+          <div className="flex items-center space-x-3">
             {/* Current Time */}
-            <div
-              className={`flex items-center space-x-2 px-4 py-2 ${currentTheme.cardBg} rounded-xl ${currentTheme.border}`}
-            >
-              <svg
-                className="w-5 h-5 text-green-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <span
-                className={`text-sm font-medium ${currentTheme.textPrimary}`}
-              >
-                {currentTime.toLocaleTimeString("en-US", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
+            <div className="hidden sm:block text-right">
+              <p className={`text-sm font-medium ${currentTheme.textPrimary}`}>
+                {new Date().toLocaleDateString()}
+              </p>
+              <p className={`text-xs ${currentTheme.textMuted}`}>
+                {new Date().toLocaleTimeString()}
+              </p>
             </div>
 
-            {/* Quick Actions */}
-            <button className="px-4 py-2 bg-blue-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105 text-sm">
-              New Entry
+            {/* New Entry Button */}
+            <button className="hidden md:flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl">
+              <span className="text-sm font-medium">New Entry</span>
             </button>
 
             {/* Notifications */}
-            <button
-              className={`relative p-3 ${currentTheme.cardBg} rounded-xl ${currentTheme.border} ${currentTheme.hover} transition-all`}
-            >
-              <svg
-                className={`w-6 h-6 ${currentTheme.textSecondary}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className={`relative p-3 ${currentTheme.cardBg} rounded-xl ${currentTheme.border} ${currentTheme.hover} transition-all`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 17h5l-5 5v-5z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"
-                />
-              </svg>
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs text-white flex items-center justify-center font-bold">
-                12
-              </span>
+                <Bell className={`w-5 h-5 ${currentTheme.textSecondary}`} />
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs text-white flex items-center justify-center font-bold">
+                  12
+                </span>
+              </button>
+
+              {/* Notifications Dropdown */}
+              {showNotifications && (
+                <div
+                  className={`absolute right-0 top-full mt-2 w-80 ${currentTheme.cardBg} ${currentTheme.border} rounded-xl shadow-2xl backdrop-blur-lg z-50`}
+                >
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3
+                        className={`font-semibold ${currentTheme.textPrimary}`}
+                      >
+                        Notifications
+                      </h3>
+                      <span className="text-xs bg-red-500 text-white px-2 py-1 rounded-full">
+                        12 new
+                      </span>
+                    </div>
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {[
+                        {
+                          title: "New client registration",
+                          time: "2 min ago",
+                          type: "info",
+                        },
+                        {
+                          title: "Contract expiring soon",
+                          time: "1 hour ago",
+                          type: "warning",
+                        },
+                        {
+                          title: "System backup completed",
+                          time: "3 hours ago",
+                          type: "success",
+                        },
+                      ].map((notification, index) => (
+                        <div
+                          key={index}
+                          className={`p-3 rounded-lg ${currentTheme.hover} cursor-pointer`}
+                        >
+                          <p
+                            className={`text-sm font-medium ${currentTheme.textPrimary}`}
+                          >
+                            {notification.title}
+                          </p>
+                          <p className={`text-xs ${currentTheme.textMuted}`}>
+                            {notification.time}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <button className="w-full text-center text-sm text-blue-600 hover:text-blue-700 font-medium">
+                        View all notifications
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Settings */}
+            <button
+              className={`p-3 ${currentTheme.cardBg} rounded-xl ${currentTheme.border} ${currentTheme.hover} transition-all`}
+            >
+              <Settings className={`w-5 h-5 ${currentTheme.textSecondary}`} />
             </button>
 
             {/* Admin Profile */}
             <div
               className={`flex items-center space-x-3 px-4 py-2 ${currentTheme.cardBg} rounded-xl ${currentTheme.border}`}
             >
-              <div className="text-right">
+              <div className="text-right hidden sm:block">
                 <p
                   className={`text-sm font-semibold ${currentTheme.textPrimary}`}
                 >
-                  {user?.name || "Admin User"}
+                  {user?.name || "SOL Admin"}
                 </p>
                 <p className={`text-xs ${currentTheme.textMuted}`}>
                   System Administrator
@@ -212,7 +189,7 @@ const AdminHeader = ({
                   }, ${preferences.primaryColor || "#6366f1"}dd)`,
                 }}
               >
-                {user?.name?.[0] || "A"}
+                {user?.name?.[0] || "S"}
               </div>
             </div>
 
@@ -220,20 +197,11 @@ const AdminHeader = ({
             <button
               onClick={handleLogout}
               className={`p-3 ${currentTheme.cardBg} rounded-xl ${currentTheme.border} ${currentTheme.hover} transition-all group`}
+              title="Logout"
             >
-              <svg
-                className={`w-6 h-6 ${currentTheme.textMuted} group-hover:text-red-500 transition-colors`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
+              <LogOut
+                className={`w-5 h-5 ${currentTheme.textMuted} group-hover:text-red-500 transition-colors`}
+              />
             </button>
           </div>
         </div>

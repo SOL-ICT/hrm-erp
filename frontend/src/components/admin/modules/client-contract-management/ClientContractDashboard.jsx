@@ -1,375 +1,465 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState, Suspense } from "react";
+import {
+  Building2,
+  Users,
+  FileText,
+  UserPlus,
+  Briefcase,
+  DollarSign,
+  TrendingUp,
+  ArrowRight,
+  BarChart3,
+  Calendar,
+  Shield,
+} from "lucide-react";
+import ClientMaster from "./submodules/client-master/ClientMaster";
+
+// File: frontend/src/components/admin/modules/client-contract-management/ClientContractDashboard.jsx
 
 const ClientContractDashboard = ({ currentTheme, preferences }) => {
-  const { user } = useAuth();
-  const [stats, setStats] = useState({
-    totalClients: 0,
-    activeContracts: 0,
-    pendingRecruitments: 0,
-    activeVacancies: 0,
-    pendingClaims: 0,
-    totalRevenue: 0,
-    expiringContracts: 0,
-    newRequestsThisMonth: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const [activeSubmodule, setActiveSubmodule] = useState(null);
 
-  useEffect(() => {
-    loadDashboardStats();
-  }, []);
+  // Define available submodules
+  const submodules = [
+    {
+      id: "client-master",
+      name: "Client Master",
+      icon: Building2,
+      description: "Add, edit, and manage client information and profiles",
+      component: ClientMaster,
+      color: "blue",
+      gradient: "from-blue-500 to-blue-600",
+      stats: { count: "127", change: "+8" },
+    },
+    {
+      id: "client-service",
+      name: "Client Service",
+      icon: Users,
+      description: "Manage service locations and regional zones",
+      component: null,
+      color: "emerald",
+      gradient: "from-emerald-500 to-emerald-600",
+      stats: { count: "45", change: "+12" },
+      comingSoon: true,
+    },
+    {
+      id: "client-contract",
+      name: "Client Contract",
+      icon: FileText,
+      description: "Handle contract management and renewals",
+      component: null,
+      color: "purple",
+      gradient: "from-purple-500 to-purple-600",
+      stats: { count: "98", change: "+5" },
+      comingSoon: true,
+    },
+    {
+      id: "recruitment-request",
+      name: "Recruitment Request",
+      icon: UserPlus,
+      description: "Process and manage recruitment requests",
+      component: null,
+      color: "orange",
+      gradient: "from-orange-500 to-orange-600",
+      stats: { count: "23", change: "+7" },
+      comingSoon: true,
+    },
+    {
+      id: "vacancy-setup",
+      name: "Vacancy Setup",
+      icon: Briefcase,
+      description: "Configure and post job vacancies",
+      component: null,
+      color: "teal",
+      gradient: "from-teal-500 to-teal-600",
+      stats: { count: "15", change: "+3" },
+      comingSoon: true,
+    },
+    {
+      id: "salary-structure",
+      name: "Salary Structure",
+      icon: DollarSign,
+      description: "Define and manage salary structures",
+      component: null,
+      color: "indigo",
+      gradient: "from-indigo-500 to-indigo-600",
+      stats: { count: "12", change: "+2" },
+      comingSoon: true,
+    },
+  ];
 
-  const loadDashboardStats = async () => {
-    try {
-      // TODO: Replace with actual API call
-      // const response = await clientContractAPI.getDashboardStats();
-
-      // Mock data for now
-      setTimeout(() => {
-        setStats({
-          totalClients: 127,
-          activeContracts: 89,
-          pendingRecruitments: 23,
-          activeVacancies: 45,
-          pendingClaims: 8,
-          totalRevenue: 45670000,
-          expiringContracts: 12,
-          newRequestsThisMonth: 34,
-        });
-        setLoading(false);
-      }, 1000);
-    } catch (error) {
-      console.error("Failed to load dashboard stats:", error);
-      setLoading(false);
+  // Render active submodule (DIRECT - no intermediate dashboard)
+  if (activeSubmodule) {
+    const module = submodules.find((m) => m.id === activeSubmodule);
+    if (module && module.component) {
+      const Component = module.component;
+      return (
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
+            </div>
+          }
+        >
+          <Component
+            currentTheme={currentTheme}
+            preferences={preferences}
+            onClose={() => setActiveSubmodule(null)}
+          />
+        </Suspense>
+      );
     }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className={currentTheme.textSecondary}>
-            Loading Client Contract Management...
-          </p>
-        </div>
-      </div>
-    );
   }
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency: "NGN",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatNumber = (num) => {
-    return new Intl.NumberFormat("en-US").format(num);
-  };
-
+  // Main dashboard view
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className={`text-3xl font-bold ${currentTheme.textPrimary}`}>
-            Client Contract Management
-          </h1>
-          <p className={`${currentTheme.textSecondary} mt-1`}>
-            Comprehensive client relationship and contract administration
-          </p>
-        </div>
-        <div className="flex items-center space-x-3">
-          <div
-            className={`px-4 py-2 ${currentTheme.cardBg} rounded-xl ${currentTheme.border}`}
-          >
-            <span className={`text-sm ${currentTheme.textSecondary}`}>
-              Last Updated:
-            </span>
-            <span className={`ml-2 font-semibold ${currentTheme.textPrimary}`}>
-              {new Date().toLocaleTimeString()}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div
-          className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 backdrop-blur-md shadow-lg`}
-        >
+    <div className="space-y-8">
+      {/* Enhanced Header */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 rounded-2xl"></div>
+        <div className="relative p-8">
           <div className="flex items-center justify-between">
             <div>
-              <p className={`text-sm ${currentTheme.textMuted}`}>
-                Total Clients
-              </p>
-              <p className={`text-3xl font-bold ${currentTheme.textPrimary}`}>
-                {formatNumber(stats.totalClients)}
-              </p>
-              <p className={`text-xs ${currentTheme.textMuted} mt-1`}>
-                <span className="text-green-500">↗ +5.2%</span> from last month
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <span className="text-2xl">👤</span>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 backdrop-blur-md shadow-lg`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm ${currentTheme.textMuted}`}>
-                Active Contracts
-              </p>
-              <p className={`text-3xl font-bold ${currentTheme.textPrimary}`}>
-                {formatNumber(stats.activeContracts)}
-              </p>
-              <p className={`text-xs ${currentTheme.textMuted} mt-1`}>
-                <span className="text-green-500">↗ +2.1%</span> from last month
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-              <span className="text-2xl">📋</span>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 backdrop-blur-md shadow-lg`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm ${currentTheme.textMuted}`}>
-                Active Vacancies
-              </p>
-              <p className={`text-3xl font-bold ${currentTheme.textPrimary}`}>
-                {formatNumber(stats.activeVacancies)}
-              </p>
-              <p className={`text-xs ${currentTheme.textMuted} mt-1`}>
-                <span className="text-orange-500">↗ +12.3%</span> from last
-                month
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-              <span className="text-2xl">📊</span>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 backdrop-blur-md shadow-lg`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm ${currentTheme.textMuted}`}>
-                Revenue (YTD)
-              </p>
-              <p className={`text-3xl font-bold ${currentTheme.textPrimary}`}>
-                {formatCurrency(stats.totalRevenue)}
-              </p>
-              <p className={`text-xs ${currentTheme.textMuted} mt-1`}>
-                <span className="text-green-500">↗ +18.7%</span> from last year
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-yellow-500/20 flex items-center justify-center">
-              <span className="text-2xl">💰</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div
-        className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 backdrop-blur-md shadow-lg`}
-      >
-        <h2
-          className={`text-xl font-semibold ${currentTheme.textPrimary} mb-6`}
-        >
-          Quick Actions
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {[
-            {
-              name: "Add New Client",
-              icon: "👤",
-              color: "blue",
-              path: "/client-master/manual-entry",
-            },
-            {
-              name: "Create Contract",
-              icon: "📄",
-              color: "green",
-              path: "/client-contract/contract-details",
-            },
-            {
-              name: "Recruitment Request",
-              icon: "👥",
-              color: "purple",
-              path: "/recruitment-request",
-            },
-            {
-              name: "Setup Vacancy",
-              icon: "📊",
-              color: "orange",
-              path: "/vacancy-setup",
-            },
-            {
-              name: "Salary Structure",
-              icon: "💰",
-              color: "yellow",
-              path: "/salary-structure",
-            },
-            {
-              name: "Claims Resolution",
-              icon: "⚖️",
-              color: "red",
-              path: "/claims-resolution",
-            },
-          ].map((action, index) => (
-            <button
-              key={index}
-              className={`p-4 rounded-xl border border-${action.color}-500/20 bg-${action.color}-500/10 hover:bg-${action.color}-500/20 transition-all text-center group`}
-            >
-              <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">
-                {action.icon}
-              </div>
-              <p
-                className={`font-semibold ${currentTheme.textPrimary} text-sm`}
+              <h1
+                className={`text-4xl font-bold ${currentTheme.textPrimary} mb-2`}
               >
-                {action.name}
+                Client Contract Management
+              </h1>
+              <p className={`text-lg ${currentTheme.textSecondary}`}>
+                Comprehensive client relationship and contract oversight
               </p>
-            </button>
+              <div className="flex items-center mt-3 space-x-4">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                  ✅ Active
+                </span>
+                <span className={`text-sm ${currentTheme.textMuted}`}>
+                  Last updated: {new Date().toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+            <div className="hidden lg:block">
+              <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white shadow-xl">
+                <FileText className="w-12 h-12" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Key Metrics (Removed Monthly Revenue) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {[
+          {
+            label: "Total Clients",
+            value: "127",
+            change: "+8",
+            icon: Building2,
+            color: "blue",
+            trend: "up",
+          },
+          {
+            label: "Active Contracts",
+            value: "98",
+            change: "+5",
+            icon: FileText,
+            color: "green",
+            trend: "up",
+          },
+          {
+            label: "Open Vacancies",
+            value: "45",
+            change: "+12",
+            icon: Briefcase,
+            color: "purple",
+            trend: "up",
+          },
+        ].map((stat, index) => (
+          <div
+            key={index}
+            className={`relative overflow-hidden ${currentTheme.cardBg} ${currentTheme.border} rounded-2xl p-6 backdrop-blur-md shadow-xl hover:shadow-2xl transition-all duration-300 group`}
+          >
+            <div
+              className={`absolute inset-0 bg-gradient-to-br from-${stat.color}-500/5 to-${stat.color}-600/5 group-hover:from-${stat.color}-500/10 group-hover:to-${stat.color}-600/10 transition-all`}
+            ></div>
+            <div className="relative">
+              <div className="flex items-center justify-between mb-4">
+                <div
+                  className={`p-3 rounded-xl bg-${stat.color}-500/20 group-hover:bg-${stat.color}-500/30 transition-colors`}
+                >
+                  <stat.icon className={`w-6 h-6 text-${stat.color}-600`} />
+                </div>
+                <span
+                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold text-${stat.color}-700 bg-${stat.color}-100 dark:text-${stat.color}-300 dark:bg-${stat.color}-900/30`}
+                >
+                  {stat.trend === "up" ? (
+                    <TrendingUp className="w-3 h-3 mr-1" />
+                  ) : (
+                    <TrendingUp className="w-3 h-3 mr-1 rotate-180" />
+                  )}{" "}
+                  {stat.change}
+                </span>
+              </div>
+              <div>
+                <p
+                  className={`text-sm font-medium ${currentTheme.textSecondary} mb-1`}
+                >
+                  {stat.label}
+                </p>
+                <p className={`text-3xl font-bold ${currentTheme.textPrimary}`}>
+                  {stat.value}
+                </p>
+                <p className={`text-xs ${currentTheme.textMuted} mt-1`}>
+                  This month
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Enhanced Submodules Grid */}
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
+            Management Modules
+          </h2>
+          <div className={`text-sm ${currentTheme.textMuted}`}>
+            Click any module to access its features
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {submodules.map((module) => (
+            <div
+              key={module.id}
+              className={`relative overflow-hidden ${currentTheme.cardBg} ${
+                currentTheme.border
+              } rounded-2xl backdrop-blur-md shadow-xl hover:shadow-2xl transition-all duration-300 group cursor-pointer ${
+                module.comingSoon
+                  ? "opacity-60 hover:opacity-80"
+                  : "hover:scale-105 hover:-translate-y-1"
+              }`}
+              onClick={() => {
+                if (!module.comingSoon && module.component) {
+                  setActiveSubmodule(module.id);
+                }
+              }}
+            >
+              {/* Gradient Background */}
+              <div
+                className={`absolute inset-0 bg-gradient-to-br ${module.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}
+              ></div>
+
+              {/* Content */}
+              <div className="relative p-6">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className={`p-4 rounded-xl bg-gradient-to-br ${module.gradient} text-white shadow-lg group-hover:shadow-xl transition-all duration-300`}
+                  >
+                    <module.icon className="w-6 h-6" />
+                  </div>
+                  {module.comingSoon && (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
+                      <Calendar className="w-3 h-3 mr-1" />
+                      Coming Soon
+                    </span>
+                  )}
+                </div>
+
+                {/* Title & Description */}
+                <div className="mb-4">
+                  <h3
+                    className={`text-xl font-bold ${currentTheme.textPrimary} mb-2 group-hover:text-${module.color}-600 transition-colors`}
+                  >
+                    {module.name}
+                  </h3>
+                  <p
+                    className={`text-sm ${currentTheme.textSecondary} leading-relaxed`}
+                  >
+                    {module.description}
+                  </p>
+                </div>
+
+                {/* Stats */}
+                {module.stats && (
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p
+                        className={`text-2xl font-bold ${currentTheme.textPrimary}`}
+                      >
+                        {module.stats.count}
+                      </p>
+                      <p className={`text-xs ${currentTheme.textMuted}`}>
+                        Total Records
+                      </p>
+                    </div>
+                    <div className={`text-right`}>
+                      <p
+                        className={`text-sm font-medium text-${module.color}-600`}
+                      >
+                        {module.stats.change} this month
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Button */}
+                {!module.comingSoon && (
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
+                    <span
+                      className={`text-sm font-medium ${currentTheme.textPrimary} group-hover:text-${module.color}-600 transition-colors`}
+                    >
+                      Access Module
+                    </span>
+                    <div className="flex items-center space-x-1 text-${module.color}-600 group-hover:translate-x-1 transition-transform">
+                      <span className="text-sm font-medium">Open</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           ))}
         </div>
       </div>
 
-      {/* Recent Activity & Alerts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Enhanced Activity Section */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {/* Recent Activity */}
         <div
-          className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 backdrop-blur-md shadow-lg`}
+          className={`${currentTheme.cardBg} ${currentTheme.border} rounded-2xl p-6 backdrop-blur-md shadow-xl`}
         >
-          <h3
-            className={`text-xl font-semibold ${currentTheme.textPrimary} mb-4`}
-          >
-            Recent Activity
-          </h3>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className={`text-xl font-bold ${currentTheme.textPrimary}`}>
+              Recent Activity
+            </h3>
+            <button
+              className={`text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center space-x-1`}
+            >
+              <span>View All</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
           <div className="space-y-4">
             {[
               {
-                action: "New contract signed",
-                client: "Access Bank Nigeria",
+                name: "Access Bank Nigeria",
+                action: "Client profile updated",
                 time: "2 hours ago",
-                type: "success",
+                type: "update",
+                icon: "✏️",
               },
               {
-                action: "Recruitment request submitted",
-                client: "UBA Group",
+                name: "Zenith Bank PLC",
+                action: "Contract renewal initiated",
                 time: "4 hours ago",
-                type: "info",
+                type: "contract",
+                icon: "📋",
               },
               {
-                action: "Contract renewal pending",
-                client: "Zenith Bank",
+                name: "First Bank Nigeria",
+                action: "New client added",
                 time: "6 hours ago",
-                type: "warning",
-              },
-              {
-                action: "Claims resolution completed",
-                client: "First Bank Nigeria",
-                time: "1 day ago",
-                type: "success",
+                type: "new",
+                icon: "➕",
               },
             ].map((activity, index) => (
               <div
                 key={index}
-                className={`flex items-center space-x-3 p-3 ${currentTheme.hover} rounded-lg`}
+                className={`flex items-center space-x-4 p-4 ${currentTheme.hover} rounded-xl transition-colors group`}
               >
                 <div
-                  className={`w-2 h-2 rounded-full ${
-                    activity.type === "success"
-                      ? "bg-green-500"
-                      : activity.type === "warning"
-                      ? "bg-yellow-500"
-                      : activity.type === "info"
-                      ? "bg-blue-500"
-                      : "bg-gray-500"
-                  }`}
-                />
+                  className={`w-10 h-10 rounded-full bg-gradient-to-br ${
+                    activity.type === "new"
+                      ? "from-green-500 to-green-600"
+                      : activity.type === "update"
+                      ? "from-blue-500 to-blue-600"
+                      : "from-purple-500 to-purple-600"
+                  } flex items-center justify-center text-white shadow-lg`}
+                >
+                  <span className="text-sm">{activity.icon}</span>
+                </div>
                 <div className="flex-1">
                   <p
-                    className={`font-medium ${currentTheme.textPrimary} text-sm`}
+                    className={`font-semibold ${currentTheme.textPrimary} group-hover:text-blue-600 transition-colors`}
                   >
+                    {activity.name}
+                  </p>
+                  <p className={`text-sm ${currentTheme.textSecondary}`}>
                     {activity.action}
                   </p>
-                  <p className={`text-xs ${currentTheme.textMuted}`}>
-                    {activity.client} • {activity.time}
-                  </p>
                 </div>
+                <p className={`text-xs ${currentTheme.textMuted}`}>
+                  {activity.time}
+                </p>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Alerts & Notifications */}
+        {/* Quick Actions */}
         <div
-          className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 backdrop-blur-md shadow-lg`}
+          className={`${currentTheme.cardBg} ${currentTheme.border} rounded-2xl p-6 backdrop-blur-md shadow-xl`}
         >
-          <h3
-            className={`text-xl font-semibold ${currentTheme.textPrimary} mb-4`}
-          >
-            Alerts & Notifications
-          </h3>
-          <div className="space-y-4">
-            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <div className="flex items-center space-x-2 mb-2">
-                <span className="text-red-500">⚠️</span>
-                <p
-                  className={`font-semibold ${currentTheme.textPrimary} text-sm`}
+          <div className="flex items-center justify-between mb-6">
+            <h3 className={`text-xl font-bold ${currentTheme.textPrimary}`}>
+              Quick Actions
+            </h3>
+            <span className={`text-sm ${currentTheme.textMuted}`}>
+              Most used features
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              {
+                action: "Add Client",
+                icon: Building2,
+                color: "blue",
+                gradient: "from-blue-500 to-blue-600",
+              },
+              {
+                action: "New Contract",
+                icon: FileText,
+                color: "green",
+                gradient: "from-green-500 to-green-600",
+              },
+              {
+                action: "Post Vacancy",
+                icon: Briefcase,
+                color: "purple",
+                gradient: "from-purple-500 to-purple-600",
+              },
+              {
+                action: "View Reports",
+                icon: BarChart3,
+                color: "orange",
+                gradient: "from-orange-500 to-orange-600",
+              },
+            ].map((action, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  if (action.action === "Add Client") {
+                    setActiveSubmodule("client-master");
+                  }
+                }}
+                className={`flex flex-col items-center space-y-3 p-4 ${currentTheme.hover} rounded-xl text-center transition-all duration-200 hover:scale-105 group`}
+              >
+                <div
+                  className={`w-12 h-12 rounded-xl bg-gradient-to-br ${action.gradient} flex items-center justify-center text-white shadow-lg group-hover:shadow-xl transition-all`}
                 >
-                  {stats.expiringContracts} Contracts Expiring Soon
-                </p>
-              </div>
-              <p className={`text-xs ${currentTheme.textMuted}`}>
-                Review and initiate renewal process
-              </p>
-            </div>
-
-            <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <div className="flex items-center space-x-2 mb-2">
-                <span className="text-yellow-500">⏰</span>
-                <p
-                  className={`font-semibold ${currentTheme.textPrimary} text-sm`}
+                  <action.icon className="w-5 h-5" />
+                </div>
+                <span
+                  className={`text-sm font-medium ${currentTheme.textPrimary} group-hover:text-${action.color}-600 transition-colors`}
                 >
-                  {stats.pendingClaims} Pending Claims
-                </p>
-              </div>
-              <p className={`text-xs ${currentTheme.textMuted}`}>
-                Requires immediate attention
-              </p>
-            </div>
-
-            <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-              <div className="flex items-center space-x-2 mb-2">
-                <span className="text-blue-500">📈</span>
-                <p
-                  className={`font-semibold ${currentTheme.textPrimary} text-sm`}
-                >
-                  {stats.newRequestsThisMonth} New Requests This Month
-                </p>
-              </div>
-              <p className={`text-xs ${currentTheme.textMuted}`}>
-                Monthly target: 40 requests
-              </p>
-            </div>
+                  {action.action}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
       </div>

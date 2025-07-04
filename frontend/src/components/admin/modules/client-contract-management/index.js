@@ -43,18 +43,6 @@ export const clientContractModule = {
       icon: "👤",
       component: ClientMaster,
       path: "/client-master",
-      children: [
-        {
-          id: "excel-import",
-          name: "Excel Import",
-          path: "/excel-import",
-        },
-        {
-          id: "manual-entry",
-          name: "Manual Entry",
-          path: "/manual-entry",
-        },
-      ],
     },
     {
       id: "client-service",

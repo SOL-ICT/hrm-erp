@@ -7,6 +7,8 @@ import AdminHeader from "./AdminHeader";
 import AdminNavigation from "./AdminNavigation";
 import AdminRouter from "./AdminRouter";
 
+// File: frontend/src/components/admin/AdminLayout.jsx
+
 const AdminLayout = () => {
   const { user, loading, isAuthenticated, getUserPreferences } = useAuth();
   const router = useRouter();
@@ -54,34 +56,31 @@ const AdminLayout = () => {
       textSecondary: "text-white/80",
       textMuted: "text-white/60",
       border: "border-white/20",
-      hover: "hover:bg-white/20",
+      hover: "hover:bg-white/10",
     },
   };
 
   const currentTheme = themes[preferences.theme] || themes.dark;
 
+  // Handle module changes
+  const handleModuleChange = (moduleId, submoduleId = null) => {
+    setActiveModule(moduleId);
+    setActiveSubmodule(submoduleId);
+  };
+
+  // Check authentication
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.push("/login");
-      return;
     }
   }, [loading, isAuthenticated, router]);
 
   if (loading) {
     return (
-      <div
-        className={`min-h-screen ${currentTheme.bg} flex items-center justify-center`}
-      >
-        <div
-          className={`text-center ${currentTheme.cardBg} backdrop-blur-md rounded-3xl p-12 border ${currentTheme.border} shadow-2xl`}
-        >
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-          <h3 className={`text-2xl font-bold ${currentTheme.textPrimary} mb-2`}>
-            Loading Admin Dashboard
-          </h3>
-          <p className={currentTheme.textSecondary}>
-            Preparing administration workspace...
-          </p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-gray-900 to-black">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white/80">Loading Admin Dashboard...</p>
         </div>
       </div>
     );
@@ -90,11 +89,6 @@ const AdminLayout = () => {
   if (!isAuthenticated) {
     return null;
   }
-
-  const handleModuleChange = (module, submodule = null) => {
-    setActiveModule(module);
-    setActiveSubmodule(submodule);
-  };
 
   return (
     <div className={`min-h-screen ${currentTheme.bg}`}>
@@ -110,7 +104,7 @@ const AdminLayout = () => {
         />
       </div>
 
-      {/* Header */}
+      {/* Fixed Header */}
       <AdminHeader
         currentTheme={currentTheme}
         preferences={preferences}
@@ -130,11 +124,11 @@ const AdminLayout = () => {
           isCollapsed={isSidebarCollapsed}
         />
 
-        {/* Main Content Area */}
+        {/* Main Content Area - Fixed padding-top to account for header */}
         <main
           className={`flex-1 transition-all duration-300 ${
             isSidebarCollapsed ? "ml-20" : "ml-72"
-          }`}
+          } pt-20`} // Added pt-20 to account for header height
         >
           <div className="p-8">
             <Suspense

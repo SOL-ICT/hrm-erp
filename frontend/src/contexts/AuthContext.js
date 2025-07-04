@@ -280,6 +280,7 @@ export const AuthProvider = ({ children }) => {
     getUserPreferences,
     updatePreferences,
     userPreferences,
+    sanctumRequest,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
