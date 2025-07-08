@@ -1,0 +1,81 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+:root {
+  /* SOL Official Brand Colors */
+  --sol-midnight-blue: #191970;
+  --sol-primary-blue: #0066cc;
+  --sol-secondary-red: #dc3545;
+  --sol-success-green: #10b981;
+  --sol-warning-yellow: #f59e0b;
+  --sol-purple: #8b5cf6;
+}
+
+@layer components {
+  /* SOL Compact Buttons */
+  .sol-btn-compact {
+    @apply inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 text-xs;
+    height: 28px;
+    padding: 0 12px;
+  }
+
+  .sol-btn-primary {
+    background: linear-gradient(
+      135deg,
+      var(--sol-primary-blue),
+      var(--sol-midnight-blue)
+    );
+    @apply text-white shadow-sm hover:shadow-md;
+  }
+
+  .sol-btn-outline {
+    @apply border border-gray-300 text-gray-700 bg-white hover:bg-gray-50;
+  }
+
+  /* SOL Compact Inputs */
+  .sol-input-compact {
+    @apply w-full rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all;
+    height: 28px;
+  }
+
+  /* SOL Status Badges */
+  .sol-status-active {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800;
+  }
+
+  .sol-status-pending {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800;
+  }
+
+  .sol-status-inactive {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800;
+  }
+
+  /* SOL Cards */
+  .sol-stat-card {
+    @apply bg-white rounded-xl p-3 border border-gray-200 hover:shadow-lg transition-all cursor-pointer;
+  }
+
+  .sol-stat-value {
+    @apply text-lg font-bold text-gray-900;
+  }
+
+  .sol-stat-label {
+    @apply text-xs text-gray-500 leading-tight;
+  }
+
+  /* SOL Table */
+  .sol-table-compact {
+    @apply w-full text-xs;
+  }
+
+  .sol-table-compact th {
+    @apply px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wide border-b border-gray-200;
+    font-size: 10px;
+  }
+
+  .sol-table-compact td {
+    @apply px-3 py-2 border-b border-gray-100;
+  }
+}

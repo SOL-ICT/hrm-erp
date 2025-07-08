@@ -51,7 +51,7 @@ const CandidateDashboard = () => {
     language: "en",
   };
 
-  // Theme configurations matching your login page
+  // Theme configurations matching login page
   const themes = {
     light: {
       bg: "bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50",

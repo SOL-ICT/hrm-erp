@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "../styles/sol-components.css";
 
 // Only import Providers - it already includes AuthProvider
 import Providers from "@/components/Providers";
