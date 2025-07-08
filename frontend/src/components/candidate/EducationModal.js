@@ -10,7 +10,7 @@ export default function EducationModal({
   education = null,
   candidateId,
 }) {
-  const { getUserPreferences } = useAuth();
+  const { getUserPreferences,sanctumRequest } = useAuth();
   const preferences = getUserPreferences();
 
   const [formData, setFormData] = useState({
@@ -126,60 +126,62 @@ export default function EducationModal({
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!validateForm()) {
-      return;
-    }
+  if (!validateForm()) return;
 
-    setIsLoading(true);
-    try {
-      const url = education
-        ? `http://localhost:8000/api/candidates/education/${education.id}`
-        : `http://localhost:8000/api/candidates/${candidateId}/education`;
+  setIsLoading(true);
 
-      const method = education ? "PUT" : "POST";
+  try {
+    const url = education
+      ? `http://localhost:8000/api/candidates/education/${education.id}`
+      : `http://localhost:8000/api/candidates/${candidateId}/education`;
 
-      // ✅ Simple request - no CSRF cookie fetching needed
-      const response = await fetch(url, {
-        method,
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        body: JSON.stringify(formData),
-      });
+    const method = education ? "PUT" : "POST";
 
-      if (response.ok) {
-        const data = await response.json();
-        onSave(data.education);
-        onClose();
-      } else {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await response.json();
-          if (errorData.errors) {
-            setErrors(errorData.errors);
-          }
-        } else {
-          const htmlError = await response.text();
-          console.error("HTML Error Response:", htmlError);
-          setErrors({
-            general: `Server error (${response.status}). Check console for details.`,
-          });
+    // ✅ Don't forget await
+    const response = await sanctumRequest(url, {
+      method,
+      body: JSON.stringify(formData),
+    });
+
+    if (response?.ok) {
+      const data = await response.json();
+      onSave(data.education);
+      onClose();
+    } else if (response instanceof Response) {
+      // ✅ Error response from Laravel
+      const contentType = response.headers.get("content-type");
+
+      if (contentType?.includes("application/json")) {
+        const errorData = await response.json();
+        if (errorData.errors) {
+          setErrors(errorData.errors);
         }
+      } else {
+        const htmlError = await response.text();
+        console.error("HTML Error Response:", htmlError);
+        setErrors({
+          general: `Server error (${response.status}). Check console for details.`,
+        });
       }
-    } catch (error) {
-      console.error("Failed to save education:", error);
+    } else {
+      // ✅ Non-standard failure (like CORS, bad network)
+      console.error("Unexpected response object:", response);
       setErrors({
-        general: "Network error. Please check your connection and try again.",
+        general: "Something went wrong. Please try again.",
       });
-    } finally {
-      setIsLoading(false);
     }
-  };
+  } catch (error) {
+    console.error("Failed to save education:", error);
+    setErrors({
+      general: "Network error. Please check your connection and try again.",
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   if (!isOpen) return null;
 

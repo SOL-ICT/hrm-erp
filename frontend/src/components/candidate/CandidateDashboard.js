@@ -7,9 +7,12 @@ import ProfileEdit from "./ProfileEdit";
 import EducationModal from "./EducationModal";
 import ExperienceModal from "./ExperienceModal";
 import EmergencyContactModal from "./EmergencyContactModal";
+import NextOfKin from "./NextofKin";
+import FamilyContact from "./FamilyContact";
+import EmergencyContact from "./EmergencyContact";
 
 const CandidateDashboard = () => {
-  const { user, loading, isAuthenticated, logout, getUserPreferences } =
+  const { user, loading, isAuthenticated, logout, getUserPreferences,sanctumRequest } =
     useAuth();
   const [activeSection, setActiveSection] = useState("overview");
   const [candidateProfile, setCandidateProfile] = useState(null);
@@ -292,13 +295,17 @@ const CandidateDashboard = () => {
   };
 
   const handleProfileSave = async (updatedProfile) => {
+  
+
+  console.log("Saving profile...");
+  console.log("User object:", user);
+  console.log("Updated profile data:", updatedProfile);
+
     try {
-      const response = await fetch(
+      const response = await sanctumRequest (
         `http://localhost:8000/api/candidates/${user.id}/profile`,
         {
           method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(updatedProfile),
         }
       );
@@ -308,6 +315,9 @@ const CandidateDashboard = () => {
         calculateProfileCompletion(data.profile);
         setIsEditingProfile(false);
       }
+      else {
+        console.error("❌ Failed response:", response.status);
+    }
     } catch (error) {
       console.error("Failed to save profile:", error);
     }
@@ -1428,163 +1438,58 @@ const CandidateDashboard = () => {
               )}
             </div>
           )}
-
           {/* Emergency Contacts Section */}
           {activeSection === "emergency" && (
             <div className="space-y-8">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1
-                    className={`text-4xl font-bold ${currentTheme.textPrimary} mb-2 flex items-center`}
-                  >
-                    <span className="mr-3">📞</span>
-                    Emergency Contacts
-                  </h1>
-                  <p className={`text-xl ${currentTheme.textSecondary}`}>
-                    Manage your emergency contacts and guarantors
-                  </p>
-                </div>
-                <button
-                  onClick={() =>
-                    setContactModal({ isOpen: true, editingContact: null })
-                  }
-                  className="px-8 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
-                  style={{
-                    background: `linear-gradient(135deg, ${
-                      preferences.primaryColor || "#6366f1"
-                    }, ${preferences.primaryColor || "#6366f1"}dd)`,
-                  }}
-                >
-                  Add Emergency Contact
-                </button>
-              </div>
-
-              {emergencyContacts.length > 0 ? (
-                <div className="space-y-6">
-                  {emergencyContacts.map((contact, index) => (
-                    <div
-                      key={contact.id || index}
-                      className={`${currentTheme.cardBg} backdrop-blur-md rounded-2xl p-6 ${currentTheme.border} shadow-xl hover:shadow-2xl transition-all duration-300`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center mb-2">
-                            <h3
-                              className={`text-2xl font-bold ${currentTheme.textPrimary}`}
-                            >
-                              {contact.full_name}
-                            </h3>
-                            {contact.is_primary && (
-                              <span className="ml-3 px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full font-medium">
-                                Primary
-                              </span>
-                            )}
-                          </div>
-                          <p
-                            className={`text-lg ${currentTheme.textSecondary} mb-2`}
-                          >
-                            {contact.relationship}
-                          </p>
-                          <p
-                            className={`text-sm ${currentTheme.textMuted} mb-3`}
-                          >
-                            {contact.contact_type}
-                          </p>
-                          <div className="space-y-2">
-                            <p
-                              className={`text-sm ${currentTheme.textSecondary}`}
-                            >
-                              📞 {contact.phone_primary}
-                            </p>
-                            {contact.phone_secondary && (
-                              <p
-                                className={`text-sm ${currentTheme.textSecondary}`}
-                              >
-                                📱 {contact.phone_secondary}
-                              </p>
-                            )}
-                            {contact.email && (
-                              <p
-                                className={`text-sm ${currentTheme.textSecondary}`}
-                              >
-                                ✉️ {contact.email}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-3">
-                          <button
-                            onClick={() =>
-                              setContactModal({
-                                isOpen: true,
-                                editingContact: contact,
-                              })
-                            }
-                            className={`p-3 ${currentTheme.cardBg} rounded-xl ${currentTheme.border} ${currentTheme.hover} transition-all`}
-                          >
-                            <svg
-                              className={`h-5 w-5 ${currentTheme.textSecondary}`}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div
-                  className={`${currentTheme.cardBg} backdrop-blur-md rounded-2xl p-16 ${currentTheme.border} shadow-xl text-center`}
-                >
-                  <div className="max-w-md mx-auto">
-                    <div
-                      className="w-24 h-24 mx-auto rounded-full flex items-center justify-center text-4xl mb-6 shadow-2xl"
-                      style={{
-                        background: `linear-gradient(135deg, ${
-                          preferences.primaryColor || "#6366f1"
-                        }, ${preferences.primaryColor || "#6366f1"}dd)`,
-                      }}
-                    >
-                      📞
-                    </div>
-                    <h3
-                      className={`text-3xl font-bold ${currentTheme.textPrimary} mb-4`}
-                    >
-                      No Emergency Contacts
-                    </h3>
-                    <p
-                      className={`text-lg ${currentTheme.textSecondary} mb-8 leading-relaxed`}
-                    >
-                      Add emergency contacts and guarantors for safety and
-                      verification purposes.
-                    </p>
-                    <button
-                      onClick={() =>
-                        setContactModal({ isOpen: true, editingContact: null })
-                      }
-                      className="px-8 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
-                      style={{
-                        background: `linear-gradient(135deg, ${
-                          preferences.primaryColor || "#6366f1"
-                        }, ${preferences.primaryColor || "#6366f1"}dd)`,
-                      }}
-                    >
-                      Add Your First Contact
-                    </button>
-                  </div>
-                </div>
-              )}
+              <EmergencyContact
+                contacts={emergencyContacts}
+                currentTheme={currentTheme}
+                preferences={preferences}
+                onAdd={() => setContactModal({ isOpen: true, editingContact: null })}
+                onEdit={(contact) =>
+                  setContactModal({ isOpen: true, editingContact: contact })
+                }
+              />
             </div>
           )}
+          {/* End of Emergency Contacts Section */}
+
+          <div className="my-6"></div>
+          
+          {/* Next of Kin Section */}
+          {activeSection === "emergency" && (
+            <NextOfKin
+              contacts={emergencyContacts}
+              currentTheme={currentTheme}
+              preferences={preferences}
+              onAdd={() => setContactModal({ isOpen: true, editingContact: null })}
+              onEdit={(contact) =>
+                setContactModal({ isOpen: true, editingContact: contact })
+              }
+            />
+          )}
+
+          {/* End ofNext of Kin Section */}
+          
+           <div className="my-6"></div>
+
+          {/* family contact Section */}
+          
+          {activeSection === "emergency" && (
+            <FamilyContact
+              contacts={emergencyContacts}
+              currentTheme={currentTheme}
+              preferences={preferences}
+              onAdd={() => setContactModal({ isOpen: true, editingContact: null })}
+              onEdit={(contact) =>
+                setContactModal({ isOpen: true, editingContact: contact })
+              }
+            />
+          )}
+
+          {/* End family contact Section */}
+
+
 
           {/* Other sections with professional empty states */}
           {[

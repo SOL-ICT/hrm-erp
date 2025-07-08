@@ -10,7 +10,7 @@ export default function ExperienceModal({
   experience = null,
   candidateId,
 }) {
-  const { getUserPreferences } = useAuth();
+  const { getUserPreferences, sanctumRequest } = useAuth();
   const preferences = getUserPreferences();
 
   const [formData, setFormData] = useState({
@@ -175,10 +175,8 @@ export default function ExperienceModal({
 
       const method = experience ? "PUT" : "POST";
 
-      const response = await fetch(url, {
+      const response = await sanctumRequest(url, {
         method,
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submissionData),
       });
 
