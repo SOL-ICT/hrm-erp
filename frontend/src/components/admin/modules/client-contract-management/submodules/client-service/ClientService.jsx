@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import LocationMasterForm from "./LocationMasterForm";
 import ServiceRequestForm from "./ServiceRequestForm";
+import ApiService from "../../../../../../services/api";
 
 const ClientService = ({ currentTheme, preferences, onBack }) => {
   const [activeTab, setActiveTab] = useState("location-master");
@@ -49,46 +50,16 @@ const ClientService = ({ currentTheme, preferences, onBack }) => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Sample data - replace with actual API calls
-      setLocations([
-        {
-          id: 1,
-          location_code: "ACC-VI-001",
-          location_name: "Victoria Island Branch",
-          address: "999C Danmole Street, Victoria Island",
-          client_name: "Access Bank Hydrogen",
-          sol_region: "South West",
-          sol_zone: "Lagos Zone",
-          client_region: "Lagos Region",
-          client_zone: "Island Zone",
-          status: "active",
-        },
-        {
-          id: 2,
-          location_code: "FBN-MAR-001",
-          location_name: "Marina Head Office",
-          address: "35 Marina, Lagos Island",
-          client_name: "First Bank Nigeria",
-          sol_region: "South West",
-          sol_zone: "Lagos Zone",
-          client_region: "Lagos Region",
-          client_zone: "Marina Zone",
-          status: "active",
-        },
-        {
-          id: 3,
-          location_code: "ZEN-ABJ-001",
-          location_name: "Abuja Regional Office",
-          address: "Plot 84, Ademola Adetokunbo Crescent, Wuse II",
-          client_name: "Zenith Bank PLC",
-          sol_region: "North Central",
-          sol_zone: "FCT Zone",
-          client_region: "FCT Region",
-          client_zone: "Central Zone",
-          status: "pending",
-        },
-      ]);
+      // Load locations from API
+      const locationsResponse = await ApiService.getServiceLocations();
+      
+      if (locationsResponse.success) {
+        setLocations(locationsResponse.data || []);
+      } else {
+        throw new Error(locationsResponse.message || 'Failed to load locations');
+      }
 
+      // Sample services data - replace with actual API calls later
       setServices([
         {
           id: 1,
@@ -141,6 +112,46 @@ const ClientService = ({ currentTheme, preferences, onBack }) => {
       ]);
     } catch (error) {
       console.error("Error loading data:", error);
+      
+      // Fallback to sample data if API fails
+      setLocations([
+        {
+          id: 1,
+          location_code: "ACC-VI-001",
+          location_name: "Victoria Island Branch",
+          address: "999C Danmole Street, Victoria Island",
+          client_name: "Access Bank Hydrogen",
+          sol_region: "South West",
+          sol_zone: "Lagos Zone",
+          client_region: "Lagos Region",
+          client_zone: "Island Zone",
+          status: "active",
+        },
+        {
+          id: 2,
+          location_code: "FBN-MAR-001",
+          location_name: "Marina Head Office",
+          address: "35 Marina, Lagos Island",
+          client_name: "First Bank Nigeria",
+          sol_region: "South West",
+          sol_zone: "Lagos Zone",
+          client_region: "Lagos Region",
+          client_zone: "Marina Zone",
+          status: "active",
+        },
+        {
+          id: 3,
+          location_code: "ZEN-ABJ-001",
+          location_name: "Abuja Regional Office",
+          address: "Plot 84, Ademola Adetokunbo Crescent, Wuse II",
+          client_name: "Zenith Bank PLC",
+          sol_region: "North Central",
+          sol_zone: "FCT Zone",
+          client_region: "FCT Region",
+          client_zone: "Central Zone",
+          status: "pending",
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -149,9 +160,9 @@ const ClientService = ({ currentTheme, preferences, onBack }) => {
   // Form handlers
   const handleLocationSave = async (locationData) => {
     try {
-      console.log("Saving location:", locationData);
-      // API call would go here
-      await loadData(); // Refresh data
+      console.log("Location saved:", locationData);
+      // Refresh the locations list
+      await loadData();
       setShowLocationForm(false);
       setEditingLocation(null);
     } catch (error) {
@@ -184,11 +195,17 @@ const ClientService = ({ currentTheme, preferences, onBack }) => {
   const handleDeleteLocation = async (locationId) => {
     if (confirm("Are you sure you want to delete this location?")) {
       try {
-        console.log("Deleting location:", locationId);
-        // API call would go here
-        await loadData(); // Refresh data
+        const response = await ApiService.deleteServiceLocation(locationId);
+        
+        if (response.success) {
+          console.log("Location deleted successfully");
+          await loadData(); // Refresh data
+        } else {
+          throw new Error(response.message || 'Failed to delete location');
+        }
       } catch (error) {
         console.error("Error deleting location:", error);
+        alert("Failed to delete location: " + error.message);
       }
     }
   };
