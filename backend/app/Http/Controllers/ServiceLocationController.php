@@ -127,6 +127,8 @@ class ServiceLocationController extends Controller
                 'contact_email' => $request->contact_email,
                 'sol_region' => $request->sol_region,
                 'sol_zone' => $request->sol_zone,
+                'client_region' => $request->client_region,
+                'client_zone' => $request->client_zone,
                 'is_active' => 1,
                 'created_by' => Auth::id(),
                 'created_at' => now(),
@@ -259,6 +261,8 @@ class ServiceLocationController extends Controller
                     'contact_email' => $request->contact_email,
                     'sol_region' => $request->sol_region,
                     'sol_zone' => $request->sol_zone,
+                    'client_region' => $request->client_region,
+                    'client_zone' => $request->client_zone,
                     'is_active' => $request->is_active ?? 1,
                     'updated_at' => now()
                 ]);

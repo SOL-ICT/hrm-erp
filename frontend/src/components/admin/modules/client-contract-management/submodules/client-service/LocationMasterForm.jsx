@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, Save } from "lucide-react";
+import ApiService from "../../../../../../services/api";
 
 const LocationMasterForm = ({
   isOpen,
@@ -31,16 +32,51 @@ const LocationMasterForm = ({
   });
 
   const [clients, setClients] = useState([]);
+  const [states, setStates] = useState([]);
+  const [lgas, setLgas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showRegionManager, setShowRegionManager] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Load clients and states/LGAs data from API
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [clientsResponse, statesResponse] = await Promise.all([
+          ApiService.getClients(),
+          ApiService.getStatesLgas()
+        ]);
+
+        setClients(clientsResponse.data || []);
+        
+        // Process states and LGAs
+        const statesData = statesResponse.data || [];
+        const uniqueStates = [...new Set(statesData.map(item => item.state_name))];
+        setStates(uniqueStates);
+        setLgas(statesData);
+      } catch (error) {
+        console.error("Error loading data:", error);
+        setError(error.message || "Failed to load data");
+        
+        // Fallback to hardcoded data if API fails
+        setClients([
+          { id: 1, name: "Access Bank Hydrogen" },
+          { id: 3, name: "First Bank Nigeria" },
+          { id: 4, name: "Zenith Bank PLC" },
+        ]);
+        setStates(["Lagos", "Abuja FCT", "Rivers", "Kano", "Oyo"]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   // Sample clients data (replace with API call)
   useEffect(() => {
-    setClients([
-      { id: 1, name: "Access Bank Hydrogen" },
-      { id: 3, name: "First Bank Nigeria" },
-      { id: 4, name: "Zenith Bank PLC" },
-    ]);
+    // Remove hardcoded clients - now loaded from API above
   }, []);
 
   // Pre-fill form when editing
@@ -77,24 +113,42 @@ const LocationMasterForm = ({
     setFormData((prev) => ({
       ...prev,
       [name]: value,
+      // Clear city when state changes
+      ...(name === 'state' && { city: '' }),
     }));
+  };
+
+  // Get cities for selected state
+  const getCitiesForState = (stateName) => {
+    if (!stateName) return [];
+    return [...new Set(lgas.filter(item => item.state_name === stateName).map(item => item.lga_name))];
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     try {
-      // API call would go here
-      console.log("Saving location:", formData);
+      let response;
+      
+      if (editingLocation) {
+        // Update existing location
+        response = await ApiService.updateServiceLocation(editingLocation.id, formData);
+      } else {
+        // Create new location
+        response = await ApiService.createServiceLocation(formData);
+      }
 
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      onSave(formData);
-      onClose();
+      if (response.success) {
+        onSave(response.data);
+        onClose();
+      } else {
+        throw new Error(response.message || 'Failed to save location');
+      }
     } catch (error) {
       console.error("Error saving location:", error);
+      setError(error.message || "Failed to save location");
     } finally {
       setLoading(false);
     }
@@ -125,6 +179,42 @@ const LocationMasterForm = ({
           onSubmit={handleSubmit}
           className="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-200px)]"
         >
+          {/* Error display */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+                <div className="ml-auto pl-3">
+                  <button
+                    type="button"
+                    onClick={() => setError(null)}
+                    className="inline-flex text-red-400 hover:text-red-600"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Loading state */}
+          {loading && (
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                <div className="ml-3">
+                  <p className="text-sm text-blue-800">Loading data...</p>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Row 1: Location Code, Location Name, Pin Code */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -198,11 +288,11 @@ const LocationMasterForm = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               >
                 <option value="">Select State</option>
-                <option value="Lagos">Lagos</option>
-                <option value="Abuja FCT">Abuja FCT</option>
-                <option value="Rivers">Rivers</option>
-                <option value="Kano">Kano</option>
-                <option value="Oyo">Oyo</option>
+                {states.map((state) => (
+                  <option key={state} value={state}>
+                    {state}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
@@ -214,13 +304,14 @@ const LocationMasterForm = ({
                 value={formData.city}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                disabled={!formData.state}
               >
                 <option value="">Select City</option>
-                <option value="Lagos">Lagos</option>
-                <option value="Abuja">Abuja</option>
-                <option value="Port Harcourt">Port Harcourt</option>
-                <option value="Kano">Kano</option>
-                <option value="Ibadan">Ibadan</option>
+                {getCitiesForState(formData.state).map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -317,8 +408,8 @@ const LocationMasterForm = ({
             </div>
           </div>
 
-          {/* Row 5: SOL Region, SOL Zone, Client Region, Client Zone */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Row 5: SOL Region, SOL Zone */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 SOL Region
@@ -356,6 +447,10 @@ const LocationMasterForm = ({
                 <option value="Ibadan Zone">Ibadan Zone</option>
               </select>
             </div>
+          </div>
+
+          {/* Row 6: Client Region, Client Zone */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Client Region
@@ -406,7 +501,7 @@ const LocationMasterForm = ({
             </div>
           </div>
 
-          {/* Row 6: Address */}
+          {/* Row 7: Address */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Address
@@ -421,7 +516,7 @@ const LocationMasterForm = ({
             />
           </div>
 
-          {/* Row 7: Notes */}
+          {/* Row 8: Notes */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Notes
