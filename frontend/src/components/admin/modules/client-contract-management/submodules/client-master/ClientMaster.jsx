@@ -442,18 +442,21 @@ const ClientMaster = ({ currentTheme, onClose }) => {
                 </span>
               </div>
 
-              {client.openingBalance !== 0 && (
+              {getClientDisplayData(client).openingBalance !== 0 && (
                 <div className="flex items-center space-x-2">
                   <DollarSign className={`w-4 h-4 ${currentTheme.textMuted}`} />
                   <span
                     className={`text-sm font-medium ${
-                      client.currency === "Dr"
+                      getClientDisplayData(client).currency === "Dr"
                         ? "text-red-600"
                         : "text-green-600"
                     }`}
                   >
-                    ₦{client.openingBalance.toLocaleString()} ({client.currency}
-                    )
+                    ₦
+                    {getClientDisplayData(
+                      client
+                    ).openingBalance.toLocaleString()}{" "}
+                    ({getClientDisplayData(client).currency})
                   </span>
                 </div>
               )}
@@ -745,15 +748,15 @@ const ClientMaster = ({ currentTheme, onClose }) => {
                           Industry/Sector *
                         </label>
                         <select
-                          value={formData.industryCategory}
+                          value={formData.industry_category}
                           onChange={(e) =>
                             setFormData((prev) => ({
                               ...prev,
-                              industryCategory: e.target.value,
+                              industry_category: e.target.value,
                             }))
                           }
                           className={`w-full px-4 py-3 rounded-lg border ${
-                            errors.industryCategory
+                            errors.industry_category
                               ? "border-red-500"
                               : currentTheme.border
                           } ${currentTheme.cardBg} ${
@@ -761,12 +764,13 @@ const ClientMaster = ({ currentTheme, onClose }) => {
                           } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                         >
                           <option value="">Select Industry</option>
-                          {industryOptions.map((industry) => (
+                          {industryCategories.map((industry) => (
                             <option key={industry} value={industry}>
                               {industry}
                             </option>
                           ))}
                         </select>
+
                         {errors.industryCategory && (
                           <p className="text-red-500 text-sm mt-1 flex items-center">
                             <AlertCircle className="w-4 h-4 mr-1" />
@@ -782,15 +786,15 @@ const ClientMaster = ({ currentTheme, onClose }) => {
                           Client Category *
                         </label>
                         <select
-                          value={formData.clientCategory}
+                          value={formData.client_category}
                           onChange={(e) =>
                             setFormData((prev) => ({
                               ...prev,
-                              clientCategory: e.target.value,
+                              client_category: e.target.value,
                             }))
                           }
                           className={`w-full px-4 py-3 rounded-lg border ${
-                            errors.clientCategory
+                            errors.client_category
                               ? "border-red-500"
                               : currentTheme.border
                           } ${currentTheme.cardBg} ${
@@ -798,7 +802,7 @@ const ClientMaster = ({ currentTheme, onClose }) => {
                           } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                         >
                           <option value="">Select Category</option>
-                          {categoryOptions.map((category) => (
+                          {clientCategories.map((category) => (
                             <option key={category} value={category}>
                               {category}
                             </option>

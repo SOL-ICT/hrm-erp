@@ -1,343 +1,404 @@
-// components/admin/modules/DashboardOverview.jsx
-// Fixed syntax errors and imports
-
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState, useEffect } from "react";
+import {
+  Users,
+  Building2,
+  TrendingUp,
+  AlertCircle,
+  FileText,
+  DollarSign,
+  Calendar,
+  Clock,
+  ArrowUp,
+  ArrowDown,
+  MoreHorizontal,
+  Eye,
+  Plus,
+} from "lucide-react";
 
 const DashboardOverview = ({ currentTheme, preferences }) => {
-  const { user } = useAuth();
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState({
+    totalClients: 127,
+    activeStaff: 8942,
+    pendingRequisitions: 23,
+    monthlyRevenue: 142500000,
+    completedPlacements: 89,
+    pendingInterviews: 34,
+    riskAlerts: 3,
+    complianceIssues: 1,
+  });
+
   const [loading, setLoading] = useState(true);
 
+  // SOL Colors
+  const MIDNIGHT_BLUE = "#191970";
+  const SOL_BLUE = "#0066CC";
+  const SOL_RED = "#DC3545";
+
   useEffect(() => {
-    loadDashboardStats();
+    // Simulate API call
+    setTimeout(() => setLoading(false), 1000);
   }, []);
 
-  const loadDashboardStats = async () => {
-    try {
-      // TODO: Replace with actual API call
-      // const response = await adminAPI.getStats();
+  // Compact stat cards data
+  const statCards = [
+    {
+      title: "Total Clients",
+      value: stats.totalClients,
+      change: "+8",
+      changeType: "positive",
+      icon: Building2,
+      color: SOL_BLUE,
+      bgColor: "bg-blue-50",
+      textColor: "text-blue-700",
+    },
+    {
+      title: "Active Staff",
+      value: stats.activeStaff.toLocaleString(),
+      change: "+124",
+      changeType: "positive",
+      icon: Users,
+      color: "#10B981",
+      bgColor: "bg-green-50",
+      textColor: "text-green-700",
+    },
+    {
+      title: "Pending Requests",
+      value: stats.pendingRequisitions,
+      change: "-5",
+      changeType: "positive",
+      icon: FileText,
+      color: "#F59E0B",
+      bgColor: "bg-yellow-50",
+      textColor: "text-yellow-700",
+    },
+    {
+      title: "Monthly Revenue",
+      value: `₦${(stats.monthlyRevenue / 1000000).toFixed(1)}M`,
+      change: "+12.5%",
+      changeType: "positive",
+      icon: DollarSign,
+      color: "#10B981",
+      bgColor: "bg-green-50",
+      textColor: "text-green-700",
+    },
+    {
+      title: "Placements",
+      value: stats.completedPlacements,
+      change: "+15",
+      changeType: "positive",
+      icon: TrendingUp,
+      color: SOL_BLUE,
+      bgColor: "bg-blue-50",
+      textColor: "text-blue-700",
+    },
+    {
+      title: "Interviews",
+      value: stats.pendingInterviews,
+      change: "+7",
+      changeType: "positive",
+      icon: Calendar,
+      color: "#8B5CF6",
+      bgColor: "bg-purple-50",
+      textColor: "text-purple-700",
+    },
+    {
+      title: "Risk Alerts",
+      value: stats.riskAlerts,
+      change: "-2",
+      changeType: "positive",
+      icon: AlertCircle,
+      color: SOL_RED,
+      bgColor: "bg-red-50",
+      textColor: "text-red-700",
+    },
+    {
+      title: "Compliance",
+      value: stats.complianceIssues,
+      change: "0",
+      changeType: "neutral",
+      icon: FileText,
+      color: "#6B7280",
+      bgColor: "bg-gray-50",
+      textColor: "text-gray-700",
+    },
+  ];
 
-      // Mock comprehensive stats for SOL Nigeria
-      setTimeout(() => {
-        setStats({
-          // Core business metrics
-          totalClients: 127,
-          activeContracts: 89,
-          totalStaff: 6578,
-          monthlyRevenue: 45670000,
-
-          // Client contract metrics
-          newClientsThisMonth: 8,
-          expiringContracts: 12,
-          pendingRenewals: 23,
-
-          // HR & Payroll metrics
-          activeEmployees: 6234,
-          pendingPayroll: 34,
-          leaveRequests: 18,
-
-          // Recruitment metrics
-          openVacancies: 45,
-          pendingApplications: 156,
-          interviewsScheduled: 28,
-
-          // Financial metrics
-          monthlyBilling: 28430000,
-          pendingInvoices: 15,
-          overduePayments: 7,
-
-          // Operational metrics
-          pendingRequisitions: 19,
-          procurementRequests: 12,
-          riskAlerts: 3,
-          complianceIssues: 2,
-        });
-        setLoading(false);
-      }, 1000);
-    } catch (error) {
-      console.error("Failed to load dashboard stats:", error);
-      setLoading(false);
-    }
-  };
+  // Recent activities - compact
+  const recentActivities = [
+    {
+      id: 1,
+      type: "client",
+      title: "New client registration",
+      subtitle: "Zenith Bank - Branch Operations",
+      time: "5m ago",
+      status: "pending",
+    },
+    {
+      id: 2,
+      type: "placement",
+      title: "Successful placement",
+      subtitle: "Access Bank - Software Developer",
+      time: "12m ago",
+      status: "completed",
+    },
+    {
+      id: 3,
+      type: "interview",
+      title: "Interview scheduled",
+      subtitle: "First Bank - 3 candidates",
+      time: "1h ago",
+      status: "scheduled",
+    },
+    {
+      id: 4,
+      type: "alert",
+      title: "Contract expiry alert",
+      subtitle: "GTB Contract - 30 days",
+      time: "2h ago",
+      status: "warning",
+    },
+  ];
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className={currentTheme.textSecondary}>
-            Loading dashboard overview...
-          </p>
-        </div>
+        <div
+          className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
+          style={{ borderColor: SOL_BLUE, borderTopColor: "transparent" }}
+        ></div>
       </div>
     );
   }
-
-  if (!stats) {
-    return (
-      <div className="text-center py-12">
-        <p className={currentTheme.textSecondary}>
-          Failed to load dashboard statistics
-        </p>
-      </div>
-    );
-  }
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency: "NGN",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatNumber = (num) => {
-    return new Intl.NumberFormat("en-US").format(num);
-  };
 
   return (
-    <div className="space-y-6">
-      {/* Welcome Header */}
-      <div
-        className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-8 backdrop-blur-md shadow-lg`}
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h1
-              className={`text-4xl font-bold ${currentTheme.textPrimary} mb-2`}
-            >
-              Welcome back, {user?.name}! 👋
-            </h1>
-            <p className={`text-lg ${currentTheme.textSecondary}`}>
-              Here's your Strategic Outsourcing Limited business overview for
-              today.
-            </p>
-          </div>
-          <div className="text-6xl">🏢</div>
+    <div className="space-y-4">
+      {" "}
+      {/* Reduced from space-y-6 */}
+      {/* Header - Compact */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className={`text-xl font-bold ${currentTheme.textPrimary}`}>
+            Dashboard Overview
+          </h1>
+          <p className={`text-sm ${currentTheme.textMuted}`}>
+            Strategic Outsourcing Limited - Real-time insights
+          </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <span className={`text-xs ${currentTheme.textMuted}`}>
+            Last updated:{" "}
+            {new Date().toLocaleTimeString("en-GB", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+          <button className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+            <Plus className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
-
-      {/* Core Business Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div
-          className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 backdrop-blur-md shadow-lg`}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`text-lg font-semibold ${currentTheme.textPrimary}`}>
-              Total Clients
-            </h3>
-            <span className="text-2xl">🏢</span>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className={`${currentTheme.textMuted}`}>Active</span>
-              <span className={`font-bold ${currentTheme.textPrimary}`}>
-                {formatNumber(stats.totalClients)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className={`${currentTheme.textMuted}`}>
-                New This Month
-              </span>
-              <span className={`font-bold text-green-500`}>
-                +{stats.newClientsThisMonth}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className={`${currentTheme.textMuted}`}>
-                Contracts Expiring
-              </span>
-              <span className={`font-bold text-orange-500`}>
-                {stats.expiringContracts}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 backdrop-blur-md shadow-lg`}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`text-lg font-semibold ${currentTheme.textPrimary}`}>
-              Staff Deployed
-            </h3>
-            <span className="text-2xl">👥</span>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className={`${currentTheme.textMuted}`}>Total</span>
-              <span className={`font-bold ${currentTheme.textPrimary}`}>
-                {formatNumber(stats.totalStaff)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className={`${currentTheme.textMuted}`}>Active</span>
-              <span className={`font-bold text-green-500`}>
-                {formatNumber(stats.activeEmployees)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className={`${currentTheme.textMuted}`}>
-                Open Vacancies
-              </span>
-              <span className={`font-bold text-blue-500`}>
-                {stats.openVacancies}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 backdrop-blur-md shadow-lg`}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`text-lg font-semibold ${currentTheme.textPrimary}`}>
-              Monthly Revenue
-            </h3>
-            <span className="text-2xl">💰</span>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className={`${currentTheme.textMuted}`}>This Month</span>
-              <span className={`font-bold ${currentTheme.textPrimary}`}>
-                {formatCurrency(stats.monthlyRevenue)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className={`${currentTheme.textMuted}`}>Billing</span>
-              <span className={`font-bold text-green-500`}>
-                {formatCurrency(stats.monthlyBilling)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className={`${currentTheme.textMuted}`}>
-                Pending Invoices
-              </span>
-              <span className={`font-bold text-yellow-500`}>
-                {stats.pendingInvoices}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 backdrop-blur-md shadow-lg`}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`text-lg font-semibold ${currentTheme.textPrimary}`}>
-              Operations
-            </h3>
-            <span className="text-2xl">⚡</span>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className={`${currentTheme.textMuted}`}>
-                Pending Requisitions
-              </span>
-              <span className={`font-bold ${currentTheme.textPrimary}`}>
-                {stats.pendingRequisitions}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className={`${currentTheme.textMuted}`}>Risk Alerts</span>
-              <span className={`font-bold text-red-500`}>
-                {stats.riskAlerts}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className={`${currentTheme.textMuted}`}>
-                Compliance Issues
-              </span>
-              <span className={`font-bold text-orange-500`}>
-                {stats.complianceIssues}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Module Quick Actions */}
-      <div
-        className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 backdrop-blur-md shadow-lg`}
-      >
-        <h2
-          className={`text-xl font-semibold ${currentTheme.textPrimary} mb-6`}
-        >
-          Business Module Quick Access
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-          {[
-            {
-              name: "Client Contract",
-              icon: "📋",
-              color: "blue",
-              module: "client-contract-management",
-            },
-            {
-              name: "Requisition",
-              icon: "📝",
-              color: "green",
-              module: "requisition-management",
-            },
-            {
-              name: "HR & Payroll",
-              icon: "👥",
-              color: "purple",
-              module: "hr-payroll-management",
-            },
-            {
-              name: "Procurement",
-              icon: "🛒",
-              color: "orange",
-              module: "procurement-management",
-            },
-            {
-              name: "Billing",
-              icon: "💳",
-              color: "yellow",
-              module: "billing-receivable-management",
-            },
-            {
-              name: "Financial",
-              icon: "📈",
-              color: "indigo",
-              module: "financial-accounting",
-            },
-            {
-              name: "Fixed Assets",
-              icon: "🏢",
-              color: "gray",
-              module: "fixed-assets-management",
-            },
-            {
-              name: "Risk Control",
-              icon: "🛡️",
-              color: "red",
-              module: "risk-control-management",
-            },
-          ].map((module, index) => (
-            <button
-              key={index}
-              className="p-4 rounded-xl border border-gray-500/20 bg-gray-500/10 hover:bg-gray-500/20 transition-all text-center group"
-            >
-              <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">
-                {module.icon}
-              </div>
-              <p
-                className={`font-semibold ${currentTheme.textPrimary} text-sm`}
+      {/* Stats Grid - Compact */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+        {" "}
+        {/* Reduced gap */}
+        {statCards.map((stat, index) => (
+          <div
+            key={index}
+            className={`${currentTheme.cardBg} rounded-xl p-3 border ${currentTheme.border} hover:shadow-lg transition-all cursor-pointer group`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div
+                className={`w-7 h-7 rounded-lg ${stat.bgColor} flex items-center justify-center`}
               >
-                {module.name}
+                <stat.icon
+                  className="w-3.5 h-3.5"
+                  style={{ color: stat.color }}
+                />
+              </div>
+              <button className="opacity-0 group-hover:opacity-100 transition-opacity">
+                <MoreHorizontal className="w-3 h-3 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              <p className={`text-lg font-bold ${currentTheme.textPrimary}`}>
+                {stat.value}
               </p>
+              <p className={`text-xs ${currentTheme.textMuted} leading-tight`}>
+                {stat.title}
+              </p>
+              <div className="flex items-center space-x-1">
+                {stat.changeType === "positive" ? (
+                  <ArrowUp className="w-2.5 h-2.5 text-green-500" />
+                ) : stat.changeType === "negative" ? (
+                  <ArrowDown className="w-2.5 h-2.5 text-red-500" />
+                ) : null}
+                <span
+                  className={`text-xs font-medium ${
+                    stat.changeType === "positive"
+                      ? "text-green-600"
+                      : stat.changeType === "negative"
+                      ? "text-red-600"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {stat.change}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Content Grid - Compact */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Recent Activity - Compact */}
+        <div
+          className={`${currentTheme.cardBg} rounded-xl p-4 border ${currentTheme.border}`}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3 className={`text-sm font-semibold ${currentTheme.textPrimary}`}>
+              Recent Activity
+            </h3>
+            <button className="text-xs text-blue-600 hover:text-blue-700 font-medium">
+              View all
             </button>
-          ))}
+          </div>
+          <div className="space-y-2">
+            {recentActivities.map((activity) => (
+              <div
+                key={activity.id}
+                className="flex items-center space-x-3 py-2 border-b border-gray-100 last:border-0"
+              >
+                <div
+                  className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs ${
+                    activity.status === "completed"
+                      ? "bg-green-100 text-green-600"
+                      : activity.status === "pending"
+                      ? "bg-yellow-100 text-yellow-600"
+                      : activity.status === "warning"
+                      ? "bg-red-100 text-red-600"
+                      : "bg-blue-100 text-blue-600"
+                  }`}
+                >
+                  {activity.type === "client"
+                    ? "C"
+                    : activity.type === "placement"
+                    ? "P"
+                    : activity.type === "interview"
+                    ? "I"
+                    : "!"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p
+                    className={`text-xs font-medium ${currentTheme.textPrimary} truncate`}
+                  >
+                    {activity.title}
+                  </p>
+                  <p className={`text-xs ${currentTheme.textMuted} truncate`}>
+                    {activity.subtitle}
+                  </p>
+                </div>
+                <span className={`text-xs ${currentTheme.textMuted}`}>
+                  {activity.time}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Actions - Compact */}
+        <div
+          className={`${currentTheme.cardBg} rounded-xl p-4 border ${currentTheme.border}`}
+        >
+          <h3
+            className={`text-sm font-semibold ${currentTheme.textPrimary} mb-3`}
+          >
+            Quick Actions
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "Add Client", icon: Building2, color: SOL_BLUE },
+              { label: "New Request", icon: FileText, color: "#10B981" },
+              { label: "Schedule Interview", icon: Calendar, color: "#8B5CF6" },
+              { label: "Generate Report", icon: TrendingUp, color: "#F59E0B" },
+            ].map((action, index) => (
+              <button
+                key={index}
+                className="flex flex-col items-center p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all"
+              >
+                <action.icon
+                  className="w-4 h-4 mb-1"
+                  style={{ color: action.color }}
+                />
+                <span className="text-xs font-medium text-gray-700">
+                  {action.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Performance Summary - Compact */}
+        <div
+          className={`${currentTheme.cardBg} rounded-xl p-4 border ${currentTheme.border}`}
+        >
+          <h3
+            className={`text-sm font-semibold ${currentTheme.textPrimary} mb-3`}
+          >
+            This Month
+          </h3>
+          <div className="space-y-3">
+            {[
+              {
+                label: "Placement Rate",
+                value: "89%",
+                change: "+5%",
+                positive: true,
+              },
+              {
+                label: "Client Satisfaction",
+                value: "4.8/5",
+                change: "+0.2",
+                positive: true,
+              },
+              {
+                label: "Response Time",
+                value: "2.3h",
+                change: "-0.5h",
+                positive: true,
+              },
+              {
+                label: "Revenue Target",
+                value: "94%",
+                change: "+12%",
+                positive: true,
+              },
+            ].map((metric, index) => (
+              <div key={index} className="flex items-center justify-between">
+                <span className={`text-xs ${currentTheme.textMuted}`}>
+                  {metric.label}
+                </span>
+                <div className="flex items-center space-x-2">
+                  <span
+                    className={`text-xs font-semibold ${currentTheme.textPrimary}`}
+                  >
+                    {metric.value}
+                  </span>
+                  <span
+                    className={`text-xs ${
+                      metric.positive ? "text-green-600" : "text-red-600"
+                    }`}
+                  >
+                    {metric.change}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-
-      {/* Rest of the component continues... */}
     </div>
   );
 };

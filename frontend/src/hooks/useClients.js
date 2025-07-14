@@ -1,6 +1,3 @@
-// File Path: frontend/src/hooks/useClients.js
-// Using existing sanctumRequest from AuthContext
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,9 +13,14 @@ export const useClients = (initialParams = {}) => {
   const [statistics, setStatistics] = useState({});
 
   // Get sanctumRequest from existing AuthContext
-  const { sanctumRequest } = useAuth();
+  const { sanctumRequest, isAuthenticated, hasRole } = useAuth();
 
   const fetchClients = async (params = initialParams) => {
+    // Only fetch if user is authenticated and has admin role
+    if (!isAuthenticated || !hasRole("admin")) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -32,19 +34,22 @@ export const useClients = (initialParams = {}) => {
         page: params.page || 1,
       });
 
+      // FIXED: Use correct backend route
       const response = await sanctumRequest(
-        `${API_BASE}/clients?${queryParams}`
+        `${API_BASE}/admin/clients?${queryParams}`
       );
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success) {
-          setClients(data.data.data || []);
+        if (data.status === "success") {
+          // Backend returns data directly, not in data.data structure
+          setClients(Array.isArray(data.data) ? data.data : []);
+          // Set basic pagination (backend doesn't return pagination info yet)
           setPagination({
-            current_page: data.data.current_page,
-            last_page: data.data.last_page,
-            per_page: data.data.per_page,
-            total: data.data.total,
+            current_page: params.page || 1,
+            last_page: 1,
+            per_page: params.perPage || 15,
+            total: Array.isArray(data.data) ? data.data.length : 0,
           });
         } else {
           setError(data.message || "Failed to fetch clients");
@@ -61,12 +66,18 @@ export const useClients = (initialParams = {}) => {
   };
 
   const fetchStatistics = async () => {
+    // Only fetch if user is authenticated and has admin role
+    if (!isAuthenticated || !hasRole("admin")) {
+      return;
+    }
+
     try {
-      const response = await sanctumRequest(`${API_BASE}/clients/statistics`);
+      // FIXED: Use correct backend route
+      const response = await sanctumRequest(`${API_BASE}/admin/stats`);
       if (response.ok) {
         const data = await response.json();
-        if (data.success) {
-          setStatistics(data.data);
+        if (data.status === "success") {
+          setStatistics(data.data.stats || {});
         }
       }
     } catch (err) {
@@ -75,16 +86,21 @@ export const useClients = (initialParams = {}) => {
   };
 
   const createClient = async (clientData) => {
+    if (!isAuthenticated || !hasRole("admin")) {
+      throw new Error("Unauthorized");
+    }
+
     setLoading(true);
     try {
-      const response = await sanctumRequest(`${API_BASE}/clients`, {
+      // FIXED: Use correct backend route
+      const response = await sanctumRequest(`${API_BASE}/admin/clients`, {
         method: "POST",
         body: JSON.stringify(clientData),
       });
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success) {
+        if (data.status === "success") {
           await fetchClients(); // Refresh the list
           await fetchStatistics(); // Refresh statistics
           return data;
@@ -104,16 +120,21 @@ export const useClients = (initialParams = {}) => {
   };
 
   const updateClient = async (id, clientData) => {
+    if (!isAuthenticated || !hasRole("admin")) {
+      throw new Error("Unauthorized");
+    }
+
     setLoading(true);
     try {
-      const response = await sanctumRequest(`${API_BASE}/clients/${id}`, {
+      // FIXED: Use correct backend route (assuming it exists)
+      const response = await sanctumRequest(`${API_BASE}/admin/clients/${id}`, {
         method: "PUT",
         body: JSON.stringify(clientData),
       });
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success) {
+        if (data.status === "success") {
           await fetchClients(); // Refresh the list
           return data;
         } else {
@@ -132,15 +153,20 @@ export const useClients = (initialParams = {}) => {
   };
 
   const deleteClient = async (id) => {
+    if (!isAuthenticated || !hasRole("admin")) {
+      throw new Error("Unauthorized");
+    }
+
     setLoading(true);
     try {
-      const response = await sanctumRequest(`${API_BASE}/clients/${id}`, {
+      // FIXED: Use correct backend route (assuming it exists)
+      const response = await sanctumRequest(`${API_BASE}/admin/clients/${id}`, {
         method: "DELETE",
       });
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success) {
+        if (data.status === "success") {
           await fetchClients(); // Refresh the list
           await fetchStatistics(); // Refresh statistics
           return data;
@@ -160,55 +186,53 @@ export const useClients = (initialParams = {}) => {
   };
 
   const toggleStatus = async (id, status) => {
+    if (!isAuthenticated || !hasRole("admin")) {
+      throw new Error("Unauthorized");
+    }
+
     try {
-      const response = await sanctumRequest(
-        `${API_BASE}/clients/${id}/toggle-status`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({ status }),
-        }
-      );
+      const response = await sanctumRequest(`${API_BASE}/admin/clients/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status }),
+      });
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success) {
+        if (data.status === "success") {
           await fetchClients(); // Refresh the list
           return data;
         } else {
-          throw new Error(data.message || "Failed to toggle status");
+          throw new Error(data.message || "Failed to update client status");
         }
       } else {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to toggle status");
+        throw new Error(errorData.message || "Failed to update client status");
       }
     } catch (err) {
-      setError(err.message);
+      console.error("Error updating client status:", err);
       throw err;
     }
   };
 
-  const uploadLogo = async (file, clientId) => {
+  const uploadLogo = async (id, logoFile) => {
+    if (!isAuthenticated || !hasRole("admin")) {
+      throw new Error("Unauthorized");
+    }
+
     try {
       const formData = new FormData();
-      formData.append("file", file);
-      formData.append("type", "logo");
-      if (clientId) formData.append("client_id", clientId);
+      formData.append("logo", logoFile);
 
-      const response = await sanctumRequest(
-        `${API_BASE}/utilities/upload-file`,
-        {
-          method: "POST",
-          body: formData,
-          // Don't set Content-Type header for FormData - let the browser set it
-          headers: {
-            "X-Requested-With": "XMLHttpRequest",
-          },
-        }
-      );
+      const response = await fetch(`${API_BASE}/admin/clients/${id}/logo`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success) {
+        if (data.status === "success") {
+          await fetchClients(); // Refresh the list
           return data;
         } else {
           throw new Error(data.message || "Failed to upload logo");
@@ -223,11 +247,13 @@ export const useClients = (initialParams = {}) => {
     }
   };
 
-  // Fetch initial data
+  // Only fetch initial data if user has admin access
   useEffect(() => {
-    fetchClients();
-    fetchStatistics();
-  }, []);
+    if (isAuthenticated && hasRole("admin")) {
+      fetchClients();
+      fetchStatistics();
+    }
+  }, [isAuthenticated]);
 
   return {
     clients,
@@ -243,8 +269,10 @@ export const useClients = (initialParams = {}) => {
     toggleStatus,
     uploadLogo,
     refetch: () => {
-      fetchClients();
-      fetchStatistics();
+      if (isAuthenticated && hasRole("admin")) {
+        fetchClients();
+        fetchStatistics();
+      }
     },
   };
 };
@@ -256,31 +284,44 @@ export const useUtilityData = () => {
   const [statesLgas, setStatesLgas] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const { sanctumRequest } = useAuth();
+  const { sanctumRequest, isAuthenticated } = useAuth();
 
   const fetchUtilityData = async () => {
+    if (!isAuthenticated) {
+      return;
+    }
+
     setLoading(true);
     try {
       // Fetch all utility data in parallel
       const [industriesRes, categoriesRes, statesRes] = await Promise.all([
         sanctumRequest(`${API_BASE}/utilities/industry-categories`),
         sanctumRequest(`${API_BASE}/utilities/client-categories`),
-        sanctumRequest(`${API_BASE}/utilities/states-lgas`),
+        sanctumRequest(`${API_BASE}/states-lgas`),
       ]);
 
+      // Process industry categories
       if (industriesRes.ok) {
         const data = await industriesRes.json();
-        if (data.success) setIndustryCategories(data.data);
+        if (data.success) {
+          setIndustryCategories(data.data || []);
+        }
       }
 
+      // Process client categories
       if (categoriesRes.ok) {
         const data = await categoriesRes.json();
-        if (data.success) setClientCategories(data.data);
+        if (data.success) {
+          setClientCategories(data.data || []);
+        }
       }
 
+      // Process states/LGAs
       if (statesRes.ok) {
         const data = await statesRes.json();
-        if (data.success) setStatesLgas(data.data);
+        if (data.success) {
+          setStatesLgas(data.data || []);
+        }
       }
     } catch (error) {
       console.error("Error fetching utility data:", error);
@@ -290,8 +331,10 @@ export const useUtilityData = () => {
   };
 
   useEffect(() => {
-    fetchUtilityData();
-  }, []);
+    if (isAuthenticated) {
+      fetchUtilityData();
+    }
+  }, [isAuthenticated]);
 
   return {
     industryCategories,

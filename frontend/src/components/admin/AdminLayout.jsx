@@ -6,27 +6,32 @@ import { useRouter } from "next/navigation";
 import AdminHeader from "./AdminHeader";
 import AdminNavigation from "./AdminNavigation";
 import AdminRouter from "./AdminRouter";
-
-// File: frontend/src/components/admin/AdminLayout.jsx
+import ActivitySidebarPanel from "./ActivitySidebarPanel";
 
 const AdminLayout = () => {
   const { user, loading, isAuthenticated, getUserPreferences } = useAuth();
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isActivityPanelOpen, setIsActivityPanelOpen] = useState(false);
   const [activeModule, setActiveModule] = useState("dashboard");
   const [activeSubmodule, setActiveSubmodule] = useState(null);
 
-  // Get user preferences
+  // SOL Colors
+  const MIDNIGHT_BLUE = "#191970";
+  const SOL_BLUE = "#0066CC";
+  const SOL_RED = "#DC3545";
+
+  // Get user preferences with SOL defaults
   const preferences = getUserPreferences() || {
     theme: "dark",
-    primaryColor: "#6366f1",
+    primaryColor: SOL_BLUE,
     language: "en",
   };
 
-  // Theme configurations
+  // Enhanced theme configurations with SOL branding
   const themes = {
     light: {
-      bg: "bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50",
+      bg: "bg-gradient-to-br from-slate-50 via-gray-50 to-blue-50",
       cardBg: "bg-white/95",
       sidebarBg: "bg-white/90",
       headerBg: "bg-white/95",
@@ -37,21 +42,21 @@ const AdminLayout = () => {
       hover: "hover:bg-gray-50",
     },
     dark: {
-      bg: "bg-gradient-to-br from-slate-900 via-gray-900 to-black",
+      bg: "bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800",
       cardBg: "bg-slate-800/95",
-      sidebarBg: "bg-slate-800/90",
-      headerBg: "bg-slate-800/95",
+      sidebarBg: `bg-gradient-to-b from-[${MIDNIGHT_BLUE}] to-[#0f0f3d]`,
+      headerBg: `bg-gradient-to-r from-[${MIDNIGHT_BLUE}] to-[#0f0f3d]`,
       textPrimary: "text-white",
       textSecondary: "text-gray-300",
       textMuted: "text-gray-400",
-      border: "border-gray-700",
+      border: "border-slate-600/30",
       hover: "hover:bg-slate-700/50",
     },
     transparent: {
-      bg: "bg-gradient-to-br from-indigo-900/80 via-purple-900/80 to-slate-900/80",
+      bg: "bg-gradient-to-br from-slate-900/90 via-gray-900/90 to-slate-800/90",
       cardBg: "bg-white/10 backdrop-blur-md",
-      sidebarBg: "bg-white/10 backdrop-blur-md",
-      headerBg: "bg-white/10 backdrop-blur-md",
+      sidebarBg: `bg-gradient-to-b from-[${MIDNIGHT_BLUE}]/95 to-[#0f0f3d]/95 backdrop-blur-md`,
+      headerBg: `bg-gradient-to-r from-[${MIDNIGHT_BLUE}]/95 to-[#0f0f3d]/95 backdrop-blur-md`,
       textPrimary: "text-white",
       textSecondary: "text-white/80",
       textMuted: "text-white/60",
@@ -68,6 +73,17 @@ const AdminLayout = () => {
     setActiveSubmodule(submoduleId);
   };
 
+  // Handle activity panel actions
+  const handleActivityAction = (moduleId, action) => {
+    console.log(`Activity action: ${action} for module: ${moduleId}`);
+    // Handle specific actions based on module and action type
+    if (action === "add") {
+      handleModuleChange(moduleId, "create");
+    } else if (action === "view") {
+      handleModuleChange(moduleId);
+    }
+  };
+
   // Check authentication
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -77,10 +93,15 @@ const AdminLayout = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-gray-900 to-black">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#191970] via-slate-900 to-black">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-white/80">Loading Admin Dashboard...</p>
+          <div
+            className="w-12 h-12 border-3 border-t-transparent rounded-full animate-spin mx-auto mb-3"
+            style={{ borderColor: SOL_BLUE, borderTopColor: "transparent" }}
+          ></div>
+          <p className="text-white/80 text-sm">
+            Loading SOL Admin Dashboard...
+          </p>
         </div>
       </div>
     );
@@ -92,19 +113,20 @@ const AdminLayout = () => {
 
   return (
     <div className={`min-h-screen ${currentTheme.bg}`}>
-      {/* Background Pattern */}
-      <div className="fixed inset-0 opacity-5 pointer-events-none">
+      {/* Subtle Background Pattern */}
+      <div className="fixed inset-0 opacity-3 pointer-events-none">
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23${
-              preferences.primaryColor?.replace("#", "") || "6366f1"
-            }' fill-opacity='0.1'%3E%3Cpath d='m36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23${SOL_BLUE.replace(
+              "#",
+              ""
+            )}' fill-opacity='0.05'%3E%3Cpath d='m20 20v-8h-4v8h-8v4h8v8h4v-8h8v-4h-8z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           }}
         />
       </div>
 
-      {/* Fixed Header */}
+      {/* Compact Fixed Header */}
       <AdminHeader
         currentTheme={currentTheme}
         preferences={preferences}
@@ -114,29 +136,53 @@ const AdminLayout = () => {
       />
 
       <div className="flex">
-        {/* Navigation Sidebar */}
-        <AdminNavigation
-          currentTheme={currentTheme}
-          preferences={preferences}
-          activeModule={activeModule}
-          activeSubmodule={activeSubmodule}
-          onModuleChange={handleModuleChange}
-          isCollapsed={isSidebarCollapsed}
-        />
+        {/* Navigation Sidebar - Compact positioning */}
+        <div
+          className={`fixed left-0 bottom-0 z-40 transition-all duration-300 ${
+            isSidebarCollapsed ? "w-16" : "w-64"
+          }`}
+          style={{
+            top: "64px", // Matches new compact header height
+            height: "calc(100vh - 64px)",
+          }}
+        >
+          <AdminNavigation
+            currentTheme={currentTheme}
+            preferences={preferences}
+            activeModule={activeModule}
+            activeSubmodule={activeSubmodule}
+            onModuleChange={handleModuleChange}
+            isCollapsed={isSidebarCollapsed}
+          />
+        </div>
 
-        {/* Main Content Area - Fixed padding-top to account for header */}
+        {/* Main Content Area - Compact spacing */}
         <main
           className={`flex-1 transition-all duration-300 ${
-            isSidebarCollapsed ? "ml-20" : "ml-72"
-          } pt-20`} // Added pt-20 to account for header height
+            isSidebarCollapsed ? "ml-16" : "ml-64"
+          }`}
+          style={{
+            marginTop: "64px", // Compact header height
+            minHeight: "calc(100vh - 64px)",
+          }}
         >
-          <div className="p-8">
+          <div
+            className={`p-6 ${
+              isActivityPanelOpen ? "pr-80" : ""
+            } transition-all duration-300`}
+          >
             <Suspense
               fallback={
                 <div className="flex items-center justify-center h-64">
                   <div className="text-center">
-                    <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className={currentTheme.textSecondary}>
+                    <div
+                      className="w-12 h-12 border-3 border-t-transparent rounded-full animate-spin mx-auto mb-3"
+                      style={{
+                        borderColor: SOL_BLUE,
+                        borderTopColor: "transparent",
+                      }}
+                    ></div>
+                    <p className={`${currentTheme.textSecondary} text-sm`}>
                       Loading module...
                     </p>
                   </div>
@@ -153,6 +199,15 @@ const AdminLayout = () => {
           </div>
         </main>
       </div>
+
+      {/* Activity Sidebar Panel */}
+      <ActivitySidebarPanel
+        currentTheme={currentTheme}
+        preferences={preferences}
+        isOpen={isActivityPanelOpen}
+        onToggle={() => setIsActivityPanelOpen(!isActivityPanelOpen)}
+        onActionClick={handleActivityAction}
+      />
     </div>
   );
 };
