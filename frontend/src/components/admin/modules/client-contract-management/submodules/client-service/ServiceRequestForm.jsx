@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, Save } from "lucide-react";
+import { serviceRequestAPI } from "../../../../../../services/api";
 
 const ServiceRequestForm = ({
   isOpen,
@@ -18,20 +19,54 @@ const ServiceRequestForm = ({
 
   const [loading, setLoading] = useState(false);
 
+  // Add the resetForm function here
+  const resetForm = () => {
+    setFormData({
+      service_code: "",
+      service_name: "",
+      description: "",
+      category: "",
+      is_active: true,
+    });
+  };
+
   // Pre-fill form when editing
   useEffect(() => {
     if (editingService) {
-      setFormData(editingService);
-    } else {
-      // Reset form for new service
       setFormData({
-        service_code: "",
-        service_name: "",
-        description: "",
-        category: "",
+        service_code: editingService.service_code || "",
+        service_name: editingService.service_name || "",
+        description: editingService.description || "",
+        category: editingService.category || "",
+        is_active: editingService.is_active === 1,
       });
     }
-  }, [editingService, isOpen]);
+  }, [editingService]);
+
+  useEffect(() => {
+    if (isOpen && !editingService) {
+      resetForm();
+    }
+  }, [isOpen, editingService]);
+
+  const [existingServices, setExistingServices] = useState([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadExistingServices();
+    }
+  }, [isOpen]);
+
+  const loadExistingServices = async () => {
+    try {
+      const response = await serviceRequestAPI.getAll();
+      if (response.success) {
+        setExistingServices(response.data || []);
+      }
+    } catch (error) {
+      console.error("Error loading existing services:", error);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -43,21 +78,44 @@ const ServiceRequestForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setFormLoading(true);
 
     try {
-      // API call would go here
-      console.log("Saving service request:", formData);
+      const dataToSubmit = {
+        service_code: formData.service_code,
+        service_name: formData.service_name,
+        description: formData.description,
+        category: formData.category,
+        is_active: formData.is_active ? 1 : 0,
+      };
 
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      let response;
+      if (editingService) {
+        response = await serviceRequestAPI.update(
+          editingService.id,
+          dataToSubmit
+        );
+      } else {
+        response = await serviceRequestAPI.create(dataToSubmit);
+      }
 
-      onSave(formData);
-      onClose();
+      if (response.success) {
+        alert(
+          editingService
+            ? "Service updated successfully!"
+            : "Service created successfully!"
+        );
+        onSave(response.data);
+        onClose();
+        resetForm();
+      } else {
+        alert(response.message || "Error saving service");
+      }
     } catch (error) {
-      console.error("Error saving service request:", error);
+      console.error("Error saving service:", error);
+      alert("Error saving service. Please try again.");
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   };
 
@@ -158,69 +216,72 @@ const ServiceRequestForm = ({
 
         {/* Record List Section */}
         <div className="bg-black text-white py-2 px-6">
-          <h3 className="text-center font-bold">RECORD LIST</h3>
+          <h3 className="text-center font-bold">EXISTING SERVICE TYPES</h3>
         </div>
 
-        {/* Sample Records Table */}
+        {/* Real Services Table */}
         <div className="max-h-48 overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-100 sticky top-0">
               <tr>
                 <th className="px-4 py-2 text-left font-medium text-gray-700">
-                  S/N
+                  Code
                 </th>
                 <th className="px-4 py-2 text-left font-medium text-gray-700">
                   Service Name
                 </th>
                 <th className="px-4 py-2 text-left font-medium text-gray-700">
-                  Description
+                  Category
+                </th>
+                <th className="px-4 py-2 text-left font-medium text-gray-700">
+                  Status
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {[
-                {
-                  id: 1,
-                  name: "Account Officer",
-                  description: "Manage client accounts and financial records",
-                },
-                { id: 2, name: "Accountant", description: "" },
-                {
-                  id: 3,
-                  name: "Accounting Financial Analyst",
-                  description: "",
-                },
-                {
-                  id: 4,
-                  name: "Accounts Receivable Specialist",
-                  description: "",
-                },
-                { id: 5, name: "Ad-Hoc Accounting Officer", description: "" },
-                { id: 6, name: "Adhoc Staff", description: "" },
-                { id: 7, name: "Admin & Operation Manager", description: "" },
-                {
-                  id: 8,
-                  name: "Administrative Officer",
-                  description: "Administrative Officer",
-                },
-                { id: 9, name: "Agent Field Officer", description: "" },
-                {
-                  id: 10,
-                  name: "Agent Network Officer",
-                  description:
-                    "Recruit agents and businesses to resell our servicesComp...",
-                },
-              ].map((record, index) => (
-                <tr key={record.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2 text-gray-900">{record.id}</td>
-                  <td className="px-4 py-2 text-gray-900">{record.name}</td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {record.description}
+              {existingServices.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan="4"
+                    className="px-4 py-4 text-center text-gray-500"
+                  >
+                    No existing services found
                   </td>
                 </tr>
-              ))}
+              ) : (
+                existingServices.map((service) => (
+                  <tr key={service.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-2 text-gray-900 font-medium">
+                      {service.service_code}
+                    </td>
+                    <td className="px-4 py-2 text-gray-900">
+                      {service.service_name}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {service.category || "Uncategorized"}
+                    </td>
+                    <td className="px-4 py-2">
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${
+                          service.is_active
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {service.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
+        </div>
+        <div className="px-6 py-2 bg-gray-50 text-xs text-gray-600">
+          <p>
+            💡 Tip: Ensure your service code is unique. Common format: XXX001
+            (e.g., ACC001, SEC001)
+          </p>
         </div>
 
         {/* Footer Actions */}

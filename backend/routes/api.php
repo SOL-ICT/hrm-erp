@@ -16,6 +16,7 @@ use App\Http\Controllers\ClientContractController;
 use App\Http\Controllers\SystemPreferenceController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\UtilityController;
+use App\Http\Controllers\Admin\SOLOfficeController;
 
 /*
 |--------------------------------------------------------------------------
@@ -274,6 +275,40 @@ Route::middleware([
         Route::delete('/cleanup/{days}', [AuditLogController::class, 'cleanup'])->name('audit-logs.cleanup');
     });
 
+
+    // SOL Office lookup (for service location assignment)
+    Route::prefix('sol-offices')->group(function () {
+        Route::get('/lookup/auto-assign', function (Request $request) {
+            $stateCode = $request->get('state_code');
+            $lgaCode = $request->get('lga_code');
+
+            // Use DB instead of model
+            $office = DB::table('sol_offices')
+                ->where('is_active', true)
+                ->where('state_code', $stateCode)
+                ->first();
+
+            return response()->json([
+                'success' => true,
+                'data' => $office
+            ]);
+        })->name('sol-offices.auto-assign');
+
+        Route::get('/active', function () {
+            $offices = DB::table('sol_offices')
+                ->where('is_active', true)
+                ->select('id', 'office_name', 'office_code', 'state_name', 'control_type', 'zone_name')
+                ->orderBy('state_name')
+                ->orderBy('office_name')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $offices
+            ]);
+        })->name('sol-offices.active');
+    });
+
     /*
     |--------------------------------------------------------------------------
     | Utility Routes
@@ -444,6 +479,19 @@ Route::middleware(['auth:sanctum', 'role:super-admin,admin'])->group(function ()
     Route::prefix('admin/service-requests')->group(function () {
         Route::post('/bulk-update', [ServiceRequestController::class, 'bulkUpdate'])->name('admin.service-requests.bulk-update');
         Route::get('/usage-statistics', [ServiceRequestController::class, 'getUsageStatistics'])->name('admin.service-requests.usage-statistics');
+    });
+
+
+    // SOL Office management (Global admin only)
+    Route::prefix('admin/sol-offices')->group(function () {
+        Route::get('/', [SOLOfficeController::class, 'index'])->name('admin.sol-offices.index');
+        Route::post('/', [SOLOfficeController::class, 'store'])->name('admin.sol-offices.store');
+        Route::get('/data/states-lgas', [SOLOfficeController::class, 'getStatesAndLGAs'])->name('admin.sol-offices.states-lgas');
+        Route::get('/data/statistics', [SOLOfficeController::class, 'getStatistics'])->name('admin.sol-offices.statistics');
+        Route::patch('/bulk/status', [SOLOfficeController::class, 'bulkUpdateStatus'])->name('admin.sol-offices.bulk-status');
+        Route::get('/{id}', [SOLOfficeController::class, 'show'])->name('admin.sol-offices.show');
+        Route::put('/{id}', [SOLOfficeController::class, 'update'])->name('admin.sol-offices.update');
+        Route::delete('/{id}', [SOLOfficeController::class, 'destroy'])->name('admin.sol-offices.destroy');
     });
 
     // System maintenance routes

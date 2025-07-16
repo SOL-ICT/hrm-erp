@@ -73,32 +73,23 @@ class ServiceLocationController extends Controller
         }
     }
 
-    /**
-     * Store a newly created service location
-     */
     public function store(Request $request)
     {
         try {
-            // Validation rules
+            // Validation rules - updated to match new requirements
             $validator = Validator::make($request->all(), [
-                'location_code' => 'required|string|max:20|unique:service_locations,location_code',
+                'location_code' => 'nullable|string|max:20|unique:service_locations,location_code',
                 'location_name' => 'required|string|max:255',
+                'unique_id' => 'nullable|string|max:100',
+                'short_name' => 'nullable|string|max:100',
+                'city' => 'required|string|max:100',
+                'full_address' => 'nullable|string',
+                'contact_person_name' => 'nullable|string|max:255',
+                'contact_person_phone' => 'nullable|string|max:20',
+                'contact_person_email' => 'nullable|email|max:255',
                 'client_id' => 'required|integer|exists:clients,id',
-                'country' => 'nullable|string|max:100',
-                'state' => 'nullable|string|max:100',
-                'city' => 'nullable|string|max:100',
-                'address' => 'nullable|string',
-                'pin_code' => 'nullable|string|max:10',
-                'phone' => 'nullable|string|max:20',
-                'fax' => 'nullable|string|max:20',
-                'notes' => 'nullable|string',
-                'contact_name' => 'nullable|string|max:255',
-                'contact_phone' => 'nullable|string|max:20',
-                'contact_email' => 'nullable|email|max:255',
-                'sol_region' => 'nullable|string|max:100',
-                'sol_zone' => 'nullable|string|max:100',
-                'client_region' => 'nullable|string|max:100',
-                'client_zone' => 'nullable|string|max:100',
+                'sol_office_id' => 'nullable|integer|exists:sol_offices,id',
+                'is_active' => 'boolean'
             ]);
 
             if ($validator->fails()) {
@@ -109,37 +100,61 @@ class ServiceLocationController extends Controller
                 ], 422);
             }
 
+            // Generate location code if not provided
+            if (empty($request->location_code)) {
+                $client = DB::table('clients')->where('id', $request->client_id)->first();
+                $cityCode = strtoupper(substr($request->city, 0, 3));
+                $timestamp = now()->format('His');
+                $locationCode = $client->client_code . '-' . $cityCode . '-' . $timestamp;
+            } else {
+                $locationCode = $request->location_code;
+            }
+
             // Create service location
             $locationId = DB::table('service_locations')->insertGetId([
-                'location_code' => $request->location_code,
+                'location_code' => $locationCode,
                 'location_name' => $request->location_name,
-                'client_id' => $request->client_id,
-                'country' => $request->country ?? 'Nigeria',
-                'state' => $request->state,
+                'unique_id' => $request->unique_id,
+                'short_name' => $request->short_name,
                 'city' => $request->city,
-                'address' => $request->address,
-                'pin_code' => $request->pin_code,
-                'phone' => $request->phone,
-                'fax' => $request->fax,
-                'notes' => $request->notes,
-                'contact_name' => $request->contact_name,
-                'contact_phone' => $request->contact_phone,
-                'contact_email' => $request->contact_email,
-                'sol_region' => $request->sol_region,
-                'sol_zone' => $request->sol_zone,
-                'is_active' => 1,
+                'full_address' => $request->full_address,
+                'contact_person_name' => $request->contact_person_name,
+                'contact_person_phone' => $request->contact_person_phone,
+                'contact_person_email' => $request->contact_person_email,
+                'client_id' => $request->client_id,
+                'sol_office_id' => $request->sol_office_id,
+                'country' => 'Nigeria',
+                'is_active' => $request->boolean('is_active', true),
                 'created_by' => Auth::id(),
                 'created_at' => now(),
-                'updated_at' => now()
+                'updated_at' => now(),
+
+                // Set old fields to null or default values
+                'state' => null,
+                'address' => $request->full_address, // Copy to old address field
+                'pin_code' => null,
+                'phone' => null,
+                'fax' => null,
+                'contact_name' => $request->contact_person_name, // Copy to old field
+                'contact_phone' => $request->contact_person_phone, // Copy to old field
+                'contact_email' => $request->contact_person_email, // Copy to old field
+                'sol_region' => null,
+                'sol_zone' => null,
+                'client_region' => null,
+                'client_zone' => null,
+                'notes' => null
             ]);
 
-            // Get the created location with client info
+            // Get the created location with client and SOL office info
             $location = DB::table('service_locations')
                 ->join('clients', 'service_locations.client_id', '=', 'clients.id')
+                ->leftJoin('sol_offices', 'service_locations.sol_office_id', '=', 'sol_offices.id')
                 ->select(
                     'service_locations.*',
                     'clients.name as client_name',
-                    'clients.client_code'
+                    'clients.client_code',
+                    'sol_offices.office_name as sol_office_name',
+                    'sol_offices.state_name as sol_office_state'
                 )
                 ->where('service_locations.id', $locationId)
                 ->first();
@@ -156,6 +171,7 @@ class ServiceLocationController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * Display the specified service location
@@ -200,8 +216,8 @@ class ServiceLocationController extends Controller
     {
         try {
             // Check if location exists
-            $existingLocation = DB::table('service_locations')->where('id', $id)->first();
-            if (!$existingLocation) {
+            $location = DB::table('service_locations')->where('id', $id)->first();
+            if (!$location) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Service location not found'
@@ -210,24 +226,17 @@ class ServiceLocationController extends Controller
 
             // Validation rules
             $validator = Validator::make($request->all(), [
-                'location_code' => 'required|string|max:20|unique:service_locations,location_code,' . $id,
+                'location_code' => 'nullable|string|max:20|unique:service_locations,location_code,' . $id,
                 'location_name' => 'required|string|max:255',
+                'unique_id' => 'nullable|string|max:100',
+                'short_name' => 'nullable|string|max:100',
+                'city' => 'required|string|max:100',
+                'full_address' => 'nullable|string',
+                'contact_person_name' => 'nullable|string|max:255',
+                'contact_person_phone' => 'nullable|string|max:20',
+                'contact_person_email' => 'nullable|email|max:255',
                 'client_id' => 'required|integer|exists:clients,id',
-                'country' => 'nullable|string|max:100',
-                'state' => 'nullable|string|max:100',
-                'city' => 'nullable|string|max:100',
-                'address' => 'nullable|string',
-                'pin_code' => 'nullable|string|max:10',
-                'phone' => 'nullable|string|max:20',
-                'fax' => 'nullable|string|max:20',
-                'notes' => 'nullable|string',
-                'contact_name' => 'nullable|string|max:255',
-                'contact_phone' => 'nullable|string|max:20',
-                'contact_email' => 'nullable|email|max:255',
-                'sol_region' => 'nullable|string|max:100',
-                'sol_zone' => 'nullable|string|max:100',
-                'client_region' => 'nullable|string|max:100',
-                'client_zone' => 'nullable|string|max:100',
+                'sol_office_id' => 'nullable|integer|exists:sol_offices,id',
                 'is_active' => 'boolean'
             ]);
 
@@ -240,43 +249,45 @@ class ServiceLocationController extends Controller
             }
 
             // Update service location
-            DB::table('service_locations')
-                ->where('id', $id)
-                ->update([
-                    'location_code' => $request->location_code,
-                    'location_name' => $request->location_name,
-                    'client_id' => $request->client_id,
-                    'country' => $request->country ?? 'Nigeria',
-                    'state' => $request->state,
-                    'city' => $request->city,
-                    'address' => $request->address,
-                    'pin_code' => $request->pin_code,
-                    'phone' => $request->phone,
-                    'fax' => $request->fax,
-                    'notes' => $request->notes,
-                    'contact_name' => $request->contact_name,
-                    'contact_phone' => $request->contact_phone,
-                    'contact_email' => $request->contact_email,
-                    'sol_region' => $request->sol_region,
-                    'sol_zone' => $request->sol_zone,
-                    'is_active' => $request->is_active ?? 1,
-                    'updated_at' => now()
-                ]);
+            DB::table('service_locations')->where('id', $id)->update([
+                'location_code' => $request->location_code ?? $location->location_code,
+                'location_name' => $request->location_name,
+                'unique_id' => $request->unique_id,
+                'short_name' => $request->short_name,
+                'city' => $request->city,
+                'full_address' => $request->full_address,
+                'contact_person_name' => $request->contact_person_name,
+                'contact_person_phone' => $request->contact_person_phone,
+                'contact_person_email' => $request->contact_person_email,
+                'client_id' => $request->client_id,
+                'sol_office_id' => $request->sol_office_id,
+                'is_active' => $request->boolean('is_active', true),
+                'updated_at' => now(),
 
-            // Get the updated location with client info
-            $location = DB::table('service_locations')
+                // Update old fields
+                'address' => $request->full_address,
+                'contact_name' => $request->contact_person_name,
+                'contact_phone' => $request->contact_person_phone,
+                'contact_email' => $request->contact_person_email,
+            ]);
+
+            // Get updated location with relationships
+            $updatedLocation = DB::table('service_locations')
                 ->join('clients', 'service_locations.client_id', '=', 'clients.id')
+                ->leftJoin('sol_offices', 'service_locations.sol_office_id', '=', 'sol_offices.id')
                 ->select(
                     'service_locations.*',
                     'clients.name as client_name',
-                    'clients.client_code'
+                    'clients.client_code',
+                    'sol_offices.office_name as sol_office_name',
+                    'sol_offices.state_name as sol_office_state'
                 )
                 ->where('service_locations.id', $id)
                 ->first();
 
             return response()->json([
                 'success' => true,
-                'data' => $location,
+                'data' => $updatedLocation,
                 'message' => 'Service location updated successfully'
             ]);
         } catch (Exception $e) {
@@ -424,6 +435,198 @@ class ServiceLocationController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error retrieving statistics: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Bulk import service locations from CSV
+     */
+    public function bulkImport(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'client_id' => 'required|integer|exists:clients,id',
+            'sol_office_id' => 'required|integer|exists:sol_offices,id',
+            'file' => 'required|file|mimes:csv,txt|max:5120', // 5MB max
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $file = $request->file('file');
+            $clientId = $request->client_id;
+            $solOfficeId = $request->sol_office_id;
+
+            // Get client info for code generation
+            $client = DB::table('clients')->where('id', $clientId)->first();
+            if (!$client) {
+                throw new Exception('Client not found');
+            }
+
+            // Read CSV file
+            $csvData = array_map('str_getcsv', file($file->getPathname()));
+            $headers = array_map('trim', array_shift($csvData)); // Remove header row and trim
+
+            $totalProcessed = 0;
+            $successCount = 0;
+            $errorCount = 0;
+            $errors = [];
+
+            DB::beginTransaction();
+
+            foreach ($csvData as $index => $row) {
+                $totalProcessed++;
+                $rowNumber = $index + 2; // Account for header row
+
+                try {
+                    // Skip empty rows
+                    if (empty(array_filter($row))) {
+                        continue;
+                    }
+
+                    // Map CSV data to fields
+                    $data = array_combine($headers, $row);
+
+                    // Clean and validate data
+                    $uniqueId = trim($data['unique_id'] ?? '');
+                    $locationName = trim($data['location_name'] ?? '');
+                    $shortName = trim($data['short_name'] ?? '');
+                    $city = trim($data['city'] ?? '');
+                    $fullAddress = trim($data['full_address'] ?? '');
+                    $contactPersonName = trim($data['contact_person_name'] ?? '');
+                    $contactPersonPhone = trim($data['contact_person_phone'] ?? '');
+                    $contactPersonEmail = trim($data['contact_person_email'] ?? '');
+
+                    // Validate required fields
+                    if (empty($locationName) || empty($city)) {
+                        $errors[] = [
+                            'row' => $rowNumber,
+                            'message' => 'Location name and city are required'
+                        ];
+                        $errorCount++;
+                        continue;
+                    }
+
+                    // Generate location code
+                    $cityCode = strtoupper(substr($city, 0, 3));
+                    $timestamp = now()->format('His');
+                    $locationCode = $client->client_code . '-' . $cityCode . '-' . $timestamp . $rowNumber;
+
+                    // Check if location already exists
+                    $existingLocation = DB::table('service_locations')
+                        ->where('client_id', $clientId)
+                        ->where(function ($query) use ($uniqueId, $locationCode) {
+                            $query->where('unique_id', $uniqueId)
+                                ->orWhere('location_code', $locationCode);
+                        })
+                        ->first();
+
+                    if ($existingLocation) {
+                        // Update existing location
+                        DB::table('service_locations')
+                            ->where('id', $existingLocation->id)
+                            ->update([
+                                'location_name' => $locationName,
+                                'short_name' => $shortName,
+                                'city' => $city,
+                                'full_address' => $fullAddress,
+                                'contact_person_name' => $contactPersonName,
+                                'contact_person_phone' => $contactPersonPhone,
+                                'contact_person_email' => $contactPersonEmail,
+                                'sol_office_id' => $solOfficeId,
+                                'updated_at' => now()
+                            ]);
+                    } else {
+                        // Insert new location
+                        DB::table('service_locations')->insert([
+                            'location_code' => $locationCode,
+                            'location_name' => $locationName,
+                            'unique_id' => $uniqueId,
+                            'short_name' => $shortName,
+                            'city' => $city,
+                            'full_address' => $fullAddress,
+                            'contact_person_name' => $contactPersonName,
+                            'contact_person_phone' => $contactPersonPhone,
+                            'contact_person_email' => $contactPersonEmail,
+                            'client_id' => $clientId,
+                            'sol_office_id' => $solOfficeId,
+                            'country' => 'Nigeria',
+                            'is_active' => 1,
+                            'created_by' => Auth::id(),
+                            'created_at' => now(),
+                            'updated_at' => now()
+                        ]);
+                    }
+
+                    $successCount++;
+                } catch (Exception $e) {
+                    $errors[] = [
+                        'row' => $rowNumber,
+                        'message' => 'Error processing row: ' . $e->getMessage()
+                    ];
+                    $errorCount++;
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Bulk import completed',
+                'data' => [
+                    'total_processed' => $totalProcessed,
+                    'success_count' => $successCount,
+                    'error_count' => $errorCount,
+                    'errors' => $errors
+                ]
+            ]);
+        } catch (Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error processing bulk import: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Generate location code
+     */
+    public function generateLocationCode(Request $request)
+    {
+        try {
+            $clientCode = $request->client_code;
+            $city = $request->city;
+
+            if (!$clientCode || !$city) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Client code and city are required'
+                ], 422);
+            }
+
+            // Generate code format: CLIENT_CODE-CITY-XXX
+            $cityCode = strtoupper(substr($city, 0, 3));
+            $timestamp = now()->format('His');
+            $locationCode = $clientCode . '-' . $cityCode . '-' . $timestamp;
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'location_code' => $locationCode
+                ]
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error generating location code: ' . $e->getMessage()
             ], 500);
         }
     }

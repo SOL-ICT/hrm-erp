@@ -69,7 +69,7 @@ const AdminHeader = ({
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-[#191970] to-[#0f0f3d] border-b border-slate-600/30 backdrop-blur-lg shadow-xl"
+      className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-[#011b3f] to-[#0f0f3d] border-b border-slate-600/30 backdrop-blur-lg shadow-xl"
       style={{ height: "64px" }} // Reduced from 80px to 64px for compactness
     >
       <div className="px-4 py-2 h-full">

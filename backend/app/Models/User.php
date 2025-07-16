@@ -6,10 +6,12 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use App\Models\Role;
 
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -21,7 +23,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'password',
         'role',
-        'preferences', // Add this
+        'preferences',
     ];
 
     /**
@@ -35,36 +37,38 @@ class User extends Authenticatable implements MustVerifyEmail
     ];
 
     /**
-     * Get the attributes that should be cast.
+     * The attributes that should be cast.
      *
-     * @return array<string, string>
+     * @var array<string, string>
      */
-    protected function casts(): array
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'preferences' => 'array',
+    ];
+
+    /**
+     * Default preferences fallback.
+     */
+    protected $attributes = [
+        'preferences' => '{}',
+    ];
+
+    /**
+     * Roles relationship (many-to-many).
+     */
+    public function roles()
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'preferences' => 'array', // Cast JSON to array automatically
-        ];
+        return $this->belongsToMany(Role::class, 'staff_roles');
     }
 
     /**
-     * Get user preferences with defaults
+     * Check if user has a specific role.
+     *
+     * @param string $role
+     * @return bool
      */
-    public function getPreferencesAttribute($value)
+    public function hasRole(string $role): bool
     {
-        $defaults = [
-            'theme' => 'light',
-            'language' => 'en',
-            'primary_color' => '#6366f1',
-        ];
-
-        if (!$value) {
-            return $defaults;
-        }
-
-        $preferences = is_string($value) ? json_decode($value, true) : $value;
-
-        return array_merge($defaults, $preferences ?: []);
+        return $this->roles()->where('name', $role)->exists();
     }
 }

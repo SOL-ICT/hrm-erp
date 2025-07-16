@@ -7,6 +7,7 @@ const DashboardOverview = lazy(() => import("./modules/DashboardOverview"));
 const ClientContractDashboard = lazy(() =>
   import("./modules/client-contract-management/ClientContractDashboard")
 );
+const SOLMaster = lazy(() => import("./modules/administration/SOLMaster"));
 
 // Direct submodule imports
 const ClientMaster = lazy(() =>
@@ -50,6 +51,15 @@ const AdminRouter = ({
         case "client-service":
           return (
             <ClientService
+              {...commonProps}
+              onBack={() => {
+                window.history.back();
+              }}
+            />
+          );
+        case "sol-master":
+          return (
+            <SOLMaster
               {...commonProps}
               onBack={() => {
                 window.history.back();

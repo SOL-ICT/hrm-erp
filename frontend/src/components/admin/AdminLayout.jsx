@@ -42,8 +42,8 @@ const AdminLayout = () => {
       hover: "hover:bg-gray-50",
     },
     dark: {
-      bg: "bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800",
-      cardBg: "bg-slate-800/95",
+      bg: "bg-gradient-to-br from-blue-950 via-[#001023] to-blue-900",
+      cardBg: "bg-blue-950",
       sidebarBg: `bg-gradient-to-b from-[${MIDNIGHT_BLUE}] to-[#0f0f3d]`,
       headerBg: `bg-gradient-to-r from-[${MIDNIGHT_BLUE}] to-[#0f0f3d]`,
       textPrimary: "text-white",
@@ -93,7 +93,7 @@ const AdminLayout = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#191970] via-slate-900 to-black">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#011b3f] via-slate-900 to-black">
         <div className="text-center">
           <div
             className="w-12 h-12 border-3 border-t-transparent rounded-full animate-spin mx-auto mb-3"

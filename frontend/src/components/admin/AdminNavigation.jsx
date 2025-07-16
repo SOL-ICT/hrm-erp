@@ -118,6 +118,7 @@ const AdminNavigation = ({
       type: "module",
       description: "System administration and settings",
       submodules: [
+        { id: "sol-master", name: "SOL Master", icon: "🏢" },
         { id: "user-management", name: "User Management", icon: "👥" },
         { id: "system-settings", name: "System Settings", icon: "⚙️" },
         { id: "audit-logs", name: "Audit Logs", icon: "📋" },
@@ -160,7 +161,7 @@ const AdminNavigation = ({
 
   return (
     <aside
-      className={`h-full bg-gradient-to-b from-[#191970] to-[#0f0f3d] border-r border-slate-700/30 shadow-2xl transition-all duration-300 ${
+      className={`h-full bg-gradient-to-b from-[#011b3f] to-[#0f0f3d] border-r border-slate-700/30 shadow-2xl transition-all duration-300 ${
         isCollapsed ? "w-16" : "w-64"
       }`}
     >
@@ -198,7 +199,7 @@ const AdminNavigation = ({
                 onMouseLeave={() => setHoveredModule(null)}
                 className={`w-full flex items-center justify-between p-2 rounded-lg transition-all duration-200 group ${
                   isModuleActive(module.id)
-                    ? "bg-white/20 text-white shadow-lg border border-white/30"
+                    ? "bg-blue-700/50 text-white shadow-lg border border-white/50"
                     : "text-slate-200 hover:bg-white/10 hover:text-white"
                 }`}
                 title={isCollapsed ? module.name : ""}
