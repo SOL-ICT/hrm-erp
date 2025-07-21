@@ -308,72 +308,78 @@ class AuthController extends Controller
         }
     }
 
+
     /**
      * Register a new candidate - FIXED for current database schema
      */
     public function register(Request $request)
-    {
-        try {
-            $data = $request->validate([
-                'email'    => 'required|email|unique:candidates,email',
-                'password' => 'required|string|min:8|confirmed',
-                'first_name' => 'required|string|max:255',
-                'last_name' => 'required|string|max:255',
-                'phone' => 'sometimes|string|max:20',
-                'date_of_birth' => 'sometimes|date',
-                // Theme preferences (optional)
-                'theme' => 'sometimes|string|in:light,dark,transparent',
-                'language' => 'sometimes|string',
-                'primary_color' => 'sometimes|string',
-            ]);
+{
+    try {
+        $data = $request->validate([
+            'email'    => 'required|email|unique:candidates,email|unique:users,email',
+            'password' => 'required|string|min:8|confirmed',
+            'first_name' => 'required|string|max:255',
+            'last_name'  => 'required|string|max:255',
+            'phone'      => 'sometimes|string|max:20',
+            'date_of_birth' => 'sometimes|date',
+            // Theme preferences (optional)
+            'theme' => 'sometimes|string|in:light,dark,transparent',
+            'language' => 'sometimes|string',
+            'primary_color' => 'sometimes|string',
+        ]);
 
-            DB::beginTransaction();
+        DB::beginTransaction();
 
-            // Create candidate record
-            $candidateId = DB::table('candidates')->insertGetId([
-                'email' => $data['email'],
-                'password' => Hash::make($data['password']),
-                'first_name' => $data['first_name'],
-                'last_name' => $data['last_name'],
-                'phone' => $data['phone'] ?? null,
-                'date_of_birth' => $data['date_of_birth'] ?? null,
-                'profile_completed' => false,
-                'status' => 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+        // ✅ Create users record first
+        $preferences = [
+            'theme' => $data['theme'] ?? 'light',
+            'language' => $data['language'] ?? 'en',
+            'primary_color' => $data['primary_color'] ?? '#6366f1',
+        ];
 
-            // Create candidate_profile record  
-            DB::table('candidate_profiles')->insert([
-                'candidate_id' => $candidateId,
-                'nationality' => 'Nigeria',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+        // ✅ FIXED: Create users record with correct field mapping
+        $userId = DB::table('users')->insertGetId([
+            'name' => $data['first_name'] . ' ' . $data['last_name'],
+            'email' => $data['email'],
+            'username' => strtolower($data['first_name'] . '.' . $data['last_name']),
+            'email_verified_at' => now(),
+            'password' => Hash::make($data['password']),
+            'role' => 'candidate',
+            'user_type' => 'candidate',
+            'profile_id' => null,
+            'is_active' => true,
+            'preferences' => json_encode($preferences), // ✅ Store as JSON
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    
+        // ✅Create candidate record using same ID as user
+        DB::table('candidates')->insert([
+            'id' => $userId, // shared PK
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
+            'phone' => $data['phone'] ?? null,
+            'date_of_birth' => $data['date_of_birth'] ?? null,
+            'profile_completed' => false,
+            'status' => 'active',
+            'created_at' => now(),  
+            'updated_at' => now(),
+        ]);
 
-            // ✅ FIXED: Prepare preferences as JSON for users table
-            $preferences = [
-                'theme' => $data['theme'] ?? 'light',
-                'language' => $data['language'] ?? 'en',
-                'primary_color' => $data['primary_color'] ?? '#6366f1',
-            ];
+        $candidateId = $userId; // Use the same ID for candidate
 
-            // ✅ FIXED: Create users record with correct field mapping
-            $userId = DB::table('users')->insertGetId([
-                'name' => $data['first_name'] . ' ' . $data['last_name'],
-                'email' => $data['email'],
-                'username' => strtolower($data['first_name'] . '.' . $data['last_name']),
-                'email_verified_at' => now(),
-                'password' => Hash::make($data['password']),
-                'role' => 'candidate',
-                'user_type' => 'candidate',
-                'profile_id' => $candidateId,
-                'is_active' => true,
-                'preferences' => json_encode($preferences), // ✅ Store as JSON
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+        // update user's profile_id to point to candidate
+       // DB::table('users')->where('id', $userId)->update(['profile_id' => $candidateId]);
 
+        // ✅Create candidate profile
+        DB::table('candidate_profiles')->insert([
+            'candidate_id' => $candidateId, // Use the same ID as user
+            'nationality' => 'Nigeria',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
             // Create user model instance for authentication
             $user = User::find($userId);
             Auth::login($user);
