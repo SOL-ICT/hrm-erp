@@ -9,8 +9,9 @@ export default function EmergencyContactModal({
   onSave,
   contact = null,
   candidateId,
+  type,// "Emergency Contact" or "Next of Kin" or "Family Contact"
 }) {
-  const { getUserPreferences } = useAuth();
+  const { getUserPreferences, sanctumRequest } = useAuth();
   const preferences = getUserPreferences();
 
   const [formData, setFormData] = useState({
@@ -27,7 +28,7 @@ export default function EmergencyContactModal({
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  const contactTypes = ["Emergency Contact", "Next of Kin", "Family Contact"];
+ // const contactTypes = ["Emergency Contact", "Next of Kin", "Family Contact"];
 
   const relationships = [
     "Parent",
@@ -66,8 +67,9 @@ export default function EmergencyContactModal({
       });
     } else {
       // Add mode - reset form
+      // Add mode - auto-fill contact type from modal context
       setFormData({
-        contact_type: "Emergency Contact",
+        contact_type: type || "Emergency Contact", // ✅ use `type` prop, not `contactModal`
         full_name: "",
         relationship: "",
         phone_primary: "",
@@ -141,9 +143,13 @@ export default function EmergencyContactModal({
     const newErrors = {};
 
     // Required fields
+    {/*
+      
     if (!formData.contact_type.trim()) {
       newErrors.contact_type = "Contact type is required";
     }
+    */}
+
     if (!formData.full_name.trim()) {
       newErrors.full_name = "Full name is required";
     }
@@ -186,8 +192,7 @@ export default function EmergencyContactModal({
     if (!validateForm()) {
       return;
     }
-
-    setIsLoading(true);
+    console.log("🚀 Contact Type:", formData.contact_type); // to check if form type based on current modal
     try {
       const url = contact
         ? `http://localhost:8000/api/candidates/emergency-contacts/${contact.id}`
@@ -195,11 +200,11 @@ export default function EmergencyContactModal({
 
       const method = contact ? "PUT" : "POST";
 
-      const response = await fetch(url, {
+      const response = await sanctumRequest(url, {
         method,
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+       // credentials: "include",
+       // headers: { "Content-Type": "application/json" },
+       body: JSON.stringify(formData),
       });
 
       if (response.ok) {
@@ -227,7 +232,7 @@ export default function EmergencyContactModal({
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
-            {contact ? "Edit Emergency Contact" : "Add Emergency Contact"}
+            {contact ? `Edit ${type}` : `Add ${type}`}
           </h2>
           <button
             onClick={onClose}
@@ -256,7 +261,7 @@ export default function EmergencyContactModal({
             </div>
           )}
 
-          {/* Contact Type */}
+          {/* Contact Type 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Contact Type <span className="text-red-500">*</span>
@@ -280,6 +285,7 @@ export default function EmergencyContactModal({
               <p className="text-red-500 text-xs mt-1">{errors.contact_type}</p>
             )}
           </div>
+            */}
 
           {/* Full Name */}
           <div>

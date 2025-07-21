@@ -172,8 +172,20 @@ const DashboardOverview = ({ currentTheme, preferences }) => {
     );
   }
 
+  if (!stats) {
+    return (
+      <div className="text-center py-12">
+        <p className={currentTheme.textSecondary}>
+          Failed to load dashboard statistics
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
+    //1bdiv
+    <div className="space-y-4"> 
+
       {" "}
       {/* Reduced from space-y-6 */}
       {/* Header - Compact */}
@@ -198,58 +210,70 @@ const DashboardOverview = ({ currentTheme, preferences }) => {
             <Plus className="w-3.5 h-3.5" />
           </button>
         </div>
-      </div>
-      {/* Stats Grid - Compact */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        {" "}
-        {/* Reduced gap */}
-        {statCards.map((stat, index) => (
-          <div
-            key={index}
-            className={`${currentTheme.cardBg} rounded-xl p-3 border ${currentTheme.border} hover:shadow-lg transition-all cursor-pointer group`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div
-                className={`w-7 h-7 rounded-lg ${stat.bgColor} flex items-center justify-center`}
-              >
-                <stat.icon
-                  className="w-3.5 h-3.5"
-                  style={{ color: stat.color }}
-                />
-              </div>
-              <button className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <MoreHorizontal className="w-3 h-3 text-gray-400" />
-              </button>
-            </div>
+        </div>
 
-            <div className="space-y-1">
-              <p className={`text-lg font-bold ${currentTheme.textPrimary}`}>
-                {stat.value}
-              </p>
-              <p className={`text-xs ${currentTheme.textMuted} leading-tight`}>
-                {stat.title}
-              </p>
-              <div className="flex items-center space-x-1">
-                {stat.changeType === "positive" ? (
-                  <ArrowUp className="w-2.5 h-2.5 text-green-500" />
-                ) : stat.changeType === "negative" ? (
-                  <ArrowDown className="w-2.5 h-2.5 text-red-500" />
-                ) : null}
-                <span
-                  className={`text-xs font-medium ${
-                    stat.changeType === "positive"
-                      ? "text-green-600"
-                      : stat.changeType === "negative"
-                      ? "text-red-600"
-                      : "text-gray-500"
-                  }`}
-                >
-                  {stat.change}
-                </span>
-              </div>
+      {/* Core Business Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div
+          className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 backdrop-blur-md shadow-lg`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className={`text-lg font-semibold ${currentTheme.textPrimary}`}>
+              Total Clients
+            </h3>
+            <span className="text-2xl">🏢</span>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className={`${currentTheme.textMuted}`}>Active</span>
+              <span className={`font-bold ${currentTheme.textPrimary}`}>
+                {stats ? stats.totalClients : 0}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className={`${currentTheme.textMuted}`}>Active Contracts</span>
+              <span className={`font-bold ${currentTheme.textPrimary}`}>
+                {stats ? stats.activeContracts : 0}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className={`${currentTheme.textMuted}`}>
+                Contracts Expiring
+              </span>
+              <span className={`font-bold text-orange-500`}>
+                {stats.expiringContracts}
+              </span>
+            </div>
             </div>
           </div>
-        ))}
+      {/* Content Grid - Compact */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Recent Activity - Compact */}
+        <div
+          className={`${currentTheme.cardBg} rounded-xl p-4 border ${currentTheme.border}`}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3 className={`text-sm font-semibold ${currentTheme.textPrimary}`}>
+              Recent Activity
+            </h3>
+            <button className="text-xs text-blue-600 hover:text-blue-700 font-medium">
+              View all
+            </button>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className={`${currentTheme.textMuted}`}>Total</span>
+              <span className={`font-bold ${currentTheme.textPrimary}`}>
+                {stats ? stats.totalStaff : 0}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className={`${currentTheme.textMuted}`}>Monthly Revenue</span>
+              <span className={`font-bold ${currentTheme.textPrimary}`}>
+                ₦{stats ? stats.monthlyRevenue.toLocaleString() : 0}
+              </span>
+            </div>
+          </div>
       </div>
       {/* Content Grid - Compact */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -400,6 +424,8 @@ const DashboardOverview = ({ currentTheme, preferences }) => {
         </div>
       </div>
     </div>
+   </div>
+   </div>
   );
 };
 
