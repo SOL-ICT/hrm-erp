@@ -183,7 +183,9 @@ const DashboardOverview = ({ currentTheme, preferences }) => {
   }
 
   return (
-    <div className="space-y-4">
+    //1bdiv
+    <div className="space-y-4"> 
+
       {" "}
       {/* Reduced from space-y-6 */}
       {/* Header - Compact */}
@@ -208,8 +210,7 @@ const DashboardOverview = ({ currentTheme, preferences }) => {
             <Plus className="w-3.5 h-3.5" />
           </button>
         </div>
-      </div>
-      </div>
+        </div>
 
       {/* Core Business Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -243,9 +244,8 @@ const DashboardOverview = ({ currentTheme, preferences }) => {
                 {stats.expiringContracts}
               </span>
             </div>
+            </div>
           </div>
-        ))}
-      </div>
       {/* Content Grid - Compact */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Recent Activity - Compact */}
@@ -424,6 +424,8 @@ const DashboardOverview = ({ currentTheme, preferences }) => {
         </div>
       </div>
     </div>
+   </div>
+   </div>
   );
 };
 
