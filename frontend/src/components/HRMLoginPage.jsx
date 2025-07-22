@@ -22,7 +22,7 @@ const HRMLoginPage = () => {
 
   const [settings, setSettings] = useState({
     theme: "light",
-    primaryColor: "#6366f1",
+    primaryColor: "#0949b3",
     backgroundImage: "gradient2",
     language: "en",
     deviceType: "auto",
@@ -59,7 +59,7 @@ const HRMLoginPage = () => {
 
   const colorOptions = [
     { name: "Indigo", value: "#6366f1" },
-    { name: "Blue", value: "#3b82f6" },
+    { name: "Blue", value: "#0949b3" },
     { name: "Purple", value: "#8b5cf6" },
     { name: "Green", value: "#10b981" },
     { name: "Red", value: "#ef4444" },

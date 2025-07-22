@@ -37,24 +37,38 @@ const AdminNavigation = ({
       type: "module",
       description: "Client relationships and contracts",
       submodules: [
-        { id: "client-master", name: "Client Master", icon: "👤" },
-        { id: "client-service", name: "Client Service", icon: "🌍" },
-        { id: "client-contract", name: "Client Contract", icon: "📄" },
-        { id: "recruitment-request", name: "Recruitment Request", icon: "👥" },
-        { id: "vacancy-setup", name: "Vacancy Setup", icon: "📊" },
-        { id: "salary-structure", name: "Salary Structure", icon: "💰" },
-        { id: "client-week-off", name: "Client Week Off", icon: "🏖️" },
-        { id: "claims-resolution", name: "Claims Resolution", icon: "⚖️" },
-        {
-          id: "claims-resolution-list",
-          name: "Claims Resolution List",
-          icon: "📋",
-        },
-        {
-          id: "recruitment-tracker-list",
-          name: "Recruitment Tracker List",
-          icon: "📈",
-        },
+        { id: "client-master", name: "Client Master" },
+        { id: "client-service", name: "Client Service" },
+        { id: "client-contract", name: "Client Contract" },
+        { id: "salary-structure", name: "Salary Structure" },
+      ],
+    },
+    {
+      id: "recruitment-management",
+      name: "Recruitment Mgt.",
+      icon: "👥",
+      type: "module",
+      description: "Recruitment and candidate management",
+      submodules: [
+        { id: "recruitment-request", name: "Recruitment Request" },
+        { id: "vacancy-setup", name: "Vacancy Setup" },
+        { id: "current-vacancy-invite", name: "Current Vacancy Invite" },
+        { id: "applicant-profile-list", name: "Applicant Profile List" },
+        { id: "screening-management", name: "Screening Management" },
+        { id: "interview", name: "Interview" },
+        { id: "boarding", name: "Boarding" },
+        { id: "reports", name: "Reports" },
+      ],
+    },
+    {
+      id: "claims",
+      name: "Claims",
+      icon: "⚖️",
+      type: "module",
+      description: "Claims resolution and management",
+      submodules: [
+        { id: "claims-resolution", name: "Claims Resolution" },
+        { id: "claims-resolution-list", name: "Claims Resolution List" },
       ],
     },
     {
@@ -64,9 +78,9 @@ const AdminNavigation = ({
       type: "module",
       description: "Staff requisition and approvals",
       submodules: [
-        { id: "create-requisition", name: "Create Requisition", icon: "➕" },
-        { id: "approve-requisition", name: "Approve Requisition", icon: "✅" },
-        { id: "requisition-history", name: "Requisition History", icon: "📚" },
+        { id: "create-requisition", name: "Create Requisition" },
+        { id: "approve-requisition", name: "Approve Requisition" },
+        { id: "requisition-history", name: "Requisition History" },
       ],
     },
     {
@@ -76,11 +90,11 @@ const AdminNavigation = ({
       type: "module",
       description: "Human resources and payroll",
       submodules: [
-        { id: "employee-management", name: "Employee Management", icon: "👤" },
-        { id: "payroll-processing", name: "Payroll Processing", icon: "💰" },
-        { id: "attendance-tracking", name: "Attendance Tracking", icon: "⏰" },
-        { id: "leave-management", name: "Leave Management", icon: "🏖️" },
-        { id: "performance-review", name: "Performance Review", icon: "📈" },
+        { id: "employee-management", name: "Employee Management" },
+        { id: "payroll-processing", name: "Payroll Processing" },
+        { id: "attendance-tracking", name: "Attendance Tracking" },
+        { id: "leave-management", name: "Leave Management" },
+        { id: "performance-review", name: "Performance Review" },
       ],
     },
     {
@@ -90,9 +104,9 @@ const AdminNavigation = ({
       type: "module",
       description: "Procurement and vendor management",
       submodules: [
-        { id: "vendor-management", name: "Vendor Management", icon: "🏢" },
-        { id: "purchase-orders", name: "Purchase Orders", icon: "📄" },
-        { id: "inventory-tracking", name: "Inventory Tracking", icon: "📦" },
+        { id: "vendor-management", name: "Vendor Management" },
+        { id: "purchase-orders", name: "Purchase Orders" },
+        { id: "inventory-tracking", name: "Inventory Tracking" },
       ],
     },
     {
@@ -102,13 +116,9 @@ const AdminNavigation = ({
       type: "module",
       description: "Business growth and development",
       submodules: [
-        { id: "lead-management", name: "Lead Management", icon: "🎯" },
-        {
-          id: "opportunity-tracking",
-          name: "Opportunity Tracking",
-          icon: "💡",
-        },
-        { id: "market-analysis", name: "Market Analysis", icon: "📊" },
+        { id: "lead-management", name: "Lead Management" },
+        { id: "opportunity-tracking", name: "Opportunity Tracking" },
+        { id: "market-analysis", name: "Market Analysis" },
       ],
     },
     {
@@ -118,9 +128,10 @@ const AdminNavigation = ({
       type: "module",
       description: "System administration and settings",
       submodules: [
-        { id: "user-management", name: "User Management", icon: "👥" },
-        { id: "system-settings", name: "System Settings", icon: "⚙️" },
-        { id: "audit-logs", name: "Audit Logs", icon: "📋" },
+        { id: "sol-master", name: "SOL Master" },
+        { id: "user-management", name: "User Management" },
+        { id: "system-settings", name: "System Settings" },
+        { id: "audit-logs", name: "Audit Logs" },
       ],
     },
   ];
@@ -135,7 +146,6 @@ const AdminNavigation = ({
     if (module.type === "single") {
       onModuleChange(module.id);
     } else {
-      // Toggle expanded state for modules with submodules
       setExpandedModules((prev) => {
         const newSet = new Set(prev);
         if (newSet.has(module.id)) {
@@ -145,8 +155,6 @@ const AdminNavigation = ({
         }
         return newSet;
       });
-
-      // If module is not active, activate it
       if (!isModuleActive(module.id)) {
         onModuleChange(module.id);
       }
@@ -160,7 +168,7 @@ const AdminNavigation = ({
 
   return (
     <aside
-      className={`h-full bg-gradient-to-b from-[#191970] to-[#0f0f3d] border-r border-slate-700/30 shadow-2xl transition-all duration-300 ${
+      className={`h-full bg-gradient-to-b from-[#fcfcfc] to-[#ffffff] border-r border-slate-700/30 shadow-2xl transition-all duration-300 ${
         isCollapsed ? "w-16" : "w-64"
       }`}
     >
@@ -172,10 +180,10 @@ const AdminNavigation = ({
           </div>
           {!isCollapsed && (
             <div>
-              <h3 className="font-semibold text-xs text-white leading-tight">
+              <h3 className="font-semibold text-xs text-slate-950 leading-tight">
                 Strategic Outsourcing
               </h3>
-              <p className="text-[10px] text-slate-300 leading-tight">
+              <p className="text-[10px] text-slate-950 leading-tight">
                 Admin Portal
               </p>
             </div>
@@ -198,13 +206,13 @@ const AdminNavigation = ({
                 onMouseLeave={() => setHoveredModule(null)}
                 className={`w-full flex items-center justify-between p-2 rounded-lg transition-all duration-200 group ${
                   isModuleActive(module.id)
-                    ? "bg-white/20 text-white shadow-lg border border-white/30"
-                    : "text-slate-200 hover:bg-white/10 hover:text-white"
+                    ? "bg-blue-950 text-white shadow-lg border border-white/50"
+                    : "text-blue-950 hover:bg-white/10 hover:text-blue"
                 }`}
                 title={isCollapsed ? module.name : ""}
               >
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm">{module.icon}</span>
+                  <span className="text-md">{module.icon}</span>
                   {!isCollapsed && (
                     <span className="font-medium text-xs">{module.name}</span>
                   )}
@@ -220,7 +228,7 @@ const AdminNavigation = ({
                 )}
               </button>
 
-              {/* Submodules - Ultra Compact */}
+              {/* Submodules - Ultra Compact, No Icons */}
               {!isCollapsed &&
                 module.type === "module" &&
                 expandedModules.has(module.id) && (
@@ -233,11 +241,10 @@ const AdminNavigation = ({
                         }
                         className={`w-full flex items-center space-x-2 p-1.5 text-[11px] rounded-md transition-all duration-150 ${
                           activeSubmodule === submodule.id
-                            ? "bg-white/25 text-white border-l-2 border-white"
-                            : "text-slate-300 hover:bg-white/15 hover:text-white hover:border-l-2 hover:border-slate-200"
+                            ? "bg-blue-900 text-slate-200 border-l-2 border-white"
+                            : "text-slate-900 hover:bg-white/15 hover:text-black hover:border-l-2 hover:border-slate-200"
                         }`}
                       >
-                        <span className="text-[10px]">{submodule.icon}</span>
                         <span>{submodule.name}</span>
                       </button>
                     ))}

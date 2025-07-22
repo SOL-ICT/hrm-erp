@@ -7,6 +7,7 @@ const DashboardOverview = lazy(() => import("./modules/DashboardOverview"));
 const ClientContractDashboard = lazy(() =>
   import("./modules/client-contract-management/ClientContractDashboard")
 );
+const SOLMaster = lazy(() => import("./modules/administration/SOLMaster"));
 
 // Direct submodule imports
 const ClientMaster = lazy(() =>
@@ -17,6 +18,11 @@ const ClientMaster = lazy(() =>
 const ClientService = lazy(() =>
   import(
     "./modules/client-contract-management/submodules/client-service/ClientService"
+  )
+);
+const ClientContract = lazy(() =>
+  import(
+    "./modules/client-contract-management/submodules/client-contract/ClientContract"
   )
 );
 
@@ -57,13 +63,24 @@ const AdminRouter = ({
             />
           );
         case "client-contract":
-        case "recruitment-request":
-        case "vacancy-setup":
+          return (
+            <ClientContract
+              {...commonProps}
+              onBack={() => {
+                window.history.back();
+              }}
+            />
+          );
+        case "sol-master":
+          return (
+            <SOLMaster
+              {...commonProps}
+              onBack={() => {
+                window.history.back();
+              }}
+            />
+          );
         case "salary-structure":
-        case "client-week-off":
-        case "claims-resolution":
-        case "claims-resolution-list":
-        case "recruitment-tracker-list":
           return (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -142,6 +159,8 @@ const AdminRouter = ({
         return <ClientContractDashboard {...commonProps} />;
 
       // Placeholder for other modules - show coming soon
+      case "recruitment-management":
+      case "claims":
       case "requisition-management":
       case "hr-payroll-management":
       case "procurement-management":

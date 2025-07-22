@@ -6,65 +6,123 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Facades\DB;
 
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'email',
+        'username',
         'password',
         'role',
-        'preferences', // Add this
+        'user_type',
+        'profile_id',
+        'preferences',
+        'is_active',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'preferences' => 'array',
+        'is_active' => 'boolean',
+    ];
+
+    protected $attributes = [
+        'preferences' => '{}',
+        'is_active' => true,
+    ];
+
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * Get the staff profile if user is staff/admin
      */
-    protected function casts(): array
+    public function staffProfile()
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'preferences' => 'array', // Cast JSON to array automatically
-        ];
+        return $this->belongsTo(\App\Models\Staff::class, 'profile_id')
+            ->when($this->user_type === 'staff' || $this->user_type === 'admin');
     }
 
     /**
-     * Get user preferences with defaults
+     * Get the candidate profile if user is candidate
      */
-    public function getPreferencesAttribute($value)
+    public function candidateProfile()
     {
-        $defaults = [
-            'theme' => 'light',
-            'language' => 'en',
-            'primary_color' => '#6366f1',
-        ];
+        return $this->belongsTo(\App\Models\Candidate::class, 'profile_id')
+            ->when($this->user_type === 'candidate');
+    }
 
-        if (!$value) {
-            return $defaults;
+    /**
+     * Check if user has a specific role (only for staff/admin)
+     */
+    public function hasRole(string $role): bool
+    {
+        if (!in_array($this->user_type, ['staff', 'admin']) || !$this->profile_id) {
+            return false;
         }
 
-        $preferences = is_string($value) ? json_decode($value, true) : $value;
+        return DB::table('staff_roles')
+            ->join('roles', 'staff_roles.role_id', '=', 'roles.id')
+            ->where('staff_roles.staff_id', $this->profile_id)
+            ->where(function ($q) use ($role) {
+                $q->where('roles.name', $role)
+                    ->orWhere('roles.slug', $role);
+            })
+            ->exists();
+    }
 
-        return array_merge($defaults, $preferences ?: []);
+    /**
+     * Check if user has any admin role
+     */
+    public function isAdmin(): bool
+    {
+        return $this->hasRole('super-admin') || $this->hasRole('admin');
+    }
+
+    /**
+     * Check if user is SOL staff
+     */
+    public function isSOLStaff(): bool
+    {
+        if (!in_array($this->user_type, ['staff', 'admin']) || !$this->profile_id) {
+            return false;
+        }
+
+        return DB::table('staff')
+            ->where('id', $this->profile_id)
+            ->where('client_id', 1) // SOL Nigeria client_id
+            ->where('status', 'active')
+            ->exists();
+    }
+
+    /**
+     * Get staff ID directly (for staff/admin users)
+     */
+    public function getStaffId(): ?int
+    {
+        if (in_array($this->user_type, ['staff', 'admin'])) {
+            return $this->profile_id;
+        }
+
+        return null;
+    }
+
+    /**
+     * Get candidate ID directly (for candidate users)
+     */
+    public function getCandidateId(): ?int
+    {
+        if ($this->user_type === 'candidate') {
+            return $this->profile_id;
+        }
+
+        return null;
     }
 }

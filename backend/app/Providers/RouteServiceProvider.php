@@ -11,13 +11,13 @@ use Illuminate\Support\Facades\Route;
 class RouteServiceProvider extends ServiceProvider
 {
     /**
-     * The path to the "home" route for your application.
+     * The path to your application's "home" route.
      *
      * Typically, users are redirected here after authentication.
      *
      * @var string
      */
-    public const HOME = '/home';
+    public const HOME = '/dashboard';
 
     /**
      * Define your route model bindings, pattern filters, and other route configuration.
@@ -29,14 +29,35 @@ class RouteServiceProvider extends ServiceProvider
         });
 
         $this->routes(function () {
-            // API Routes
             Route::middleware('api')
                 ->prefix('api')
                 ->group(base_path('routes/api.php'));
 
-            // Web Routes
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
+        });
+
+        // ✅ FIX 1: Explicit Model Bindings to prevent role conflicts
+        $this->configureModelBindings();
+    }
+
+    /**
+     * Configure explicit model bindings to prevent conflicts
+     */
+    protected function configureModelBindings(): void
+    {
+        // Explicit model bindings to prevent route parameter conflicts
+        Route::model('client', \App\Models\Client::class);
+        Route::model('solOffice', \App\Models\SOLOffice::class);
+        Route::model('serviceLocation', \App\Models\ServiceLocation::class);
+        Route::model('serviceRequest', \App\Models\ServiceRequest::class);
+        Route::model('user_role', \App\Models\Role::class); // Rename to avoid conflict
+
+        // Custom binding for role to avoid conflicts with other parameters
+        Route::bind('role', function ($value) {
+            return \App\Models\Role::where('id', $value)
+                ->orWhere('slug', $value)
+                ->firstOrFail();
         });
     }
 }
