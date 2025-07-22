@@ -1,391 +1,203 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState } from "react";
 import {
-  Building2,
   Users,
   FileText,
-  UserPlus,
-  Briefcase,
-  DollarSign,
-  Calendar,
-  Shield,
+  Building2,
   TrendingUp,
-  ArrowRight,
-  Eye,
-  Plus,
-  MoreHorizontal,
+  Package,
+  DollarSign,
+  ArrowLeft,
 } from "lucide-react";
 import ClientMaster from "./submodules/client-master/ClientMaster";
+import ClientService from "./submodules/client-service/ClientService";
+import ClientContract from "./submodules/client-contract/ClientContract";
 
-const ClientContractDashboard = ({ currentTheme, preferences }) => {
-  const [activeSubmodule, setActiveSubmodule] = useState(null);
+const ClientContractDashboard = ({ currentTheme, preferences, onBack }) => {
+  const [selectedModule, setSelectedModule] = useState(null);
 
-  // SOL Colors
-  const MIDNIGHT_BLUE = "#191970";
-  const SOL_BLUE = "#0066CC";
-  const SOL_RED = "#DC3545";
-
-  // Compact submodules configuration
-  const submodules = [
+  const modules = [
     {
       id: "client-master",
-      name: "Client Master",
-      icon: Building2,
-      description: "Manage client profiles and information",
+      title: "Client Master",
+      description: "Manage client information and profiles",
+      icon: Users,
+      color: "bg-blue-500",
+      stats: { label: "Active Clients", value: "156" },
       component: ClientMaster,
-      color: SOL_BLUE,
-      bgColor: "bg-blue-50",
-      textColor: "text-blue-700",
-      stats: { total: "127", active: "124", new: "+8" },
-      status: "active",
     },
     {
       id: "client-service",
-      name: "Client Service",
-      icon: Users,
-      description: "Service locations and regional mapping",
-      component: null,
-      color: "#10B981",
-      bgColor: "bg-green-50",
-      textColor: "text-green-700",
-      stats: { total: "245", active: "238", new: "+12" },
-      status: "ready",
+      title: "Client Service",
+      description: "Service locations and request management",
+      icon: Package,
+      color: "bg-emerald-500",
+      stats: { label: "Service Locations", value: "432" },
+      component: ClientService,
     },
     {
       id: "client-contract",
-      name: "Client Contract",
+      title: "Client Contract",
+      description: "Contract creation and management",
       icon: FileText,
-      description: "Contract management and renewals",
-      component: null,
-      color: "#8B5CF6",
-      bgColor: "bg-purple-50",
-      textColor: "text-purple-700",
-      stats: { total: "98", active: "94", new: "+5" },
-      status: "coming-soon",
-    },
-    {
-      id: "recruitment-request",
-      name: "Recruitment Request",
-      icon: UserPlus,
-      description: "Handle recruitment requisitions",
-      component: null,
-      color: "#F59E0B",
-      bgColor: "bg-yellow-50",
-      textColor: "text-yellow-700",
-      stats: { total: "156", active: "89", new: "+23" },
-      status: "coming-soon",
-    },
-    {
-      id: "vacancy-setup",
-      name: "Vacancy Setup",
-      icon: Briefcase,
-      description: "Configure job positions and requirements",
-      component: null,
-      color: SOL_RED,
-      bgColor: "bg-red-50",
-      textColor: "text-red-700",
-      stats: { total: "67", active: "45", new: "+7" },
-      status: "coming-soon",
+      color: "bg-purple-500",
+      stats: { label: "Active Contracts", value: "89" },
+      component: ClientContract,
     },
     {
       id: "salary-structure",
-      name: "Salary Structure",
+      title: "Salary Structure",
+      description: "Define and manage salary structures",
       icon: DollarSign,
-      description: "Define compensation and benefits",
-      component: null,
-      color: "#10B981",
-      bgColor: "bg-green-50",
-      textColor: "text-green-700",
-      stats: { total: "34", active: "34", new: "0" },
-      status: "coming-soon",
-    },
-    {
-      id: "client-week-off",
-      name: "Client Week Off",
-      icon: Calendar,
-      description: "Manage client holiday schedules",
-      component: null,
-      color: "#6B7280",
-      bgColor: "bg-gray-50",
-      textColor: "text-gray-700",
-      stats: { total: "52", active: "48", new: "+4" },
-      status: "coming-soon",
-    },
-    {
-      id: "claims-resolution",
-      name: "Claims Resolution",
-      icon: Shield,
-      description: "Handle disputes and claims",
-      component: null,
-      color: SOL_RED,
-      bgColor: "bg-red-50",
-      textColor: "text-red-700",
-      stats: { total: "23", active: "8", new: "+3" },
-      status: "coming-soon",
+      color: "bg-orange-500",
+      stats: { label: "Salary Templates", value: "24" },
+      component: null, // To be implemented
     },
   ];
 
-  // If a submodule is active, render it
-  if (activeSubmodule) {
-    const module = submodules.find((m) => m.id === activeSubmodule);
-    if (module?.component) {
-      const Component = module.component;
-      return (
-        <div className="space-y-4">
-          {/* Breadcrumb - Compact */}
-          <div className="flex items-center space-x-2 text-sm">
-            <button
-              onClick={() => setActiveSubmodule(null)}
-              className="text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Client Contract Management
-            </button>
-            <ArrowRight className="w-3 h-3 text-gray-400" />
-            <span className={currentTheme.textPrimary}>{module.name}</span>
-          </div>
+  const handleModuleClick = (module) => {
+    setSelectedModule(module);
+  };
 
-          <Component
-            currentTheme={currentTheme}
-            preferences={preferences}
-            onBack={() => setActiveSubmodule(null)}
-          />
-        </div>
-      );
-    }
+  const handleBackToDashboard = () => {
+    setSelectedModule(null);
+  };
+
+  if (selectedModule && selectedModule.component) {
+    const Component = selectedModule.component;
+    return (
+      <Component
+        currentTheme={currentTheme}
+        preferences={preferences}
+        onBack={handleBackToDashboard}
+      />
+    );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header - Compact */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className={`text-xl font-bold ${currentTheme.textPrimary}`}>
-            Client Contract Management
-          </h1>
-          <p className={`text-sm ${currentTheme.textMuted}`}>
-            Comprehensive client relationship and contract management system
-          </p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <span className={`text-xs ${currentTheme.textMuted}`}>
-            8 modules available
-          </span>
-          <button className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors">
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Quick Stats - Compact Row */}
-      <div
-        className={`${currentTheme.cardBg} rounded-xl p-4 border ${currentTheme.border}`}
-      >
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center">
-            <div className={`text-lg font-bold ${currentTheme.textPrimary}`}>
-              127
-            </div>
-            <div className={`text-xs ${currentTheme.textMuted}`}>
-              Total Clients
-            </div>
-          </div>
-          <div className="text-center">
-            <div className={`text-lg font-bold text-green-600`}>94%</div>
-            <div className={`text-xs ${currentTheme.textMuted}`}>
-              Active Contracts
-            </div>
-          </div>
-          <div className="text-center">
-            <div className={`text-lg font-bold text-blue-600`}>156</div>
-            <div className={`text-xs ${currentTheme.textMuted}`}>
-              Open Requests
-            </div>
-          </div>
-          <div className="text-center">
-            <div className={`text-lg font-bold text-purple-600`}>₦2.8B</div>
-            <div className={`text-xs ${currentTheme.textMuted}`}>
-              Contract Value
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Modules Grid - Compact */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        {submodules.map((module) => (
-          <div
-            key={module.id}
-            className={`${currentTheme.cardBg} rounded-xl p-4 border ${currentTheme.border} hover:shadow-lg transition-all cursor-pointer group relative`}
-            onClick={() => {
-              if (module.status === "active" || module.status === "ready") {
-                setActiveSubmodule(module.id);
-              }
-            }}
-          >
-            {/* Status Indicator */}
-            <div className="absolute top-2 right-2">
-              {module.status === "active" && (
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              )}
-              {module.status === "ready" && (
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              )}
-              {module.status === "coming-soon" && (
-                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-              )}
-            </div>
-
-            {/* Module Header */}
-            <div className="flex items-start justify-between mb-3">
-              <div
-                className={`w-8 h-8 rounded-lg ${module.bgColor} flex items-center justify-center`}
+    <div className={`min-h-screen ${currentTheme.background}`}>
+      <div className="p-6">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center space-x-4 mb-4">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <module.icon
-                  className="w-4 h-4"
-                  style={{ color: module.color }}
-                />
-              </div>
-              <button className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <MoreHorizontal className="w-3 h-3 text-gray-400" />
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
               </button>
-            </div>
-
-            {/* Module Info */}
-            <div className="space-y-2">
-              <h3
-                className={`text-sm font-semibold ${currentTheme.textPrimary} leading-tight`}
-              >
-                {module.name}
-              </h3>
-              <p className={`text-xs ${currentTheme.textMuted} leading-tight`}>
-                {module.description}
+            )}
+            <div>
+              <h1 className={`text-3xl font-bold ${currentTheme.textPrimary}`}>
+                Client Contract Management
+              </h1>
+              <p className={`${currentTheme.textSecondary} mt-1`}>
+                Manage all client-related operations and contracts
               </p>
             </div>
-
-            {/* Stats - Compact */}
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <div className="flex items-center justify-between text-xs">
-                <div>
-                  <span className={currentTheme.textMuted}>Total: </span>
-                  <span className={`font-semibold ${currentTheme.textPrimary}`}>
-                    {module.stats.total}
-                  </span>
-                </div>
-                <div>
-                  <span className={currentTheme.textMuted}>Active: </span>
-                  <span className={`font-semibold ${currentTheme.textPrimary}`}>
-                    {module.stats.active}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <TrendingUp className="w-2.5 h-2.5 text-green-500" />
-                  <span className="font-semibold text-green-600">
-                    {module.stats.new}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Indicator */}
-            <div className="mt-3 flex items-center justify-between">
-              <span
-                className={`text-xs ${
-                  module.status === "active"
-                    ? "text-green-600"
-                    : module.status === "ready"
-                    ? "text-blue-600"
-                    : "text-gray-500"
-                }`}
-              >
-                {module.status === "active"
-                  ? "Active"
-                  : module.status === "ready"
-                  ? "Ready"
-                  : "Coming Soon"}
-              </span>
-
-              {(module.status === "active" || module.status === "ready") && (
-                <div className="flex items-center space-x-1 text-xs text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Eye className="w-3 h-3" />
-                  <span>Open</span>
-                </div>
-              )}
-            </div>
           </div>
-        ))}
-      </div>
-
-      {/* Recent Activity - Compact */}
-      <div
-        className={`${currentTheme.cardBg} rounded-xl p-4 border ${currentTheme.border}`}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <h3 className={`text-sm font-semibold ${currentTheme.textPrimary}`}>
-            Recent Activity
-          </h3>
-          <button className="text-xs text-blue-600 hover:text-blue-700 font-medium">
-            View all
-          </button>
         </div>
 
-        <div className="space-y-2">
-          {[
-            {
-              action: "Client Master updated",
-              client: "Access Bank",
-              time: "5m ago",
-              type: "update",
-            },
-            {
-              action: "New contract created",
-              client: "Zenith Bank",
-              time: "12m ago",
-              type: "create",
-            },
-            {
-              action: "Service location added",
-              client: "First Bank",
-              time: "1h ago",
-              type: "create",
-            },
-            {
-              action: "Recruitment request approved",
-              client: "GTB",
-              time: "2h ago",
-              type: "approve",
-            },
-          ].map((activity, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0"
-            >
-              <div className="flex items-center space-x-2">
-                <div
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    activity.type === "create"
-                      ? "bg-green-500"
-                      : activity.type === "update"
-                      ? "bg-blue-500"
-                      : activity.type === "approve"
-                      ? "bg-purple-500"
-                      : "bg-gray-400"
-                  }`}
-                ></div>
-                <div>
-                  <p
-                    className={`text-xs font-medium ${currentTheme.textPrimary}`}
-                  >
-                    {activity.action}
-                  </p>
-                  <p className={`text-xs ${currentTheme.textMuted}`}>
-                    {activity.client}
-                  </p>
-                </div>
+        {/* Summary Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Clients</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">156</p>
+                <p className="text-xs text-green-600 mt-2">
+                  +12% from last month
+                </p>
               </div>
-              <span className={`text-xs ${currentTheme.textMuted}`}>
-                {activity.time}
-              </span>
+              <div className="bg-blue-100 p-3 rounded-lg">
+                <Users className="w-6 h-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Active Contracts</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">89</p>
+                <p className="text-xs text-green-600 mt-2">
+                  +5% from last month
+                </p>
+              </div>
+              <div className="bg-purple-100 p-3 rounded-lg">
+                <FileText className="w-6 h-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Service Locations</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">432</p>
+                <p className="text-xs text-green-600 mt-2">
+                  +18 new this month
+                </p>
+              </div>
+              <div className="bg-emerald-100 p-3 rounded-lg">
+                <Building2 className="w-6 h-6 text-emerald-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Revenue</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">₦45.2M</p>
+                <p className="text-xs text-green-600 mt-2">
+                  +8% from last month
+                </p>
+              </div>
+              <div className="bg-orange-100 p-3 rounded-lg">
+                <TrendingUp className="w-6 h-6 text-orange-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Module Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {modules.map((module) => (
+            <div
+              key={module.id}
+              onClick={() => handleModuleClick(module)}
+              className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden group"
+            >
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div
+                    className={`${module.color} p-3 rounded-lg group-hover:scale-110 transition-transform duration-300`}
+                  >
+                    <module.icon className="w-8 h-8 text-white" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {module.stats.value}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      {module.stats.label}
+                    </p>
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  {module.title}
+                </h3>
+                <p className="text-gray-600 text-sm">{module.description}</p>
+              </div>
+              <div className="bg-gray-50 px-6 py-3 flex items-center justify-between">
+                <span className="text-sm text-gray-600">Click to manage</span>
+                <span className="text-gray-400 group-hover:translate-x-1 transition-transform">
+                  →
+                </span>
+              </div>
             </div>
           ))}
         </div>

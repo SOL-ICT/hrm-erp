@@ -20,6 +20,11 @@ const ClientService = lazy(() =>
     "./modules/client-contract-management/submodules/client-service/ClientService"
   )
 );
+const ClientContract = lazy(() =>
+  import(
+    "./modules/client-contract-management/submodules/client-contract/ClientContract"
+  )
+);
 
 const AdminRouter = ({
   activeModule,
@@ -57,6 +62,15 @@ const AdminRouter = ({
               }}
             />
           );
+        case "client-contract":
+          return (
+            <ClientContract
+              {...commonProps}
+              onBack={() => {
+                window.history.back();
+              }}
+            />
+          );
         case "sol-master":
           return (
             <SOLMaster
@@ -66,14 +80,7 @@ const AdminRouter = ({
               }}
             />
           );
-        case "client-contract":
-        case "recruitment-request":
-        case "vacancy-setup":
         case "salary-structure":
-        case "client-week-off":
-        case "claims-resolution":
-        case "claims-resolution-list":
-        case "recruitment-tracker-list":
           return (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -152,6 +159,8 @@ const AdminRouter = ({
         return <ClientContractDashboard {...commonProps} />;
 
       // Placeholder for other modules - show coming soon
+      case "recruitment-management":
+      case "claims":
       case "requisition-management":
       case "hr-payroll-management":
       case "procurement-management":

@@ -11,7 +11,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ServiceLocationController;
-use App\Http\Controllers\ServiceRequestController;
+use App\Http\Controllers\Admin\ServiceRequestController;
 use App\Http\Controllers\ClientContractController;
 use App\Http\Controllers\SystemPreferenceController;
 use App\Http\Controllers\AuditLogController;
@@ -34,6 +34,10 @@ Route::get('/health', function () {
     ]);
 });
 
+// // ✅ TEMPORARY FIX: Add explicit route before others
+// Route::get('/admin/sol-offices', [SOLOfficeController::class, 'index'])->middleware(['web', 'auth:sanctum']);
+// Route::get('/admin/sol-offices/data/statistics', [SOLOfficeController::class, 'getStatistics'])->middleware(['web', 'auth:sanctum']);
+
 // Public endpoints
 Route::get('/states-lgas', [CandidateController::class, 'getStatesLgas']);
 
@@ -51,7 +55,7 @@ Route::post('/register', [AuthController::class, 'register']);
 |--------------------------------------------------------------------------
 */
 
-// ✅ SOLUTION: Custom middleware stack that excludes CSRF but includes session
+// Custom middleware stack that excludes CSRF but includes session
 Route::middleware([
     'web',
     'auth:sanctum',
@@ -212,6 +216,8 @@ Route::middleware([
         Route::get('/by-client/{clientId}', [ServiceLocationController::class, 'getByClient'])->name('service-locations.by-client');
         Route::get('/regions/list', [ServiceLocationController::class, 'getRegions'])->name('service-locations.regions');
         Route::get('/zones/list', [ServiceLocationController::class, 'getZones'])->name('service-locations.zones');
+        Route::post('/test-auto-assignment', [ServiceLocationController::class, 'testAutoAssignment'])->name('service-locations.test-auto-assignment');
+        Route::get('/bulk-template', [ServiceLocationController::class, 'downloadTemplate'])->name('service-locations.bulk-template');
     });
 
     /*
@@ -220,28 +226,41 @@ Route::middleware([
     |--------------------------------------------------------------------------
     */
     Route::prefix('service-requests')->group(function () {
+        // Basic CRUD operations (updated for new structure)
         Route::get('/', [ServiceRequestController::class, 'index'])->name('service-requests.index');
         Route::post('/', [ServiceRequestController::class, 'store'])->name('service-requests.store');
         Route::get('/{id}', [ServiceRequestController::class, 'show'])->name('service-requests.show');
         Route::put('/{id}', [ServiceRequestController::class, 'update'])->name('service-requests.update');
         Route::delete('/{id}', [ServiceRequestController::class, 'destroy'])->name('service-requests.destroy');
-        Route::get('/by-category/{category}', [ServiceRequestController::class, 'getByCategory'])->name('service-requests.by-category');
+
+        // New client-based endpoints
+        Route::get('/by-client/grouped', [ServiceRequestController::class, 'getByClient'])->name('service-requests.by-client');
+        Route::get('/service-types/list', [ServiceRequestController::class, 'getServiceTypes'])->name('service-requests.service-types');
+        Route::post('/generate-code', [ServiceRequestController::class, 'generateServiceCode'])->name('service-requests.generate-code');
+        Route::get('/dashboard/statistics', [ServiceRequestController::class, 'getDashboardStats'])->name('service-requests.dashboard-stats');
+
+        // Bulk operations
+        Route::post('/bulk-update', [ServiceRequestController::class, 'bulkUpdate'])->name('service-requests.bulk-update');
     });
 
     /*
-    |--------------------------------------------------------------------------
-    | Client Contract Routes
-    |--------------------------------------------------------------------------
-    */
+|--------------------------------------------------------------------------
+| Client Contract Routes
+|--------------------------------------------------------------------------
+*/
     Route::prefix('client-contracts')->group(function () {
+        // Basic CRUD operations
         Route::get('/', [ClientContractController::class, 'index'])->name('client-contracts.index');
         Route::post('/', [ClientContractController::class, 'store'])->name('client-contracts.store');
+        Route::get('/particulars', [ClientContractController::class, 'getContractParticulars'])->name('client-contracts.particulars');
+        Route::get('/expiring-soon', [ClientContractController::class, 'getExpiringSoon'])->name('client-contracts.expiring-soon');
         Route::get('/{id}', [ClientContractController::class, 'show'])->name('client-contracts.show');
         Route::put('/{id}', [ClientContractController::class, 'update'])->name('client-contracts.update');
         Route::delete('/{id}', [ClientContractController::class, 'destroy'])->name('client-contracts.destroy');
+
+        // Additional routes
         Route::get('/by-client/{clientId}', [ClientContractController::class, 'getByClient'])->name('client-contracts.by-client');
         Route::patch('/{id}/toggle-status', [ClientContractController::class, 'toggleStatus'])->name('client-contracts.toggle-status');
-        Route::get('/expiring/soon', [ClientContractController::class, 'getExpiringSoon'])->name('client-contracts.expiring-soon');
     });
 
     /*
@@ -294,6 +313,35 @@ Route::middleware([
             ]);
         })->name('sol-offices.auto-assign');
 
+        Route::get('/coverage-map', function () {
+            $coverageMap = DB::table('sol_offices')
+                ->where('is_active', true)
+                ->select('id', 'office_name', 'office_code', 'state_name', 'control_type', 'controlled_areas')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $coverageMap
+            ]);
+        })->name('sol-offices.coverage-map');
+
+        Route::get('/validate-coverage', function () {
+            $validation = [
+                'conflicts' => [],
+                'gaps' => [],
+                'summary' => [
+                    'total_offices' => DB::table('sol_offices')->where('is_active', true)->count(),
+                    'lga_control' => DB::table('sol_offices')->where('control_type', 'lga')->where('is_active', true)->count(),
+                    'state_control' => DB::table('sol_offices')->where('control_type', 'state')->where('is_active', true)->count(),
+                ]
+            ];
+
+            return response()->json([
+                'success' => true,
+                'data' => $validation
+            ]);
+        })->name('sol-offices.validate-coverage');
+
         Route::get('/active', function () {
             $offices = DB::table('sol_offices')
                 ->where('is_active', true)
@@ -327,6 +375,29 @@ Route::middleware([
                     ->get()
             ]);
         })->name('utilities.states-lgas');
+
+        Route::get('/city-lookup', function (Request $request) {
+            $city = $request->get('city');
+
+            if (!$city) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'City parameter required'
+                ], 400);
+            }
+
+            $matches = DB::table('states_lgas')
+                ->where('lga_name', 'LIKE', "%{$city}%")
+                ->orWhere('state_name', 'LIKE', "%{$city}%")
+                ->select('lga_code', 'lga_name', 'state_code', 'state_name', 'zone')
+                ->limit(10)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $matches
+            ]);
+        })->name('utilities.city-lookup');
 
         // Industry categories
         Route::get('/industry-categories', function () {
@@ -471,6 +542,8 @@ Route::middleware(['auth:sanctum', 'role:super-admin,admin'])->group(function ()
     // Service location management (Global admin only)
     Route::prefix('admin/service-locations')->group(function () {
         Route::post('/bulk-import', [ServiceLocationController::class, 'bulkImport'])->name('admin.service-locations.bulk-import');
+        Route::post('/test-auto-assignment', [ServiceLocationController::class, 'testAutoAssignment'])->name('admin.service-locations.test-auto-assignment');
+        Route::get('/bulk-template', [ServiceLocationController::class, 'downloadTemplate'])->name('admin.service-locations.bulk-template');
         Route::get('/hierarchy/{clientId}', [ServiceLocationController::class, 'getHierarchy'])->name('admin.service-locations.hierarchy');
         Route::post('/sync-regions-zones', [ServiceLocationController::class, 'syncRegionsZones'])->name('admin.service-locations.sync-regions-zones');
     });
@@ -479,19 +552,6 @@ Route::middleware(['auth:sanctum', 'role:super-admin,admin'])->group(function ()
     Route::prefix('admin/service-requests')->group(function () {
         Route::post('/bulk-update', [ServiceRequestController::class, 'bulkUpdate'])->name('admin.service-requests.bulk-update');
         Route::get('/usage-statistics', [ServiceRequestController::class, 'getUsageStatistics'])->name('admin.service-requests.usage-statistics');
-    });
-
-
-    // SOL Office management (Global admin only)
-    Route::prefix('admin/sol-offices')->group(function () {
-        Route::get('/', [SOLOfficeController::class, 'index'])->name('admin.sol-offices.index');
-        Route::post('/', [SOLOfficeController::class, 'store'])->name('admin.sol-offices.store');
-        Route::get('/data/states-lgas', [SOLOfficeController::class, 'getStatesAndLGAs'])->name('admin.sol-offices.states-lgas');
-        Route::get('/data/statistics', [SOLOfficeController::class, 'getStatistics'])->name('admin.sol-offices.statistics');
-        Route::patch('/bulk/status', [SOLOfficeController::class, 'bulkUpdateStatus'])->name('admin.sol-offices.bulk-status');
-        Route::get('/{id}', [SOLOfficeController::class, 'show'])->name('admin.sol-offices.show');
-        Route::put('/{id}', [SOLOfficeController::class, 'update'])->name('admin.sol-offices.update');
-        Route::delete('/{id}', [SOLOfficeController::class, 'destroy'])->name('admin.sol-offices.destroy');
     });
 
     // System maintenance routes
@@ -575,6 +635,31 @@ Route::middleware(['auth:sanctum', 'role:super-admin,admin'])->group(function ()
             }
         })->name('admin.maintenance.system-statistics');
     });
+});
+
+// SOL Office management (Global admin only) - PROPER GROUPED VERSION
+Route::prefix('admin/sol-offices')->group(function () {
+    // ✅ IMPORTANT: Specific routes MUST come FIRST (before parameterized routes)
+    Route::get('/data/states-lgas', [SOLOfficeController::class, 'getStatesAndLGAs'])->name('admin.sol-offices.states-lgas');
+    Route::get('/data/statistics', [SOLOfficeController::class, 'getStatistics'])->name('admin.sol-offices.statistics');
+    Route::patch('/bulk/status', [SOLOfficeController::class, 'bulkUpdateStatus'])->name('admin.sol-offices.bulk-status');
+
+    // ✅ General routes (no parameters)
+    Route::get('/', [SOLOfficeController::class, 'index'])->name('admin.sol-offices.index');
+    Route::post('/', [SOLOfficeController::class, 'store'])->name('admin.sol-offices.store');
+
+    // ✅ Parameterized routes MUST come LAST + add constraints
+    Route::get('/{id}', [SOLOfficeController::class, 'show'])
+        ->name('admin.sol-offices.show')
+        ->where('id', '[0-9]+'); // ✅ Only numeric IDs
+
+    Route::put('/{id}', [SOLOfficeController::class, 'update'])
+        ->name('admin.sol-offices.update')
+        ->where('id', '[0-9]+');
+
+    Route::delete('/{id}', [SOLOfficeController::class, 'destroy'])
+        ->name('admin.sol-offices.destroy')
+        ->where('id', '[0-9]+');
 });
 
 /*

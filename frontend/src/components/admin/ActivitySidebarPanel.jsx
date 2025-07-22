@@ -125,8 +125,8 @@ const ActivitySidebarPanel = ({
           background: isOpen
             ? currentTheme.cardBg
             : `linear-gradient(135deg, ${
-                preferences.primaryColor || "#6366f1"
-              }, ${preferences.primaryColor || "#6366f1"}dd)`,
+                preferences.primaryColor || "#c90620"
+              }, ${preferences.primaryColor || "#c90620"}dd)`,
         }}
       >
         {isOpen ? (

@@ -31,9 +31,9 @@ const AdminLayout = () => {
   // Enhanced theme configurations with SOL branding
   const themes = {
     light: {
-      bg: "bg-gradient-to-br from-slate-50 via-gray-50 to-blue-50",
+      bg: "bg-gradient-to-br from-gray-280 via-gray-280 to-white-50",
       cardBg: "bg-white/95",
-      sidebarBg: "bg-white/90",
+      sidebarBg: "bg-white/100",
       headerBg: "bg-white/95",
       textPrimary: "text-gray-900",
       textSecondary: "text-gray-600",

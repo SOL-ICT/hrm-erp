@@ -52,6 +52,7 @@ class AuthController extends Controller
                     'email' => $userExists->email,
                     'role' => $userExists->role,
                     'user_type' => $userExists->user_type,
+                    'profile_id' => $userExists->profile_id, // ✅ Key field for staff ID
                 ] : null
             ]);
 
@@ -96,44 +97,46 @@ class AuthController extends Controller
             // Get final preferences
             $preferences = $this->getUserPreferences($user);
 
-            // ✅ FIXED: Determine dashboard type based on SOL staff and admin access
+            // ✅ ENHANCED: Determine dashboard type and include staff information
+            $staffInfo = null;
             if ($data['login_type'] === 'candidate') {
                 // Route 1: Candidate login -> candidate dashboard
                 $dashboardType = 'candidate';
             } elseif ($data['login_type'] === 'staff') {
                 // Staff login - check if admin access is requested
                 if (isset($data['is_admin']) && $data['is_admin'] === true) {
-                    // Admin toggle is ON - verify if user is SOL staff
-                    $isSOLStaff = DB::table('staff')
-                        ->where('email', $user->email)
-                        ->where('client_id', 1) // SOL Nigeria client_id
-                        ->where('status', 'active')
-                        ->exists();
+                    // Admin toggle is ON - verify if user is SOL staff using profile_id
+                    if (in_array($user->user_type, ['staff', 'admin']) && $user->profile_id) {
 
-                    Log::info('Admin access check', [
-                        'user_email' => $user->email,
-                        'is_sol_staff' => $isSOLStaff,
-                        'admin_requested' => true
-                    ]);
+                        $solStaff = DB::table('staff')
+                            ->where('id', $user->profile_id) // ✅ Direct lookup using profile_id
+                            ->where('client_id', 1) // SOL Nigeria client_id
+                            ->where('status', 'active')
+                            ->first();
 
-                    if ($isSOLStaff) {
-                        // SOL staff with admin toggle -> admin dashboard
-                        $dashboardType = 'admin';
+                        Log::info('Admin access check using profile_id', [
+                            'user_id' => $user->id,
+                            'profile_id' => $user->profile_id,
+                            'is_sol_staff' => $solStaff ? 'YES' : 'NO',
+                            'admin_requested' => true
+                        ]);
 
-                        // Also assign admin role if not already assigned
-                        $staff = DB::table('staff')->where('email', $user->email)->first();
-                        if ($staff) {
+                        if ($solStaff) {
+                            // SOL staff with admin toggle -> admin dashboard
+                            $dashboardType = 'admin';
+                            $staffInfo = $solStaff; // ✅ Store staff info for session
+
                             // Check if admin role is already assigned
                             $hasAdminRole = DB::table('staff_roles')
                                 ->join('roles', 'staff_roles.role_id', '=', 'roles.id')
-                                ->where('staff_roles.staff_id', $staff->id)
+                                ->where('staff_roles.staff_id', $user->profile_id) // ✅ Use profile_id directly
                                 ->whereIn('roles.slug', ['super-admin', 'admin'])
                                 ->exists();
 
                             if (!$hasAdminRole) {
                                 // Assign admin role to SOL staff
                                 DB::table('staff_roles')->insert([
-                                    'staff_id' => $staff->id,
+                                    'staff_id' => $user->profile_id, // ✅ Use profile_id directly
                                     'role_id' => 2, // Admin role ID
                                     'assigned_at' => now(),
                                     'created_at' => now(),
@@ -141,21 +144,38 @@ class AuthController extends Controller
                                 ]);
 
                                 Log::info('Admin role assigned to SOL staff', [
-                                    'staff_id' => $staff->id,
-                                    'staff_email' => $staff->email
+                                    'staff_id' => $user->profile_id,
+                                    'user_id' => $user->id
                                 ]);
                             }
+                        } else {
+                            // Not SOL staff but tried admin toggle -> staff dashboard
+                            $dashboardType = 'staff';
+                            Log::warning('Non-SOL staff attempted admin access', [
+                                'user_id' => $user->id,
+                                'profile_id' => $user->profile_id
+                            ]);
                         }
                     } else {
-                        // Not SOL staff but tried admin toggle -> staff dashboard
+                        // No profile_id or wrong user type -> staff dashboard
                         $dashboardType = 'staff';
-                        Log::warning('Non-SOL staff attempted admin access', [
-                            'user_email' => $user->email
+                        Log::warning('Invalid user type or missing profile_id for admin access', [
+                            'user_id' => $user->id,
+                            'user_type' => $user->user_type,
+                            'profile_id' => $user->profile_id
                         ]);
                     }
                 } else {
                     // No admin toggle -> regular staff dashboard (including SOL staff)
                     $dashboardType = 'staff';
+
+                    // Still get staff info for regular staff dashboard
+                    if (in_array($user->user_type, ['staff', 'admin']) && $user->profile_id) {
+                        $staffInfo = DB::table('staff')
+                            ->where('id', $user->profile_id)
+                            ->where('status', 'active')
+                            ->first();
+                    }
                 }
             } else {
                 // Fallback
@@ -166,11 +186,13 @@ class AuthController extends Controller
             Log::info('Dashboard routing decision', [
                 'login_type' => $data['login_type'] ?? 'not_set',
                 'is_admin_requested' => $data['is_admin'] ?? false,
-                'user_email' => $user->email,
-                'final_dashboard_type' => $dashboardType
+                'user_id' => $user->id,
+                'profile_id' => $user->profile_id,
+                'final_dashboard_type' => $dashboardType,
+                'staff_info_loaded' => $staffInfo ? 'YES' : 'NO'
             ]);
 
-            // Build response payload
+            // ✅ ENHANCED: Build response payload with staff information
             $responseData = [
                 'id'             => $user->id,
                 'username'       => $user->{$field},
@@ -178,10 +200,23 @@ class AuthController extends Controller
                 'email'          => $user->email,
                 'user_role'      => $user->role,
                 'user_type'      => $user->user_type,
+                'profile_id'     => $user->profile_id, // ✅ Include profile_id for frontend
                 'dashboard_type' => $dashboardType,
                 'is_active'      => $user->is_active,
                 'preferences'    => $preferences,
             ];
+
+            // ✅ Add staff-specific information if available
+            if ($staffInfo) {
+                $responseData['staff_info'] = [
+                    'staff_id' => $staffInfo->id,
+                    'employee_code' => $staffInfo->employee_code,
+                    'client_id' => $staffInfo->client_id,
+                    'is_sol_staff' => $staffInfo->client_id == 1,
+                    'department' => $staffInfo->department ?? null,
+                    'designation' => $staffInfo->designation ?? null,
+                ];
+            }
 
             return response()->json([
                 'success' => true,
@@ -208,6 +243,104 @@ class AuthController extends Controller
     }
 
     /**
+     * Handle user registration (candidates only).
+     */
+    public function register(Request $request)
+    {
+        try {
+            $data = $request->validate([
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'email' => 'required|email|unique:users,email|unique:candidates,email',
+                'phone' => 'required|string|max:20|unique:candidates,phone',
+                'password' => 'required|string|min:8|confirmed',
+                'date_of_birth' => 'required|date|before:today',
+                'gender' => 'required|in:male,female',
+                'state_lga_id' => 'required|exists:states_lgas,id',
+                // Theme preferences
+                'theme' => 'sometimes|string|in:light,dark,transparent',
+                'language' => 'sometimes|string',
+                'primary_color' => 'sometimes|string',
+            ]);
+
+            DB::beginTransaction();
+
+            // Create candidate profile first
+            $candidateId = DB::table('candidates')->insertGetId([
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'email' => $data['email'],
+                'phone' => $data['phone'],
+                'date_of_birth' => $data['date_of_birth'],
+                'gender' => $data['gender'],
+                'state_lga_id' => $data['state_lga_id'],
+                'registration_status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Prepare preferences
+            $preferences = [
+                'theme' => $data['theme'] ?? 'light',
+                'language' => $data['language'] ?? 'en',
+                'primary_color' => $data['primary_color'] ?? '#6366f1',
+            ];
+
+            // ✅ Create user record with candidate profile_id
+            $userId = DB::table('users')->insertGetId([
+                'name' => $data['first_name'] . ' ' . $data['last_name'],
+                'email' => $data['email'],
+                'username' => strtolower($data['first_name'] . '.' . $data['last_name']),
+                'email_verified_at' => now(),
+                'password' => Hash::make($data['password']),
+                'role' => 'candidate',
+                'user_type' => 'candidate',
+                'profile_id' => $candidateId, // ✅ Link to candidate profile
+                'is_active' => true,
+                'preferences' => json_encode($preferences),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Create user model instance for authentication
+            $user = User::find($userId);
+            Auth::login($user);
+            $request->session()->regenerate();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Registration successful',
+                'user' => [
+                    'id' => $user->id,
+                    'user_id' => $userId,
+                    'profile_id' => $candidateId, // ✅ Return profile_id
+                    'name' => $data['first_name'] . ' ' . $data['last_name'],
+                    'email' => $data['email'],
+                    'user_type' => 'candidate',
+                    'dashboard_type' => 'candidate',
+                    'preferences' => $preferences,
+                ],
+                'candidate_id' => $candidateId,
+            ], 201);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Registration failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Return the currently authenticated user.
      */
     public function user(Request $request)
@@ -222,19 +355,46 @@ class AuthController extends Controller
                 ], 401);
             }
 
+            // ✅ Get additional profile information based on user type
+            $profileInfo = null;
+            if (in_array($user->user_type, ['staff', 'admin']) && $user->profile_id) {
+                $profileInfo = DB::table('staff')
+                    ->where('id', $user->profile_id)
+                    ->select('id', 'employee_code', 'client_id', 'department', 'designation', 'status')
+                    ->first();
+            } elseif ($user->user_type === 'candidate' && $user->profile_id) {
+                $profileInfo = DB::table('candidates')
+                    ->where('id', $user->profile_id)
+                    ->select('id', 'first_name', 'last_name', 'phone', 'registration_status')
+                    ->first();
+            }
+
+            $responseData = [
+                'id'             => $user->id,
+                'username'       => $user->username ?? $user->email,
+                'name'           => $user->name,
+                'email'          => $user->email,
+                'user_role'      => $user->role,
+                'user_type'      => $user->user_type,
+                'profile_id'     => $user->profile_id, // ✅ Include profile_id
+                'dashboard_type' => $user->user_type ?? $user->role ?? 'candidate',
+                'is_active'      => $user->is_active,
+                'preferences'    => $this->getUserPreferences($user),
+            ];
+
+            // ✅ Add profile-specific information
+            if ($profileInfo) {
+                $responseData['profile_info'] = $profileInfo;
+
+                // Add SOL staff flag for staff users
+                if (in_array($user->user_type, ['staff', 'admin'])) {
+                    $responseData['is_sol_staff'] = $profileInfo->client_id == 1;
+                }
+            }
+
             return response()->json([
                 'status' => 'success',
-                'user'   => [
-                    'id'             => $user->id,
-                    'username'       => $user->username ?? $user->email,
-                    'name'           => $user->name,
-                    'email'          => $user->email,
-                    'user_role'      => $user->role,
-                    'user_type'      => $user->user_type,
-                    'dashboard_type' => $user->user_type ?? $user->role ?? 'candidate',
-                    'is_active'      => $user->is_active,
-                    'preferences'    => $this->getUserPreferences($user),
-                ],
+                'user'   => $responseData,
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -298,115 +458,12 @@ class AuthController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Logged out successfully'
+                'message' => 'Logged out successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Logout failed: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Register a new candidate - FIXED for current database schema
-     */
-    public function register(Request $request)
-    {
-        try {
-            $data = $request->validate([
-                'email'    => 'required|email|unique:candidates,email',
-                'password' => 'required|string|min:8|confirmed',
-                'first_name' => 'required|string|max:255',
-                'last_name' => 'required|string|max:255',
-                'phone' => 'sometimes|string|max:20',
-                'date_of_birth' => 'sometimes|date',
-                // Theme preferences (optional)
-                'theme' => 'sometimes|string|in:light,dark,transparent',
-                'language' => 'sometimes|string',
-                'primary_color' => 'sometimes|string',
-            ]);
-
-            DB::beginTransaction();
-
-            // Create candidate record
-            $candidateId = DB::table('candidates')->insertGetId([
-                'email' => $data['email'],
-                'password' => Hash::make($data['password']),
-                'first_name' => $data['first_name'],
-                'last_name' => $data['last_name'],
-                'phone' => $data['phone'] ?? null,
-                'date_of_birth' => $data['date_of_birth'] ?? null,
-                'profile_completed' => false,
-                'status' => 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            // Create candidate_profile record  
-            DB::table('candidate_profiles')->insert([
-                'candidate_id' => $candidateId,
-                'nationality' => 'Nigeria',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            // ✅ FIXED: Prepare preferences as JSON for users table
-            $preferences = [
-                'theme' => $data['theme'] ?? 'light',
-                'language' => $data['language'] ?? 'en',
-                'primary_color' => $data['primary_color'] ?? '#6366f1',
-            ];
-
-            // ✅ FIXED: Create users record with correct field mapping
-            $userId = DB::table('users')->insertGetId([
-                'name' => $data['first_name'] . ' ' . $data['last_name'],
-                'email' => $data['email'],
-                'username' => strtolower($data['first_name'] . '.' . $data['last_name']),
-                'email_verified_at' => now(),
-                'password' => Hash::make($data['password']),
-                'role' => 'candidate',
-                'user_type' => 'candidate',
-                'profile_id' => $candidateId,
-                'is_active' => true,
-                'preferences' => json_encode($preferences), // ✅ Store as JSON
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            // Create user model instance for authentication
-            $user = User::find($userId);
-            Auth::login($user);
-            $request->session()->regenerate();
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Registration successful',
-                'user' => [
-                    'id' => $candidateId, // Return candidate ID for frontend
-                    'user_id' => $userId,
-                    'name' => $data['first_name'] . ' ' . $data['last_name'],
-                    'email' => $data['email'],
-                    'user_type' => 'candidate',
-                    'dashboard_type' => 'candidate',
-                    'preferences' => $preferences,
-                ],
-                'candidate_id' => $candidateId, // Explicitly return candidate ID
-            ], 201);
-        } catch (ValidationException $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Registration failed: ' . $e->getMessage(),
             ], 500);
         }
     }

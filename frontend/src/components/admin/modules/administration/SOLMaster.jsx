@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import {
   Building2,
@@ -18,6 +16,7 @@ import {
   CheckCircle,
   AlertCircle,
   Globe,
+  Loader,
 } from "lucide-react";
 import { solOfficeAPI } from "../../../../services/api";
 
@@ -32,17 +31,22 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
   const [lgas, setLgas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+  const [statistics, setStatistics] = useState({
+    total_offices: 0,
+    active_offices: 0,
+    states_covered: 0,
+  });
 
   // SOL Colors
   const SOL_BLUE = "#0066CC";
   const SOL_RED = "#DC3545";
   const MIDNIGHT_BLUE = "#191970";
 
-  // Form state
+  // Form state - ✅ FIX 4: Remove created_by from frontend
   const [formData, setFormData] = useState({
     office_name: "",
     office_code: "",
-    zone_name: "",
+    zone: "",
     state_name: "",
     state_code: "",
     control_type: "lga",
@@ -58,6 +62,7 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
   useEffect(() => {
     loadOffices();
     loadStatesAndLGAs();
+    loadStatistics();
   }, []);
 
   useEffect(() => {
@@ -68,18 +73,26 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
     return () => clearTimeout(delayedSearch);
   }, [searchTerm, filterState]);
 
+  // ✅ FIX 3: Restored proper API call for loading offices
   const loadOffices = async () => {
     setLoading(true);
     try {
-      // Use a simpler approach for now - just set empty array
-      setOffices([]);
+      const params = {};
+
+      if (searchTerm) params.search = searchTerm;
+      if (filterState !== "all") params.state = filterState;
+
+      const response = await solOfficeAPI.getAll(params);
+      setOffices(response.data || []);
     } catch (error) {
       console.error("Error loading offices:", error);
-      alert("Error loading offices. Please try again.");
+      alert("Error loading offices: " + (error.message || "Please try again."));
+      setOffices([]); // Fallback to empty array
     } finally {
       setLoading(false);
     }
   };
+
   const loadStatesAndLGAs = async () => {
     try {
       const response = await solOfficeAPI.getStatesAndLGAs();
@@ -118,6 +131,35 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
     }
   };
 
+  const loadStatistics = async () => {
+    try {
+      const response = await solOfficeAPI.getStatistics();
+      if (response.success && response.data) {
+        setStatistics(response.data);
+      }
+    } catch (error) {
+      console.error("Error loading statistics:", error);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      office_name: "",
+      office_code: "",
+      zone: "",
+      state_name: "",
+      state_code: "",
+      control_type: "lga",
+      controlled_areas: [],
+      office_address: "",
+      office_phone: "",
+      office_email: "",
+      manager_name: "",
+      is_active: true,
+    });
+    setEditingOffice(null);
+  };
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
@@ -126,34 +168,28 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
     }));
 
     // Auto-generate office code when office name or state changes
-    if ((name === "office_name" || name === "state_code") && value) {
-      const officeName = formData.office_name || ""; // Use current or empty if not set
-      const stateCode = formData.state_code || ""; // Use current or empty if not set
+    if (name === "office_name" || name === "state_code") {
+      const officeName = name === "office_name" ? value : formData.office_name;
+      const stateCode = name === "state_code" ? value : formData.state_code;
 
-      if (officeName.trim() && stateCode.trim()) {
+      if (officeName && stateCode) {
         const officePrefix = officeName.substring(0, 3).toUpperCase();
         const generatedCode = `SOL-${stateCode}-${officePrefix}`;
         setFormData((prev) => ({
           ...prev,
           office_code: generatedCode,
         }));
-      } else {
-        // Reset office_code if either field is empty
-        setFormData((prev) => ({
-          ...prev,
-          office_code: "",
-        }));
       }
     }
 
-    // Update state name and zone name when state code changes
+    // Update state name and zone when state code changes
     if (name === "state_code") {
       const selectedState = states.find((state) => state.code === value);
       if (selectedState) {
         setFormData((prev) => ({
           ...prev,
           state_name: selectedState.name,
-          zone_name: selectedState.zone || "",
+          zone: selectedState.zone || "",
         }));
       }
     }
@@ -180,6 +216,7 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
       }
 
       loadOffices();
+      loadStatistics(); // Refresh statistics
       resetForm();
       setShowForm(false);
 
@@ -189,17 +226,33 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
     } catch (error) {
       console.error("Error saving office:", error);
       alert(
-        `Error ${
-          editingOffice ? "updating" : "creating"
-        } office. Please try again.`
+        `Error ${editingOffice ? "updating" : "creating"} office: ${
+          error.message || "Please try again."
+        }`
       );
     } finally {
       setFormLoading(false);
     }
   };
+
   const handleEdit = (office) => {
     setEditingOffice(office);
-    setFormData(office);
+    setFormData({
+      office_name: office.office_name || "",
+      office_code: office.office_code || "",
+      zone: office.zone || "",
+      state_name: office.state_name || "",
+      state_code: office.state_code || "",
+      control_type: office.control_type || "lga",
+      controlled_areas: office.controlled_areas
+        ? JSON.parse(office.controlled_areas)
+        : [],
+      office_address: office.office_address || "",
+      office_phone: office.office_phone || "",
+      office_email: office.office_email || "",
+      manager_name: office.manager_name || "",
+      is_active: office.is_active !== undefined ? office.is_active : true,
+    });
     setShowForm(true);
   };
 
@@ -208,37 +261,28 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
       try {
         await solOfficeAPI.delete(officeId);
         loadOffices();
+        loadStatistics(); // Refresh statistics
         alert("SOL office deleted successfully!");
       } catch (error) {
         console.error("Error deleting office:", error);
-        alert("Error deleting office. Please try again.");
+        alert(
+          "Error deleting office: " + (error.message || "Please try again.")
+        );
       }
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      office_name: "",
-      office_code: "",
-      state_name: "",
-      state_code: "",
-      control_type: "lga",
-      controlled_areas: [],
-      office_address: "",
-      office_phone: "",
-      office_email: "",
-      manager_name: "",
-      is_active: true,
-    });
-    setEditingOffice(null);
-  };
-
+  // Filter offices based on search and state
   const filteredOffices = offices.filter((office) => {
-    const matchesSearch =
-      office.office_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      office.office_code.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = searchTerm
+      ? office.office_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        office.office_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        office.state_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      : true;
+
     const matchesState =
       filterState === "all" || office.state_code === filterState;
+
     return matchesSearch && matchesState;
   });
 
@@ -257,127 +301,118 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
         <div className="flex items-center space-x-4">
           <button
             onClick={onBack}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
+            className={`p-2 rounded-lg ${currentTheme.hover} transition-colors`}
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className={`text-3xl font-bold ${currentTheme.textPrimary}`}>
-              SOL Master Management
-            </h1>
+            <h2 className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
+              SOL Office Master
+            </h2>
             <p className={`${currentTheme.textSecondary} mt-1`}>
-              Manage SOL offices and their controlled areas
+              Manage SOL Nigeria office locations and administrative zones
             </p>
           </div>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-lg"
+          className="inline-flex items-center px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+          style={{ backgroundColor: SOL_BLUE }}
         >
-          <Plus className="w-5 h-5" />
-          <span>Add New Office</span>
+          <Plus className="w-4 h-4 mr-2" />
+          Add SOL Office
         </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
         <div
-          className={`${currentTheme.cardBg} rounded-xl p-6 border ${currentTheme.border}`}
+          className={`${currentTheme.cardBg} rounded-xl p-6 ${currentTheme.border} shadow-sm`}
         >
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Building2 className="w-6 h-6 text-blue-600" />
-            </div>
+          <div className="flex items-center justify-between">
             <div>
-              <p className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
-                {offices.length}
-              </p>
               <p className={`text-sm ${currentTheme.textSecondary}`}>
                 Total Offices
               </p>
+              <p className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
+                {statistics.total_offices}
+              </p>
             </div>
+            <Building2 className="w-8 h-8" style={{ color: SOL_BLUE }} />
           </div>
         </div>
 
         <div
-          className={`${currentTheme.cardBg} rounded-xl p-6 border ${currentTheme.border}`}
+          className={`${currentTheme.cardBg} rounded-xl p-6 ${currentTheme.border} shadow-sm`}
         >
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-            </div>
+          <div className="flex items-center justify-between">
             <div>
-              <p className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
-                {offices.filter((o) => o.is_active).length}
-              </p>
               <p className={`text-sm ${currentTheme.textSecondary}`}>
                 Active Offices
               </p>
+              <p className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
+                {statistics.active_offices}
+              </p>
             </div>
+            <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
         </div>
 
         <div
-          className={`${currentTheme.cardBg} rounded-xl p-6 border ${currentTheme.border}`}
+          className={`${currentTheme.cardBg} rounded-xl p-6 ${currentTheme.border} shadow-sm`}
         >
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <MapPin className="w-6 h-6 text-purple-600" />
-            </div>
+          <div className="flex items-center justify-between">
             <div>
-              <p className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
-                {new Set(offices.map((o) => o.state_code)).size}
-              </p>
               <p className={`text-sm ${currentTheme.textSecondary}`}>
                 States Covered
               </p>
+              <p className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
+                {statistics.states_covered}
+              </p>
             </div>
+            <MapPin className="w-8 h-8" style={{ color: SOL_RED }} />
           </div>
         </div>
 
         <div
-          className={`${currentTheme.cardBg} rounded-xl p-6 border ${currentTheme.border}`}
+          className={`${currentTheme.cardBg} rounded-xl p-6 ${currentTheme.border} shadow-sm`}
         >
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <Globe className="w-6 h-6 text-orange-600" />
-            </div>
+          <div className="flex items-center justify-between">
             <div>
-              <p className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
-                {offices.reduce(
-                  (total, office) =>
-                    total + (office.controlled_areas?.length || 0),
-                  0
-                )}
-              </p>
               <p className={`text-sm ${currentTheme.textSecondary}`}>
-                Areas Controlled
+                Coverage Rate
+              </p>
+              <p className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
+                {Math.round((statistics.states_covered / 36) * 100)}%
               </p>
             </div>
+            <Globe className="w-8 h-8 text-purple-600" />
           </div>
         </div>
       </div>
 
-      {/* Filters and Search */}
+      {/* Search and Filters */}
       <div
-        className={`${currentTheme.cardBg} rounded-xl p-6 border ${currentTheme.border}`}
+        className={`${currentTheme.cardBg} rounded-xl p-6 ${currentTheme.border} shadow-sm`}
       >
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-          <div className="flex items-center space-x-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search offices..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentTheme.border}`}
               />
             </div>
+          </div>
+          <div className="sm:w-48">
             <select
               value={filterState}
               onChange={(e) => setFilterState(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentTheme.border}`}
             >
               <option value="all">All States</option>
               {states.map((state) => (
@@ -392,20 +427,15 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
 
       {/* Offices Table */}
       <div
-        className={`${currentTheme.cardBg} rounded-xl border ${currentTheme.border} overflow-hidden`}
+        className={`${currentTheme.cardBg} rounded-xl ${currentTheme.border} shadow-sm overflow-hidden`}
       >
-        <div className="p-6 border-b border-gray-200">
-          <h3 className={`text-lg font-semibold ${currentTheme.textPrimary}`}>
-            SOL Offices ({filteredOffices.length})
-          </h3>
-        </div>
-
         {loading ? (
           <div className="p-12 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
-            <p className={`mt-4 ${currentTheme.textSecondary}`}>
-              Loading offices...
-            </p>
+            <Loader
+              className="w-8 h-8 animate-spin mx-auto mb-4"
+              style={{ color: SOL_BLUE }}
+            />
+            <p className={currentTheme.textSecondary}>Loading offices...</p>
           </div>
         ) : filteredOffices.length === 0 ? (
           <div className="p-12 text-center">
@@ -416,14 +446,19 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
               No offices found
             </h3>
             <p className={`${currentTheme.textSecondary} mb-6`}>
-              Get started by adding your first SOL office
+              {searchTerm || filterState !== "all"
+                ? "No offices match your search criteria"
+                : "Get started by adding your first SOL office"}
             </p>
-            <button
-              onClick={() => setShowForm(true)}
-              className="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-            >
-              Add First Office
-            </button>
+            {!searchTerm && filterState === "all" && (
+              <button
+                onClick={() => setShowForm(true)}
+                className="px-6 py-3 text-white rounded-lg transition-colors"
+                style={{ backgroundColor: SOL_BLUE }}
+              >
+                Add First Office
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -434,13 +469,13 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
                     Office Details
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Location
+                    Location & Zone
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Control Type
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Areas Controlled
+                    Manager
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -464,28 +499,28 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {office.state_name}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {office.manager_name}
+                      <div>
+                        <div className="text-sm text-gray-900">
+                          {office.state_name}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          Zone: {office.zone?.replace("_", " ").toUpperCase()}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          office.control_type === "lga"
+                          office.control_type === "state"
                             ? "bg-blue-100 text-blue-800"
-                            : "bg-purple-100 text-purple-800"
+                            : "bg-green-100 text-green-800"
                         }`}
                       >
-                        {office.control_type.toUpperCase()}
+                        {office.control_type?.toUpperCase()}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {office.controlled_areas?.length || 0} areas
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {office.manager_name || "Not assigned"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -499,16 +534,16 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
+                      <div className="flex space-x-2">
                         <button
                           onClick={() => handleEdit(office)}
-                          className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                          className="text-blue-600 hover:text-blue-900"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(office.id)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded"
+                          className="text-red-600 hover:text-red-900"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -522,119 +557,123 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
         )}
       </div>
 
-      {/* Add/Edit Office Modal */}
+      {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-            {/* Modal Header */}
-            <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-4 text-white">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold">
-                  {editingOffice ? "Edit" : "Add New"} SOL Office
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowForm(false);
-                    resetForm();
-                  }}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div
+            className={`${currentTheme.cardBg} rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto`}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h3
+                className={`text-lg font-semibold ${currentTheme.textPrimary}`}
+              >
+                {editingOffice ? "Edit SOL Office" : "Add New SOL Office"}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowForm(false);
+                  resetForm();
+                }}
+                className={`p-2 ${currentTheme.hover} rounded-lg`}
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* Modal Body */}
-            <form
-              onSubmit={handleSubmit}
-              className="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-200px)]"
-            >
-              {/* Basic Information */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Office Name */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Basic Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Office Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="office_name"
-                      value={formData.office_name}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="e.g., Lekki Office"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Office Code <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="office_code"
-                      value={formData.office_code}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="e.g., SOL-LG-LEK"
-                      required
-                    />
-                  </div>
+                <label
+                  className={`block text-sm font-medium ${currentTheme.textPrimary} mb-1`}
+                >
+                  Office Name *
+                </label>
+                <input
+                  type="text"
+                  name="office_name"
+                  value={formData.office_name}
+                  onChange={handleInputChange}
+                  required
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentTheme.border}`}
+                  placeholder="Enter office name"
+                />
+              </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      State <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="state_code"
-                      value={formData.state_code}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      required
-                    >
-                      <option value="">Select State</option>
-                      {states.map((state) => (
-                        <option key={state.code} value={state.code}>
-                          {state.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Zone
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.zone_name || ""}
-                      readOnly
-                      className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-700"
-                      placeholder={
-                        formData.zone_name
-                          ? ""
-                          : "Automatically populated from state"
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Control Type <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="control_type"
-                      value={formData.control_type}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      required
-                    >
-                      <option value="lga">LGA Control</option>
-                      <option value="state">State Control</option>
-                    </select>
-                  </div>
-                </div>
+              {/* Office Code */}
+              <div>
+                <label
+                  className={`block text-sm font-medium ${currentTheme.textPrimary} mb-1`}
+                >
+                  Office Code *
+                </label>
+                <input
+                  type="text"
+                  name="office_code"
+                  value={formData.office_code}
+                  onChange={handleInputChange}
+                  required
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentTheme.border}`}
+                  placeholder="Auto-generated or enter custom code"
+                />
+              </div>
+
+              {/* State Selection */}
+              <div>
+                <label
+                  className={`block text-sm font-medium ${currentTheme.textPrimary} mb-1`}
+                >
+                  State *
+                </label>
+                <select
+                  name="state_code"
+                  value={formData.state_code}
+                  onChange={handleInputChange}
+                  required
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentTheme.border}`}
+                >
+                  <option value="">Select state</option>
+                  {states.map((state) => (
+                    <option key={state.code} value={state.code}>
+                      {state.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Zone (Auto-filled) */}
+              <div>
+                <label
+                  className={`block text-sm font-medium ${currentTheme.textPrimary} mb-1`}
+                >
+                  Zone
+                </label>
+                <input
+                  type="text"
+                  name="zone"
+                  value={formData.zone?.replace("_", " ").toUpperCase()}
+                  readOnly
+                  className={`w-full px-3 py-2 border rounded-lg bg-gray-50 ${currentTheme.border}`}
+                  placeholder="Auto-filled based on state"
+                />
+              </div>
+
+              {/* Control Type */}
+              <div>
+                <label
+                  className={`block text-sm font-medium ${currentTheme.textPrimary} mb-1`}
+                >
+                  Control Type *
+                </label>
+                <select
+                  name="control_type"
+                  value={formData.control_type}
+                  onChange={handleInputChange}
+                  required
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentTheme.border}`}
+                >
+                  <option value="lga">LGA Level Control</option>
+                  <option value="state">State Level Control</option>
+                </select>
               </div>
 
               {/* Controlled Areas */}
@@ -675,103 +714,113 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
               )}
 
               {/* Contact Information */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Contact Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Office Address
-                    </label>
-                    <textarea
-                      name="office_address"
-                      value={formData.office_address}
-                      onChange={handleInputChange}
-                      rows="3"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
-                      placeholder="Complete office address"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Office Phone
-                    </label>
-                    <input
-                      type="tel"
-                      name="office_phone"
-                      value={formData.office_phone}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="+234 xxx xxx xxxx"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Office Email
-                    </label>
-                    <input
-                      type="email"
-                      name="office_email"
-                      value={formData.office_email}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="office@solnigeria.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Manager Name
-                    </label>
-                    <input
-                      type="text"
-                      name="manager_name"
-                      value={formData.manager_name}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="Office manager name"
-                    />
-                  </div>
-                  <div className="flex items-center">
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        name="is_active"
-                        checked={formData.is_active}
-                        onChange={handleInputChange}
-                        className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <span className="text-sm text-gray-700">
-                        Active Office
-                      </span>
-                    </label>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label
+                    className={`block text-sm font-medium ${currentTheme.textPrimary} mb-1`}
+                  >
+                    Manager Name
+                  </label>
+                  <input
+                    type="text"
+                    name="manager_name"
+                    value={formData.manager_name}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentTheme.border}`}
+                    placeholder="Office manager name"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    className={`block text-sm font-medium ${currentTheme.textPrimary} mb-1`}
+                  >
+                    Office Phone
+                  </label>
+                  <input
+                    type="tel"
+                    name="office_phone"
+                    value={formData.office_phone}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentTheme.border}`}
+                    placeholder="Office phone number"
+                  />
                 </div>
               </div>
-            </form>
 
-            {/* Modal Footer */}
-            <div className="bg-gray-50 px-6 py-4 flex items-center justify-end space-x-3 border-t">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForm(false);
-                  resetForm();
-                }}
-                className="px-6 py-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                disabled={formLoading}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={formLoading}
-                className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
-              >
-                <Save className="w-4 h-4" />
-                <span>{formLoading ? "Saving..." : "Save Office"}</span>
-              </button>
-            </div>
+              <div>
+                <label
+                  className={`block text-sm font-medium ${currentTheme.textPrimary} mb-1`}
+                >
+                  Office Email
+                </label>
+                <input
+                  type="email"
+                  name="office_email"
+                  value={formData.office_email}
+                  onChange={handleInputChange}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentTheme.border}`}
+                  placeholder="office@solnigeria.com"
+                />
+              </div>
+
+              <div>
+                <label
+                  className={`block text-sm font-medium ${currentTheme.textPrimary} mb-1`}
+                >
+                  Office Address
+                </label>
+                <textarea
+                  name="office_address"
+                  value={formData.office_address}
+                  onChange={handleInputChange}
+                  rows={3}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentTheme.border}`}
+                  placeholder="Complete office address"
+                />
+              </div>
+
+              {/* Status */}
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  name="is_active"
+                  checked={formData.is_active}
+                  onChange={handleInputChange}
+                  className="rounded"
+                />
+                <label
+                  className={`text-sm font-medium ${currentTheme.textPrimary}`}
+                >
+                  Active Office
+                </label>
+              </div>
+
+              {/* Form Actions */}
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    resetForm();
+                  }}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg ${currentTheme.hover} ${currentTheme.textSecondary}`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={formLoading}
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50"
+                  style={{ backgroundColor: SOL_BLUE }}
+                >
+                  {formLoading && (
+                    <Loader className="w-4 h-4 mr-2 animate-spin" />
+                  )}
+                  {editingOffice ? "Update Office" : "Create Office"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

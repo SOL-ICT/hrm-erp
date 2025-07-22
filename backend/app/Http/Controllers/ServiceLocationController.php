@@ -4,167 +4,275 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 use Exception;
+use App\Models\SOLOffice;
 
 class ServiceLocationController extends Controller
 {
     /**
-     * Display a listing of service locations
+     * ✅ COMPLETE: Auto-assign SOL office based on city location
      */
-    public function index(Request $request)
+    private function autoAssignSOLOffice($city)
     {
         try {
-            $query = DB::table('service_locations')
-                ->join('clients', 'service_locations.client_id', '=', 'clients.id')
-                ->select(
-                    'service_locations.*',
-                    'clients.name as client_name',
-                    'clients.client_code'
-                );
+            // Step 1: Find city in states_lgas table to get LGA and state codes
+            $locationInfo = DB::table('states_lgas')
+                ->where('lga_name', 'LIKE', "%{$city}%")
+                ->orWhere('state_name', 'LIKE', "%{$city}%")
+                ->select('lga_code', 'state_code', 'lga_name', 'state_name')
+                ->first();
 
-            // Apply filters
-            if ($request->has('client_id') && $request->client_id) {
-                $query->where('service_locations.client_id', $request->client_id);
+            if (!$locationInfo) {
+                // If no exact match, try to find by partial match or common city variations
+                $locationInfo = $this->findCityByVariations($city);
             }
 
-            if ($request->has('status') && $request->status !== 'all') {
-                $isActive = $request->status === 'active' ? 1 : 0;
-                $query->where('service_locations.is_active', $isActive);
+            if (!$locationInfo) {
+                return [
+                    'office' => null,
+                    'assignment_type' => 'none',
+                    'assignment_reason' => "No mapping found for city: {$city}",
+                    'location_info' => null
+                ];
             }
 
-            if ($request->has('search') && $request->search) {
-                $search = '%' . $request->search . '%';
-                $query->where(function ($q) use ($search) {
-                    $q->where('service_locations.location_name', 'like', $search)
-                        ->orWhere('service_locations.location_code', 'like', $search)
-                        ->orWhere('clients.name', 'like', $search);
-                });
+            // Step 2: Try LGA-level assignment first (highest priority)
+            if ($locationInfo->lga_code) {
+                $lgaOffice = DB::table('sol_offices')
+                    ->where('control_type', 'lga')
+                    ->where('is_active', true)
+                    ->whereNull('deleted_at')
+                    ->whereJsonContains('controlled_areas', $locationInfo->lga_code)
+                    ->select('id', 'office_name', 'office_code', 'control_type', 'state_name')
+                    ->first();
+
+                if ($lgaOffice) {
+                    return [
+                        'office' => $lgaOffice,
+                        'assignment_type' => 'lga',
+                        'assignment_reason' => "Assigned to {$lgaOffice->office_name} (LGA-level control: {$locationInfo->lga_name})",
+                        'location_info' => $locationInfo
+                    ];
+                }
             }
 
-            if ($request->has('sol_region') && $request->sol_region) {
-                $query->where('service_locations.sol_region', $request->sol_region);
+            // Step 3: Fall back to state-level assignment
+            if ($locationInfo->state_code) {
+                $stateOffice = DB::table('sol_offices')
+                    ->where('control_type', 'state')
+                    ->where('is_active', true)
+                    ->whereNull('deleted_at')
+                    ->whereJsonContains('controlled_areas', $locationInfo->state_code)
+                    ->select('id', 'office_name', 'office_code', 'control_type', 'state_name')
+                    ->first();
+
+                if ($stateOffice) {
+                    return [
+                        'office' => $stateOffice,
+                        'assignment_type' => 'state',
+                        'assignment_reason' => "Assigned to {$stateOffice->office_name} (State-level control: {$locationInfo->state_name})",
+                        'location_info' => $locationInfo
+                    ];
+                }
             }
 
-            // Order by created_at desc
-            $query->orderBy('service_locations.created_at', 'desc');
-
-            // Pagination
-            $perPage = $request->get('per_page', 15);
-            $locations = $query->paginate($perPage);
-
-            return response()->json([
-                'success' => true,
-                'data' => $locations->items(),
-                'pagination' => [
-                    'current_page' => $locations->currentPage(),
-                    'total_pages' => $locations->lastPage(),
-                    'per_page' => $locations->perPage(),
-                    'total' => $locations->total(),
-                ],
-                'message' => 'Service locations retrieved successfully'
-            ]);
+            // Step 4: No assignment possible
+            return [
+                'office' => null,
+                'assignment_type' => 'none',
+                'assignment_reason' => "No SOL office controls {$locationInfo->lga_name}, {$locationInfo->state_name}",
+                'location_info' => $locationInfo
+            ];
         } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error retrieving service locations: ' . $e->getMessage()
-            ], 500);
+            return [
+                'office' => null,
+                'assignment_type' => 'error',
+                'assignment_reason' => "Error during assignment: " . $e->getMessage(),
+                'location_info' => null
+            ];
         }
     }
 
+    /**
+     * ✅ COMPLETE: Find city by variations and common names
+     */
+    private function findCityByVariations($city)
+    {
+        $variations = [
+            // Handle common variations
+            strtolower(trim($city)),
+            ucfirst(strtolower(trim($city))),
+            strtoupper(trim($city)),
+
+            // Handle common abbreviations and full names
+            'lagos' => ['lagos', 'lag', 'lagos state'],
+            'abuja' => ['abuja', 'fct', 'federal capital territory'],
+            'kano' => ['kano', 'kn', 'kano state'],
+            'ibadan' => ['ibadan', 'oyo', 'oyo state'],
+            'ph' => ['port harcourt', 'ph', 'rivers', 'rivers state'],
+            'warri' => ['warri', 'delta', 'delta state'],
+            'benin' => ['benin city', 'benin', 'edo', 'edo state'],
+            'jos' => ['jos', 'plateau', 'plateau state'],
+            'kaduna' => ['kaduna', 'kaduna state', 'kd'],
+            'maiduguri' => ['maiduguri', 'borno', 'borno state'],
+            'calabar' => ['calabar', 'cross river', 'cross river state'],
+            'uyo' => ['uyo', 'akwa ibom', 'akwa ibom state'],
+            'asaba' => ['asaba', 'delta', 'delta state'],
+            'awka' => ['awka', 'anambra', 'anambra state'],
+            'owerri' => ['owerri', 'imo', 'imo state'],
+            'abakaliki' => ['abakaliki', 'ebonyi', 'ebonyi state'],
+            'lokoja' => ['lokoja', 'kogi', 'kogi state'],
+            'minna' => ['minna', 'niger', 'niger state'],
+            'ilorin' => ['ilorin', 'kwara', 'kwara state'],
+            'akure' => ['akure', 'ondo', 'ondo state'],
+            'abeokuta' => ['abeokuta', 'ogun', 'ogun state'],
+            'osogbo' => ['osogbo', 'osun', 'osun state'],
+            'ado ekiti' => ['ado ekiti', 'ekiti', 'ekiti state'],
+            'yola' => ['yola', 'adamawa', 'adamawa state'],
+            'gombe' => ['gombe', 'gombe state'],
+            'jalingo' => ['jalingo', 'taraba', 'taraba state'],
+            'makurdi' => ['makurdi', 'benue', 'benue state'],
+            'lafia' => ['lafia', 'nasarawa', 'nasarawa state'],
+            'bauchi' => ['bauchi', 'bauchi state'],
+            'dutse' => ['dutse', 'jigawa', 'jigawa state'],
+            'damaturu' => ['damaturu', 'yobe', 'yobe state'],
+            'gusau' => ['gusau', 'zamfara', 'zamfara state'],
+            'katsina' => ['katsina', 'katsina state'],
+            'birnin kebbi' => ['birnin kebbi', 'kebbi', 'kebbi state'],
+            'sokoto' => ['sokoto', 'sokoto state'],
+        ];
+
+        $searchCity = strtolower(trim($city));
+
+        // Check direct variations first
+        foreach ($variations as $key => $varList) {
+            if (is_array($varList) && in_array($searchCity, $varList)) {
+                $searchTerm = $key;
+                break;
+            }
+        }
+
+        if (!isset($searchTerm)) {
+            $searchTerm = $searchCity;
+        }
+
+        // Try multiple search strategies
+        $searchStrategies = [
+            // Exact LGA match
+            function ($term) {
+                return DB::table('states_lgas')
+                    ->where('lga_name', 'LIKE', $term)
+                    ->select('lga_code', 'state_code', 'lga_name', 'state_name')
+                    ->first();
+            },
+            // Partial LGA match
+            function ($term) {
+                return DB::table('states_lgas')
+                    ->where('lga_name', 'LIKE', "%{$term}%")
+                    ->select('lga_code', 'state_code', 'lga_name', 'state_name')
+                    ->first();
+            },
+            // State name match
+            function ($term) {
+                return DB::table('states_lgas')
+                    ->where('state_name', 'LIKE', "%{$term}%")
+                    ->select('lga_code', 'state_code', 'lga_name', 'state_name')
+                    ->first();
+            },
+            // Word boundary search
+            function ($term) {
+                return DB::table('states_lgas')
+                    ->whereRaw("lga_name REGEXP '[[:<:]]{$term}[[:>:]]'")
+                    ->select('lga_code', 'state_code', 'lga_name', 'state_name')
+                    ->first();
+            }
+        ];
+
+        foreach ($searchStrategies as $strategy) {
+            $result = $strategy($searchTerm);
+            if ($result) {
+                return $result;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * ✅ COMPLETE: Enhanced create method with auto-assignment
+     */
     public function store(Request $request)
     {
-        try {
-            // Validation rules - updated to match new requirements
-            $validator = Validator::make($request->all(), [
-                'location_code' => 'nullable|string|max:20|unique:service_locations,location_code',
-                'location_name' => 'required|string|max:255',
-                'unique_id' => 'nullable|string|max:100',
-                'short_name' => 'nullable|string|max:100',
-                'city' => 'required|string|max:100',
-                'full_address' => 'nullable|string',
-                'contact_person_name' => 'nullable|string|max:255',
-                'contact_person_phone' => 'nullable|string|max:20',
-                'contact_person_email' => 'nullable|email|max:255',
-                'client_id' => 'required|integer|exists:clients,id',
-                'sol_office_id' => 'nullable|integer|exists:sol_offices,id',
-                'is_active' => 'boolean'
-            ]);
+        $validator = Validator::make($request->all(), [
+            'client_id' => 'required|integer|exists:clients,id',
+            'location_name' => 'required|string|max:255',
+            'city' => 'required|string|max:100',
+            'unique_id' => 'nullable|string|max:50',
+            'short_name' => 'nullable|string|max:100',
+            'full_address' => 'nullable|string',
+            'contact_person' => 'nullable|string|max:255',
+            'contact_phone' => 'nullable|string|max:20',
+            'contact_email' => 'nullable|email|max:255',
+            'is_active' => 'boolean'
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation errors',
-                    'errors' => $validator->errors()
-                ], 422);
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Get client info for code generation
+            $client = DB::table('clients')->where('id', $request->client_id)->first();
+            if (!$client) {
+                throw new Exception('Client not found');
             }
+
+            // ✅ AUTO-ASSIGN SOL OFFICE
+            $autoAssignment = $this->autoAssignSOLOffice($request->city);
+            $solOfficeId = $autoAssignment['office'] ? $autoAssignment['office']->id : null;
 
             // Generate location code if not provided
-            if (empty($request->location_code)) {
-                $client = DB::table('clients')->where('id', $request->client_id)->first();
-                $cityCode = strtoupper(substr($request->city, 0, 3));
-                $timestamp = now()->format('His');
-                $locationCode = $client->client_code . '-' . $cityCode . '-' . $timestamp;
-            } else {
-                $locationCode = $request->location_code;
-            }
+            $locationCode = $request->unique_id ?: $this->generateLocationCode($client->client_code, $request->city);
 
-            // Create service location
+            // Create the service location
             $locationId = DB::table('service_locations')->insertGetId([
-                'location_code' => $locationCode,
+                'client_id' => $request->client_id,
+                'sol_office_id' => $solOfficeId,
                 'location_name' => $request->location_name,
+                'location_code' => $locationCode,
+                'city' => $request->city,
                 'unique_id' => $request->unique_id,
                 'short_name' => $request->short_name,
-                'city' => $request->city,
                 'full_address' => $request->full_address,
-                'contact_person_name' => $request->contact_person_name,
-                'contact_person_phone' => $request->contact_person_phone,
-                'contact_person_email' => $request->contact_person_email,
-                'client_id' => $request->client_id,
-                'sol_office_id' => $request->sol_office_id,
-                'country' => 'Nigeria',
+                'contact_person' => $request->contact_person,
+                'contact_phone' => $request->contact_phone,
+                'contact_email' => $request->contact_email,
                 'is_active' => $request->boolean('is_active', true),
-                'created_by' => Auth::id(),
+                'created_by' => Auth::check() ? Auth::user()->profile_id : 1,
                 'created_at' => now(),
-                'updated_at' => now(),
-
-                // Set old fields to null or default values
-                'state' => null,
-                'address' => $request->full_address, // Copy to old address field
-                'pin_code' => null,
-                'phone' => null,
-                'fax' => null,
-                'contact_name' => $request->contact_person_name, // Copy to old field
-                'contact_phone' => $request->contact_person_phone, // Copy to old field
-                'contact_email' => $request->contact_person_email, // Copy to old field
-                'sol_region' => null,
-                'sol_zone' => null,
-                'client_region' => null,
-                'client_zone' => null,
-                'notes' => null
+                'updated_at' => now()
             ]);
 
-            // Get the created location with client and SOL office info
-            $location = DB::table('service_locations')
-                ->join('clients', 'service_locations.client_id', '=', 'clients.id')
-                ->leftJoin('sol_offices', 'service_locations.sol_office_id', '=', 'sol_offices.id')
-                ->select(
-                    'service_locations.*',
-                    'clients.name as client_name',
-                    'clients.client_code',
-                    'sol_offices.office_name as sol_office_name',
-                    'sol_offices.state_name as sol_office_state'
-                )
-                ->where('service_locations.id', $locationId)
-                ->first();
+            DB::commit();
 
             return response()->json([
                 'success' => true,
-                'data' => $location,
-                'message' => 'Service location created successfully'
+                'message' => 'Service location created successfully',
+                'data' => [
+                    'id' => $locationId,
+                    'auto_assignment' => $autoAssignment
+                ]
             ], 201);
         } catch (Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Error creating service location: ' . $e->getMessage()
@@ -172,125 +280,84 @@ class ServiceLocationController extends Controller
         }
     }
 
-
     /**
-     * Display the specified service location
-     */
-    public function show($id)
-    {
-        try {
-            $location = DB::table('service_locations')
-                ->join('clients', 'service_locations.client_id', '=', 'clients.id')
-                ->select(
-                    'service_locations.*',
-                    'clients.name as client_name',
-                    'clients.client_code'
-                )
-                ->where('service_locations.id', $id)
-                ->first();
-
-            if (!$location) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Service location not found'
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data' => $location,
-                'message' => 'Service location retrieved successfully'
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error retrieving service location: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Update the specified service location
+     * ✅ COMPLETE: Enhanced update method with auto-assignment
      */
     public function update(Request $request, $id)
     {
+        $validator = Validator::make($request->all(), [
+            'client_id' => 'required|integer|exists:clients,id',
+            'location_name' => 'required|string|max:255',
+            'city' => 'required|string|max:100',
+            'unique_id' => 'nullable|string|max:50',
+            'short_name' => 'nullable|string|max:100',
+            'full_address' => 'nullable|string',
+            'contact_person' => 'nullable|string|max:255',
+            'contact_phone' => 'nullable|string|max:20',
+            'contact_email' => 'nullable|email|max:255',
+            'is_active' => 'boolean'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
         try {
             // Check if location exists
-            $location = DB::table('service_locations')->where('id', $id)->first();
-            if (!$location) {
+            $existingLocation = DB::table('service_locations')->where('id', $id)->first();
+            if (!$existingLocation) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Service location not found'
                 ], 404);
             }
 
-            // Validation rules
-            $validator = Validator::make($request->all(), [
-                'location_code' => 'nullable|string|max:20|unique:service_locations,location_code,' . $id,
-                'location_name' => 'required|string|max:255',
-                'unique_id' => 'nullable|string|max:100',
-                'short_name' => 'nullable|string|max:100',
-                'city' => 'required|string|max:100',
-                'full_address' => 'nullable|string',
-                'contact_person_name' => 'nullable|string|max:255',
-                'contact_person_phone' => 'nullable|string|max:20',
-                'contact_person_email' => 'nullable|email|max:255',
-                'client_id' => 'required|integer|exists:clients,id',
-                'sol_office_id' => 'nullable|integer|exists:sol_offices,id',
-                'is_active' => 'boolean'
-            ]);
+            DB::beginTransaction();
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation errors',
-                    'errors' => $validator->errors()
-                ], 422);
+            // ✅ AUTO-ASSIGN SOL OFFICE if city changed
+            $autoAssignment = null;
+            $solOfficeId = $existingLocation->sol_office_id;
+
+            if ($existingLocation->city !== $request->city) {
+                $autoAssignment = $this->autoAssignSOLOffice($request->city);
+                $solOfficeId = $autoAssignment['office'] ? $autoAssignment['office']->id : null;
             }
 
-            // Update service location
-            DB::table('service_locations')->where('id', $id)->update([
-                'location_code' => $request->location_code ?? $location->location_code,
-                'location_name' => $request->location_name,
-                'unique_id' => $request->unique_id,
-                'short_name' => $request->short_name,
-                'city' => $request->city,
-                'full_address' => $request->full_address,
-                'contact_person_name' => $request->contact_person_name,
-                'contact_person_phone' => $request->contact_person_phone,
-                'contact_person_email' => $request->contact_person_email,
-                'client_id' => $request->client_id,
-                'sol_office_id' => $request->sol_office_id,
-                'is_active' => $request->boolean('is_active', true),
-                'updated_at' => now(),
+            // Update the service location
+            DB::table('service_locations')
+                ->where('id', $id)
+                ->update([
+                    'client_id' => $request->client_id,
+                    'sol_office_id' => $solOfficeId,
+                    'location_name' => $request->location_name,
+                    'city' => $request->city,
+                    'unique_id' => $request->unique_id,
+                    'short_name' => $request->short_name,
+                    'full_address' => $request->full_address,
+                    'contact_person' => $request->contact_person,
+                    'contact_phone' => $request->contact_phone,
+                    'contact_email' => $request->contact_email,
+                    'is_active' => $request->boolean('is_active'),
+                    'updated_by' => Auth::check() ? Auth::user()->profile_id : 1,
+                    'updated_at' => now()
+                ]);
 
-                // Update old fields
-                'address' => $request->full_address,
-                'contact_name' => $request->contact_person_name,
-                'contact_phone' => $request->contact_person_phone,
-                'contact_email' => $request->contact_person_email,
-            ]);
-
-            // Get updated location with relationships
-            $updatedLocation = DB::table('service_locations')
-                ->join('clients', 'service_locations.client_id', '=', 'clients.id')
-                ->leftJoin('sol_offices', 'service_locations.sol_office_id', '=', 'sol_offices.id')
-                ->select(
-                    'service_locations.*',
-                    'clients.name as client_name',
-                    'clients.client_code',
-                    'sol_offices.office_name as sol_office_name',
-                    'sol_offices.state_name as sol_office_state'
-                )
-                ->where('service_locations.id', $id)
-                ->first();
+            DB::commit();
 
             return response()->json([
                 'success' => true,
-                'data' => $updatedLocation,
-                'message' => 'Service location updated successfully'
+                'message' => 'Service location updated successfully',
+                'data' => [
+                    'id' => $id,
+                    'auto_assignment' => $autoAssignment
+                ]
             ]);
         } catch (Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Error updating service location: ' . $e->getMessage()
@@ -299,154 +366,12 @@ class ServiceLocationController extends Controller
     }
 
     /**
-     * Remove the specified service location
-     */
-    public function destroy($id)
-    {
-        try {
-            $location = DB::table('service_locations')->where('id', $id)->first();
-
-            if (!$location) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Service location not found'
-                ], 404);
-            }
-
-            // Soft delete by setting is_active to 0
-            DB::table('service_locations')
-                ->where('id', $id)
-                ->update([
-                    'is_active' => 0,
-                    'updated_at' => now()
-                ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Service location deleted successfully'
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error deleting service location: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Get locations by client
-     */
-    public function getByClient($clientId)
-    {
-        try {
-            $locations = DB::table('service_locations')
-                ->where('client_id', $clientId)
-                ->where('is_active', 1)
-                ->orderBy('location_name')
-                ->get();
-
-            return response()->json([
-                'success' => true,
-                'data' => $locations,
-                'message' => 'Client locations retrieved successfully'
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error retrieving client locations: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Get available regions (renamed to match your routes)
-     */
-    public function getRegions()
-    {
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'North Central',
-                'North East',
-                'North West',
-                'South East',
-                'South South',
-                'South West'
-            ],
-            'message' => 'SOL regions retrieved successfully'
-        ]);
-    }
-
-    /**
-     * Get available zones (renamed to match your routes)
-     */
-    public function getZones()
-    {
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'Lagos Zone',
-                'FCT Zone',
-                'Port Harcourt Zone',
-                'Kano Zone',
-                'Ibadan Zone',
-                'Kaduna Zone',
-                'Jos Zone',
-                'Enugu Zone'
-            ],
-            'message' => 'SOL zones retrieved successfully'
-        ]);
-    }
-
-    /**
-     * Get dashboard statistics
-     */
-    public function getStats()
-    {
-        try {
-            $stats = [
-                'total_locations' => DB::table('service_locations')->count(),
-                'active_locations' => DB::table('service_locations')->where('is_active', 1)->count(),
-                'inactive_locations' => DB::table('service_locations')->where('is_active', 0)->count(),
-                'sol_regions' => DB::table('service_locations')
-                    ->whereNotNull('sol_region')
-                    ->where('sol_region', '!=', '')
-                    ->distinct('sol_region')
-                    ->count('sol_region'),
-                'client_zones' => DB::table('service_locations')
-                    ->whereNotNull('client_zone')
-                    ->where('client_zone', '!=', '')
-                    ->distinct('client_zone')
-                    ->count('client_zone'),
-                'locations_by_region' => DB::table('service_locations')
-                    ->select('sol_region', DB::raw('count(*) as count'))
-                    ->where('is_active', 1)
-                    ->whereNotNull('sol_region')
-                    ->groupBy('sol_region')
-                    ->get()
-            ];
-
-            return response()->json([
-                'success' => true,
-                'data' => $stats,
-                'message' => 'Service location statistics retrieved successfully'
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error retrieving statistics: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Bulk import service locations from CSV
+     * ✅ COMPLETE: Bulk import with auto-assignment logic
      */
     public function bulkImport(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'client_id' => 'required|integer|exists:clients,id',
-            'sol_office_id' => 'required|integer|exists:sol_offices,id',
             'file' => 'required|file|mimes:csv,txt|max:5120', // 5MB max
         ]);
 
@@ -461,7 +386,6 @@ class ServiceLocationController extends Controller
         try {
             $file = $request->file('file');
             $clientId = $request->client_id;
-            $solOfficeId = $request->sol_office_id;
 
             // Get client info for code generation
             $client = DB::table('clients')->where('id', $clientId)->first();
@@ -471,18 +395,31 @@ class ServiceLocationController extends Controller
 
             // Read CSV file
             $csvData = array_map('str_getcsv', file($file->getPathname()));
-            $headers = array_map('trim', array_shift($csvData)); // Remove header row and trim
+            $headers = array_map('trim', array_shift($csvData));
+
+            // Validate required headers
+            $requiredHeaders = ['location_name', 'city'];
+            $missingHeaders = array_diff($requiredHeaders, $headers);
+            if (!empty($missingHeaders)) {
+                throw new Exception('Missing required headers: ' . implode(', ', $missingHeaders));
+            }
 
             $totalProcessed = 0;
             $successCount = 0;
             $errorCount = 0;
             $errors = [];
+            $assignmentSummary = [
+                'lga_assignments' => 0,
+                'state_assignments' => 0,
+                'no_assignments' => 0,
+                'assignment_details' => []
+            ];
 
             DB::beginTransaction();
 
             foreach ($csvData as $index => $row) {
                 $totalProcessed++;
-                $rowNumber = $index + 2; // Account for header row
+                $rowNumber = $index + 2; // +2 because we removed headers and start from 1
 
                 try {
                     // Skip empty rows
@@ -490,87 +427,76 @@ class ServiceLocationController extends Controller
                         continue;
                     }
 
-                    // Map CSV data to fields
-                    $data = array_combine($headers, $row);
-
-                    // Clean and validate data
-                    $uniqueId = trim($data['unique_id'] ?? '');
-                    $locationName = trim($data['location_name'] ?? '');
-                    $shortName = trim($data['short_name'] ?? '');
-                    $city = trim($data['city'] ?? '');
-                    $fullAddress = trim($data['full_address'] ?? '');
-                    $contactPersonName = trim($data['contact_person_name'] ?? '');
-                    $contactPersonPhone = trim($data['contact_person_phone'] ?? '');
-                    $contactPersonEmail = trim($data['contact_person_email'] ?? '');
-
-                    // Validate required fields
-                    if (empty($locationName) || empty($city)) {
-                        $errors[] = [
-                            'row' => $rowNumber,
-                            'message' => 'Location name and city are required'
-                        ];
-                        $errorCount++;
-                        continue;
+                    // Map CSV data to fields (handle missing columns gracefully)
+                    $data = [];
+                    foreach ($headers as $i => $header) {
+                        $data[$header] = isset($row[$i]) ? trim($row[$i]) : '';
                     }
+
+                    // Clean and validate required data
+                    $locationName = $data['location_name'] ?? '';
+                    $city = $data['city'] ?? '';
+
+                    if (empty($locationName) || empty($city)) {
+                        throw new Exception('Location name and city are required');
+                    }
+
+                    // ✅ AUTO-ASSIGN SOL OFFICE for each location
+                    $autoAssignment = $this->autoAssignSOLOffice($city);
+                    $solOfficeId = $autoAssignment['office'] ? $autoAssignment['office']->id : null;
+
+                    // Track assignment statistics
+                    if ($autoAssignment['assignment_type'] === 'lga') {
+                        $assignmentSummary['lga_assignments']++;
+                    } elseif ($autoAssignment['assignment_type'] === 'state') {
+                        $assignmentSummary['state_assignments']++;
+                    } else {
+                        $assignmentSummary['no_assignments']++;
+                    }
+
+                    // Store assignment details for reporting
+                    $assignmentSummary['assignment_details'][] = [
+                        'row' => $rowNumber,
+                        'city' => $city,
+                        'location_name' => $locationName,
+                        'assignment_type' => $autoAssignment['assignment_type'],
+                        'office_name' => $autoAssignment['office'] ? $autoAssignment['office']->office_name : null,
+                        'reason' => $autoAssignment['assignment_reason']
+                    ];
 
                     // Generate location code
-                    $cityCode = strtoupper(substr($city, 0, 3));
-                    $timestamp = now()->format('His');
-                    $locationCode = $client->client_code . '-' . $cityCode . '-' . $timestamp . $rowNumber;
+                    $locationCode = $data['unique_id'] ?? $this->generateLocationCode($client->client_code, $city);
 
-                    // Check if location already exists
-                    $existingLocation = DB::table('service_locations')
-                        ->where('client_id', $clientId)
-                        ->where(function ($query) use ($uniqueId, $locationCode) {
-                            $query->where('unique_id', $uniqueId)
-                                ->orWhere('location_code', $locationCode);
-                        })
-                        ->first();
-
-                    if ($existingLocation) {
-                        // Update existing location
-                        DB::table('service_locations')
-                            ->where('id', $existingLocation->id)
-                            ->update([
-                                'location_name' => $locationName,
-                                'short_name' => $shortName,
-                                'city' => $city,
-                                'full_address' => $fullAddress,
-                                'contact_person_name' => $contactPersonName,
-                                'contact_person_phone' => $contactPersonPhone,
-                                'contact_person_email' => $contactPersonEmail,
-                                'sol_office_id' => $solOfficeId,
-                                'updated_at' => now()
-                            ]);
-                    } else {
-                        // Insert new location
-                        DB::table('service_locations')->insert([
-                            'location_code' => $locationCode,
-                            'location_name' => $locationName,
-                            'unique_id' => $uniqueId,
-                            'short_name' => $shortName,
-                            'city' => $city,
-                            'full_address' => $fullAddress,
-                            'contact_person_name' => $contactPersonName,
-                            'contact_person_phone' => $contactPersonPhone,
-                            'contact_person_email' => $contactPersonEmail,
-                            'client_id' => $clientId,
-                            'sol_office_id' => $solOfficeId,
-                            'country' => 'Nigeria',
-                            'is_active' => 1,
-                            'created_by' => Auth::id(),
-                            'created_at' => now(),
-                            'updated_at' => now()
-                        ]);
-                    }
+                    // Insert service location
+                    DB::table('service_locations')->insert([
+                        'client_id' => $clientId,
+                        'sol_office_id' => $solOfficeId,
+                        'location_name' => $locationName,
+                        'location_code' => $locationCode,
+                        'city' => $city,
+                        'unique_id' => $data['unique_id'] ?? null,
+                        'short_name' => $data['short_name'] ?? null,
+                        'full_address' => $data['full_address'] ?? null,
+                        'contact_person' => $data['contact_person'] ?? null,
+                        'contact_phone' => $data['contact_phone'] ?? null,
+                        'contact_email' => $data['contact_email'] ?? null,
+                        'is_active' => true,
+                        'created_by' => Auth::check() ? Auth::user()->profile_id : 1,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
 
                     $successCount++;
                 } catch (Exception $e) {
+                    $errorCount++;
                     $errors[] = [
                         'row' => $rowNumber,
-                        'message' => 'Error processing row: ' . $e->getMessage()
+                        'message' => $e->getMessage(),
+                        'data' => $data ?? []
                     ];
-                    $errorCount++;
+
+                    // Continue processing other rows
+                    continue;
                 }
             }
 
@@ -578,55 +504,413 @@ class ServiceLocationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Bulk import completed',
+                'message' => "Bulk import completed. {$successCount} locations imported successfully.",
                 'data' => [
                     'total_processed' => $totalProcessed,
                     'success_count' => $successCount,
                     'error_count' => $errorCount,
-                    'errors' => $errors
+                    'errors' => $errors,
+                    'assignment_summary' => $assignmentSummary
                 ]
             ]);
         } catch (Exception $e) {
             DB::rollBack();
-
             return response()->json([
                 'success' => false,
-                'message' => 'Error processing bulk import: ' . $e->getMessage()
+                'message' => 'Error during bulk import: ' . $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Generate location code
+     * ✅ NEW: Test auto-assignment for a specific city
      */
-    public function generateLocationCode(Request $request)
+    public function testAutoAssignment(Request $request)
     {
+        $validator = Validator::make($request->all(), [
+            'city' => 'required|string|max:100'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'City is required',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
         try {
-            $clientCode = $request->client_code;
-            $city = $request->city;
-
-            if (!$clientCode || !$city) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Client code and city are required'
-                ], 422);
-            }
-
-            // Generate code format: CLIENT_CODE-CITY-XXX
-            $cityCode = strtoupper(substr($city, 0, 3));
-            $timestamp = now()->format('His');
-            $locationCode = $clientCode . '-' . $cityCode . '-' . $timestamp;
+            $assignment = $this->autoAssignSOLOffice($request->city);
 
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'location_code' => $locationCode
-                ]
+                'data' => $assignment
             ]);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error generating location code: ' . $e->getMessage()
+                'message' => 'Error testing auto-assignment: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ NEW: Download CSV template for bulk upload
+     */
+    public function downloadTemplate()
+    {
+        try {
+            $headers = [
+                'unique_id',
+                'location_name',
+                'city',
+                'short_name',
+                'full_address',
+                'contact_person',
+                'contact_phone',
+                'contact_email'
+            ];
+
+            $sampleData = [
+                [
+                    'LOC001',
+                    'Lagos Main Office',
+                    'Ikeja',
+                    'LMO',
+                    '123 Allen Avenue, Ikeja, Lagos',
+                    'John Doe',
+                    '08012345678',
+                    'john.doe@example.com'
+                ],
+                [
+                    'LOC002',
+                    'Abuja Branch',
+                    'Abuja',
+                    'ABB',
+                    '456 Central Business District, Abuja',
+                    'Jane Smith',
+                    '08087654321',
+                    'jane.smith@example.com'
+                ],
+                [
+                    'LOC003',
+                    'Port Harcourt Office',
+                    'Port Harcourt',
+                    'PHO',
+                    '789 Aba Road, Port Harcourt, Rivers',
+                    'Mike Johnson',
+                    '08011223344',
+                    'mike.johnson@example.com'
+                ]
+            ];
+
+            $filename = 'service_locations_template.csv';
+            $output = fopen('php://temp', 'r+');
+
+            // Write headers
+            fputcsv($output, $headers);
+
+            // Write sample data
+            foreach ($sampleData as $row) {
+                fputcsv($output, $row);
+            }
+
+            rewind($output);
+            $csvContent = stream_get_contents($output);
+            fclose($output);
+
+            return response($csvContent)
+                ->header('Content-Type', 'text/csv')
+                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error generating template: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ NEW: Get assignment statistics
+     */
+    public function getAssignmentStats(Request $request)
+    {
+        try {
+            $query = DB::table('service_locations as sl')
+                ->leftJoin('sol_offices as so', 'sl.sol_office_id', '=', 'so.id')
+                ->leftJoin('clients as c', 'sl.client_id', '=', 'c.id');
+
+            // Filter by client if specified
+            if ($request->filled('client_id')) {
+                $query->where('sl.client_id', $request->client_id);
+            }
+
+            $stats = [
+                'total_locations' => $query->count(),
+                'assigned_locations' => $query->whereNotNull('sl.sol_office_id')->count(),
+                'unassigned_locations' => $query->whereNull('sl.sol_office_id')->count(),
+                'lga_assignments' => $query->where('so.control_type', 'lga')->count(),
+                'state_assignments' => $query->where('so.control_type', 'state')->count(),
+                'assignment_by_office' => $query->select('so.office_name', DB::raw('COUNT(*) as count'))
+                    ->whereNotNull('sl.sol_office_id')
+                    ->groupBy('so.id', 'so.office_name')
+                    ->get(),
+                'unassigned_cities' => $query->select('sl.city', DB::raw('COUNT(*) as count'))
+                    ->whereNull('sl.sol_office_id')
+                    ->groupBy('sl.city')
+                    ->get(),
+                'coverage_by_state' => DB::table('states_lgas as slg')
+                    ->leftJoin('service_locations as sl', 'slg.state_code', '=', DB::raw('(SELECT state_code FROM states_lgas WHERE lga_name LIKE CONCAT("%", sl.city, "%") OR state_name LIKE CONCAT("%", sl.city, "%") LIMIT 1)'))
+                    ->leftJoin('sol_offices as so', 'sl.sol_office_id', '=', 'so.id')
+                    ->select(
+                        'slg.state_name',
+                        DB::raw('COUNT(DISTINCT sl.id) as total_locations'),
+                        DB::raw('COUNT(DISTINCT CASE WHEN sl.sol_office_id IS NOT NULL THEN sl.id END) as assigned_locations')
+                    )
+                    ->groupBy('slg.state_code', 'slg.state_name')
+                    ->get()
+            ];
+
+            return response()->json([
+                'success' => true,
+                'data' => $stats
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching assignment statistics: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ NEW: Bulk reassign locations
+     */
+    public function bulkReassign(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'location_ids' => 'required|array|min:1',
+            'location_ids.*' => 'integer|exists:service_locations,id',
+            'new_sol_office_id' => 'nullable|integer|exists:sol_offices,id',
+            'reason' => 'nullable|string|max:500'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $updatedCount = DB::table('service_locations')
+                ->whereIn('id', $request->location_ids)
+                ->update([
+                    'sol_office_id' => $request->new_sol_office_id,
+                    'updated_by' => Auth::check() ? Auth::user()->profile_id : 1,
+                    'updated_at' => now()
+                ]);
+
+            // Log the reassignment for audit trail
+            foreach ($request->location_ids as $locationId) {
+                DB::table('audit_logs')->insert([
+                    'table_name' => 'service_locations',
+                    'record_id' => $locationId,
+                    'action' => 'bulk_reassign',
+                    'old_values' => json_encode(['reason' => $request->reason]),
+                    'new_values' => json_encode(['new_sol_office_id' => $request->new_sol_office_id]),
+                    'user_id' => Auth::check() ? Auth::id() : 1,
+                    'created_at' => now()
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$updatedCount} locations reassigned successfully",
+                'data' => [
+                    'updated_count' => $updatedCount,
+                    'new_sol_office_id' => $request->new_sol_office_id
+                ]
+            ]);
+        } catch (Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Error during bulk reassignment: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ HELPER: Generate location code
+     */
+    private function generateLocationCode($clientCode, $city)
+    {
+        // Create a simple location code: CLIENT_CODE-CITY_INITIALS-SEQUENCE
+        $cityInitials = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $city), 0, 3));
+
+        // Get next sequence number for this client and city combination
+        $lastLocation = DB::table('service_locations')
+            ->where('location_code', 'LIKE', "{$clientCode}-{$cityInitials}-%")
+            ->orderBy('location_code', 'desc')
+            ->first();
+
+        $sequence = 1;
+        if ($lastLocation) {
+            $parts = explode('-', $lastLocation->location_code);
+            if (count($parts) >= 3 && is_numeric(end($parts))) {
+                $sequence = (int)end($parts) + 1;
+            }
+        }
+
+        return sprintf('%s-%s-%03d', $clientCode, $cityInitials, $sequence);
+    }
+
+    /**
+     * ✅ EXISTING METHODS: Keep all your existing methods
+     * (index, show, destroy, getByClient, etc.)
+     */
+
+    public function index(Request $request)
+    {
+        try {
+            $query = DB::table('service_locations as sl')
+                ->leftJoin('clients as c', 'sl.client_id', '=', 'c.id')
+                ->leftJoin('sol_offices as so', 'sl.sol_office_id', '=', 'so.id')
+                ->select(
+                    'sl.*',
+                    'c.name as client_name',
+                    'c.client_code',
+                    'so.office_name as sol_office_name',
+                    'so.office_code as sol_office_code'
+                );
+
+            // Apply filters
+            if ($request->filled('client_id')) {
+                $query->where('sl.client_id', $request->client_id);
+            }
+
+            if ($request->filled('sol_office_id')) {
+                $query->where('sl.sol_office_id', $request->sol_office_id);
+            }
+
+            if ($request->filled('city')) {
+                $query->where('sl.city', 'LIKE', '%' . $request->city . '%');
+            }
+
+            if ($request->filled('is_active')) {
+                $query->where('sl.is_active', $request->boolean('is_active'));
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('sl.location_name', 'LIKE', "%{$search}%")
+                        ->orWhere('sl.location_code', 'LIKE', "%{$search}%")
+                        ->orWhere('sl.city', 'LIKE', "%{$search}%");
+                });
+            }
+
+            $locations = $query->orderBy('sl.location_name')->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $locations
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching service locations: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function show($id)
+    {
+        try {
+            $location = DB::table('service_locations as sl')
+                ->leftJoin('clients as c', 'sl.client_id', '=', 'c.id')
+                ->leftJoin('sol_offices as so', 'sl.sol_office_id', '=', 'so.id')
+                ->where('sl.id', $id)
+                ->select(
+                    'sl.*',
+                    'c.name as client_name',
+                    'c.client_code',
+                    'so.office_name as sol_office_name',
+                    'so.office_code as sol_office_code'
+                )
+                ->first();
+
+            if (!$location) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Service location not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $location
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching service location: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $deleted = DB::table('service_locations')->where('id', $id)->delete();
+
+            if ($deleted === 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Service location not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Service location deleted successfully'
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error deleting service location: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getByClient($clientId)
+    {
+        try {
+            $locations = DB::table('service_locations')
+                ->leftJoin('sol_offices', 'service_locations.sol_office_id', '=', 'sol_offices.id')
+                ->where('service_locations.client_id', $clientId)
+                ->select(
+                    'service_locations.*',
+                    'sol_offices.office_name as sol_office_name',
+                    'sol_offices.office_code as sol_office_code'
+                )
+                ->orderBy('service_locations.location_name')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $locations
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching client locations: ' . $e->getMessage()
             ], 500);
         }
     }

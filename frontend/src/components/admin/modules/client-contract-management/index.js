@@ -11,23 +11,8 @@ const ClientService = lazy(() =>
 const ClientContract = lazy(() =>
   import("./submodules/client-contract/ClientContract")
 );
-const RecruitmentRequest = lazy(() =>
-  import("./submodules/recruitment-request/RecruitmentRequest")
-);
-const VacancySetup = lazy(() =>
-  import("./submodules/vacancy-setup/VacancySetup")
-);
 const SalaryStructure = lazy(() =>
   import("./submodules/salary-structure/SalaryStructure")
-);
-const ClientWeekOff = lazy(() =>
-  import("./submodules/client-week-off/ClientWeekOff")
-);
-const ClaimsResolution = lazy(() =>
-  import("./submodules/claims-resolution/ClaimsResolution")
-);
-const RecruitmentTracker = lazy(() =>
-  import("./submodules/recruitment-tracker/RecruitmentTracker")
 );
 
 // Module configuration
@@ -108,20 +93,6 @@ export const clientContractModule = {
       ],
     },
     {
-      id: "recruitment-request",
-      name: "Recruitment Request",
-      icon: "👥",
-      component: RecruitmentRequest,
-      path: "/recruitment-request",
-    },
-    {
-      id: "vacancy-setup",
-      name: "Vacancy Setup",
-      icon: "📊",
-      component: VacancySetup,
-      path: "/vacancy-setup",
-    },
-    {
       id: "salary-structure",
       name: "Salary Structure",
       icon: "💰",
@@ -159,58 +130,6 @@ export const clientContractModule = {
           path: "/client-account",
         },
       ],
-    },
-    {
-      id: "client-week-off",
-      name: "Client Week Off",
-      icon: "🏖️",
-      component: ClientWeekOff,
-      path: "/client-week-off",
-    },
-    {
-      id: "claims-resolution",
-      name: "Claims Resolution",
-      icon: "⚖️",
-      component: ClaimsResolution,
-      path: "/claims-resolution",
-      children: [
-        {
-          id: "defalcation-incidence",
-          name: "Defalcation Incidence",
-          path: "/defalcation-incidence",
-        },
-        {
-          id: "case-documentation",
-          name: "Defalcation Incidence (Case Documentation by PMS)",
-          path: "/case-documentation",
-        },
-        {
-          id: "case-review",
-          name: "Defalcation Incidence (Case Review by CRT)",
-          path: "/case-review",
-        },
-        {
-          id: "correspondence-closure",
-          name: "Defalcation Incidence (Correspondence & Closure)",
-          path: "/correspondence-closure",
-        },
-      ],
-    },
-    {
-      id: "claims-resolution-list",
-      name: "Claims Resolution List",
-      icon: "📋",
-      component: lazy(() =>
-        import("./submodules/claims-resolution-list/ClaimsResolutionList")
-      ),
-      path: "/claims-resolution-list",
-    },
-    {
-      id: "recruitment-tracker-list",
-      name: "Recruitment Tracker List",
-      icon: "📈",
-      component: RecruitmentTracker,
-      path: "/recruitment-tracker-list",
     },
   ],
 };

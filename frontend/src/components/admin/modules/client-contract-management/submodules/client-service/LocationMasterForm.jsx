@@ -1,12 +1,14 @@
-"use client";
-
 import { useState, useEffect } from "react";
-import { X, Save, MapPin, Building2, Download, Upload } from "lucide-react";
 import {
-  solOfficeAPI,
-  serviceLocationAPI,
-  clientAPI,
-} from "../../../../../../services/api";
+  X,
+  Save,
+  MapPin,
+  Building2,
+  Download,
+  Upload,
+  Info,
+} from "lucide-react";
+import { serviceLocationAPI, clientAPI } from "../../../../../../services/api";
 
 const LocationMasterForm = ({
   isOpen,
@@ -26,15 +28,14 @@ const LocationMasterForm = ({
     contact_person_phone: "",
     contact_person_email: "",
     client_id: "",
-    sol_office_id: "",
     is_active: true,
   });
 
+  // ✅ FIX: Ensure clients is always an array
   const [clients, setClients] = useState([]);
-  const [solOffices, setSolOffices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
-  const [autoSuggestedOffice, setAutoSuggestedOffice] = useState(null);
+  const [autoAssignmentInfo, setAutoAssignmentInfo] = useState(null);
 
   // Bulk upload states
   const [activeMode, setActiveMode] = useState("single");
@@ -42,13 +43,13 @@ const LocationMasterForm = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResults, setUploadResults] = useState(null);
   const [selectedClient, setSelectedClient] = useState("");
-  const [selectedSOLOffice, setSelectedSOLOffice] = useState("");
 
-  // Load clients and SOL offices on mount
+  // ✅ FIX: Load clients on mount and when modal opens
   useEffect(() => {
-    loadClients();
-    loadSolOffices();
-  }, []);
+    if (isOpen) {
+      loadClients();
+    }
+  }, [isOpen]);
 
   // Pre-fill form when editing
   useEffect(() => {
@@ -65,115 +66,62 @@ const LocationMasterForm = ({
         contact_person_phone: editingLocation.contact_person_phone || "",
         contact_person_email: editingLocation.contact_person_email || "",
         client_id: editingLocation.client_id || "",
-        sol_office_id: editingLocation.sol_office_id || "",
         is_active:
           editingLocation.is_active !== undefined
             ? editingLocation.is_active
             : true,
       });
+    } else {
+      resetForm();
     }
-  }, [editingLocation]);
+  }, [editingLocation, isOpen]);
 
-  // Auto-suggest SOL office based on city
-  useEffect(() => {
-    if (formData.city && formData.city.trim().length > 2) {
-      autoSuggestSOLOffice();
-    }
-  }, [formData.city]);
-
+  // ✅ FIX: Add loading state and error handling
   const loadClients = async () => {
     try {
+      setLoading(true);
       const response = await clientAPI.getActive();
-      if (response) {
-        // Check if it's paginated response
-        if (response.data && Array.isArray(response.data)) {
-          setClients(response.data);
-        } else if (
-          response.data &&
-          response.data.data &&
-          Array.isArray(response.data.data)
-        ) {
-          setClients(response.data.data); // For paginated responses
-        } else if (Array.isArray(response)) {
-          setClients(response); // Direct array response
-        } else {
-          console.log("Unexpected response structure:", response);
-          setClients([]);
+      console.log("Loaded clients:", response);
+
+      // ✅ Handle paginated response structure
+      let clientsData = [];
+
+      if (response && response.data) {
+        if (Array.isArray(response.data)) {
+          clientsData = response.data;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          // Handle paginated response: response.data.data
+          clientsData = response.data.data;
+        } else if (response.data.items && Array.isArray(response.data.items)) {
+          // Handle Laravel paginated response: response.data.items
+          clientsData = response.data.items;
         }
-      } else {
-        setClients([]);
       }
+
+      setClients(clientsData);
     } catch (error) {
       console.error("Error loading clients:", error);
       setClients([]);
-      // Don't show alert for initial load failures
+    } finally {
+      setLoading(false);
     }
   };
 
-  const loadSolOffices = async () => {
-    try {
-      const response = await solOfficeAPI.getActiveOffices();
-      if (response && response.data) {
-        setSolOffices(Array.isArray(response.data) ? response.data : []);
-      } else {
-        setSolOffices([]);
-      }
-    } catch (error) {
-      console.error("Error loading SOL offices:", error);
-      setSolOffices([]);
-      // Don't show alert for initial load failures
-    }
-  };
-
-  const autoSuggestSOLOffice = async () => {
-    try {
-      // Simple logic to match city with SOL office
-      const cityLower = formData.city.toLowerCase();
-
-      // Find office that controls this city/area
-      const matchingOffice = solOffices.find((office) => {
-        // Check if city matches office location
-        if (office.office_name.toLowerCase().includes(cityLower)) {
-          return true;
-        }
-
-        // Check controlled areas if available
-        if (office.controlled_areas && Array.isArray(office.controlled_areas)) {
-          return office.controlled_areas.some((area) =>
-            area.toLowerCase().includes(cityLower)
-          );
-        }
-
-        return false;
-      });
-
-      if (matchingOffice && !formData.sol_office_id) {
-        setFormData((prev) => ({ ...prev, sol_office_id: matchingOffice.id }));
-        setAutoSuggestedOffice(matchingOffice);
-      }
-    } catch (error) {
-      console.error("Error auto-suggesting SOL office:", error);
-    }
-  };
-
-  const generateLocationCode = async () => {
-    if (!formData.client_id || !formData.city) {
-      alert("Please select a client and enter city first");
+  // ✅ NEW: Test auto-assignment when city changes
+  const testAutoAssignment = async (city) => {
+    if (!city || city.length < 3) {
+      setAutoAssignmentInfo(null);
       return;
     }
 
     try {
-      const client = clients.find((c) => c.id === parseInt(formData.client_id));
-      if (!client) return;
-
-      // Generate code format: CLIENT_CODE-CITY-XXX
-      const cityCode = formData.city.substring(0, 3).toUpperCase();
-      const timestamp = Date.now().toString().slice(-3);
-      const locationCode = `${client.client_code}-${cityCode}-${timestamp}`;
-
-      setFormData((prev) => ({ ...prev, location_code: locationCode }));
+      const response = await serviceLocationAPI.testAutoAssignment({ city });
+      if (response.success) {
+        setAutoAssignmentInfo(response.data);
+      }
     } catch (error) {
-      console.error("Error generating location code:", error);
+      console.error("Error testing auto-assignment:", error);
+      setAutoAssignmentInfo(null);
     }
   };
 
@@ -183,6 +131,13 @@ const LocationMasterForm = ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+
+    // ✅ NEW: Test auto-assignment when city changes
+    if (name === "city" && value.length >= 3) {
+      testAutoAssignment(value);
+    } else if (name === "city" && value.length < 3) {
+      setAutoAssignmentInfo(null);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -196,14 +151,9 @@ const LocationMasterForm = ({
         return;
       }
 
-      // Generate location code if not set
-      if (!formData.location_code) {
-        await generateLocationCode();
-      }
-
       const dataToSubmit = {
         ...formData,
-        sol_office_id: formData.sol_office_id || null,
+        // Note: SOL office will be auto-assigned based on city
       };
 
       let response;
@@ -217,11 +167,19 @@ const LocationMasterForm = ({
       }
 
       if (response.success) {
-        alert(
-          editingLocation
-            ? "Location updated successfully!"
-            : "Location created successfully!"
-        );
+        const assignment = response.data?.auto_assignment;
+        let message = editingLocation
+          ? "Location updated successfully!"
+          : "Location created successfully!";
+
+        if (assignment?.office) {
+          message += `\n\nAuto-assigned to: ${assignment.office.office_name}`;
+          message += `\nAssignment type: ${assignment.assignment_type.toUpperCase()}`;
+        } else if (assignment) {
+          message += `\n\nNote: ${assignment.assignment_reason}`;
+        }
+
+        alert(message);
         onSave(response.data);
         onClose();
         resetForm();
@@ -237,8 +195,8 @@ const LocationMasterForm = ({
   };
 
   const handleBulkUpload = async () => {
-    if (!uploadFile || !selectedClient || !selectedSOLOffice) {
-      alert("Please select a file, client, and SOL office for bulk upload");
+    if (!uploadFile || !selectedClient) {
+      alert("Please select a file and client for bulk upload");
       return;
     }
 
@@ -257,9 +215,9 @@ const LocationMasterForm = ({
         });
       }, 200);
 
+      // ✅ UPDATED: No need to pass SOL office - auto-assigned
       const response = await serviceLocationAPI.bulkImport(
         selectedClient,
-        selectedSOLOffice,
         uploadFile
       );
 
@@ -267,17 +225,31 @@ const LocationMasterForm = ({
       setUploadProgress(100);
 
       if (response.success) {
+        const assignmentSummary = response.data.assignment_summary || {};
+
         setUploadResults({
           success: true,
           totalProcessed: response.data.total_processed || 0,
           successCount: response.data.success_count || 0,
           errorCount: response.data.error_count || 0,
           errors: response.data.errors || [],
+          assignmentSummary,
         });
 
-        alert(
-          `Bulk upload completed! ${response.data.success_count} locations imported successfully.`
-        );
+        let message = `Bulk upload completed!\n${response.data.success_count} locations imported successfully.`;
+
+        // Show assignment summary
+        if (assignmentSummary.lga_assignments > 0) {
+          message += `\n\n📍 LGA-level assignments: ${assignmentSummary.lga_assignments}`;
+        }
+        if (assignmentSummary.state_assignments > 0) {
+          message += `\n🏢 State-level assignments: ${assignmentSummary.state_assignments}`;
+        }
+        if (assignmentSummary.no_assignments > 0) {
+          message += `\n⚠️ No SOL office found: ${assignmentSummary.no_assignments}`;
+        }
+
+        alert(message);
 
         // Reset after successful upload
         setTimeout(() => {
@@ -321,6 +293,16 @@ const LocationMasterForm = ({
         contact_person_phone: "08087654321",
         contact_person_email: "jane.smith@example.com",
       },
+      {
+        unique_id: "LOC003",
+        location_name: "Port Harcourt Branch",
+        short_name: "PH Branch",
+        city: "Port Harcourt",
+        full_address: "15 Aba Road, Port Harcourt, Rivers State",
+        contact_person_name: "Mike Johnson",
+        contact_person_phone: "08011223344",
+        contact_person_email: "mike.johnson@example.com",
+      },
     ];
 
     const headers = Object.keys(templateData[0]);
@@ -352,10 +334,9 @@ const LocationMasterForm = ({
       contact_person_phone: "",
       contact_person_email: "",
       client_id: "",
-      sol_office_id: "",
       is_active: true,
     });
-    setAutoSuggestedOffice(null);
+    setAutoAssignmentInfo(null);
   };
 
   if (!isOpen) return null;
@@ -412,252 +393,238 @@ const LocationMasterForm = ({
 
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
           {activeMode === "single" ? (
+            /* Single Location Form */
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Auto-Assignment Info */}
+              {autoAssignmentInfo && (
+                <div
+                  className={`p-4 rounded-lg border-l-4 ${
+                    autoAssignmentInfo.office
+                      ? "bg-green-50 border-green-400"
+                      : "bg-yellow-50 border-yellow-400"
+                  }`}
+                >
+                  <div className="flex">
+                    <Info
+                      className={`w-5 h-5 ${
+                        autoAssignmentInfo.office
+                          ? "text-green-400"
+                          : "text-yellow-400"
+                      } mr-3 mt-0.5`}
+                    />
+                    <div>
+                      <h3
+                        className={`text-sm font-medium ${
+                          autoAssignmentInfo.office
+                            ? "text-green-800"
+                            : "text-yellow-800"
+                        }`}
+                      >
+                        SOL Office Auto-Assignment
+                      </h3>
+                      <p
+                        className={`text-sm ${
+                          autoAssignmentInfo.office
+                            ? "text-green-700"
+                            : "text-yellow-700"
+                        }`}
+                      >
+                        {autoAssignmentInfo.assignment_reason}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Client Selection */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Client Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Client <span className="text-red-500">*</span>
-                    </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Client <span className="text-red-500">*</span>
+                  </label>
+                  {/* ✅ FIX: Add loading state and ensure clients is array */}
+                  {loading ? (
+                    <div className="flex items-center px-3 py-2 border border-gray-300 rounded-md">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                      Loading clients...
+                    </div>
+                  ) : (
                     <select
                       name="client_id"
                       value={formData.client_id}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     >
                       <option value="">Select Client</option>
-                      {clients &&
-                        Array.isArray(clients) &&
+                      {/* ✅ FIX: Ensure clients is array and add fallback */}
+                      {Array.isArray(clients) && clients.length > 0 ? (
                         clients.map((client) => (
                           <option key={client.id} value={client.id}>
-                            {client.name} ({client.client_code})
+                            {client.name}
                           </option>
-                        ))}
+                        ))
+                      ) : (
+                        <option value="" disabled>
+                          No clients available
+                        </option>
+                      )}
                     </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Location Code
-                    </label>
-                    <div className="flex space-x-2">
-                      <input
-                        type="text"
-                        name="location_code"
-                        value={formData.location_code}
-                        onChange={handleInputChange}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Auto-generated or enter manually"
-                      />
-                      <button
-                        type="button"
-                        onClick={generateLocationCode}
-                        className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
-                      >
-                        Generate
-                      </button>
-                    </div>
-                  </div>
+                  )}
                 </div>
-              </div>
 
-              {/* Location Basic Info */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Location Details
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Location Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="location_name"
-                      value={formData.location_name}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="e.g., Victoria Island Branch"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Unique ID
-                    </label>
-                    <input
-                      type="text"
-                      name="unique_id"
-                      value={formData.unique_id}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Client's internal ID"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Short Name
-                    </label>
-                    <input
-                      type="text"
-                      name="short_name"
-                      value={formData.short_name}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="e.g., VI Branch"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      City <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="e.g., Victoria Island"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Address and SOL Office */}
-              <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Full Address
+                    Location Name <span className="text-red-500">*</span>
                   </label>
-                  <textarea
-                    name="full_address"
-                    value={formData.full_address}
+                  <input
+                    type="text"
+                    name="location_name"
+                    value={formData.location_name}
                     onChange={handleInputChange}
-                    rows="3"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                    placeholder="Complete address of the location"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Location Details */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Unique ID
+                  </label>
+                  <input
+                    type="text"
+                    name="unique_id"
+                    value={formData.unique_id}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      SOL Office Assignment
-                    </label>
-                    <select
-                      name="sol_office_id"
-                      value={formData.sol_office_id}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select SOL Office</option>
-                      {solOffices &&
-                        Array.isArray(solOffices) &&
-                        solOffices.map((office) => (
-                          <option key={office.id} value={office.id}>
-                            {office.office_name} ({office.state_name})
-                          </option>
-                        ))}
-                    </select>
-                    {autoSuggestedOffice && (
-                      <p className="text-xs text-green-600 mt-1">
-                        ✓ Auto-suggested based on city:{" "}
-                        {autoSuggestedOffice.office_name}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center">
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        name="is_active"
-                        checked={formData.is_active}
-                        onChange={handleInputChange}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">
-                        Active Location
-                      </span>
-                    </label>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Short Name
+                  </label>
+                  <input
+                    type="text"
+                    name="short_name"
+                    value={formData.short_name}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    City <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="city"
+                    value={formData.city}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., Ikeja, Abuja, Port Harcourt"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Address */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Full Address
+                </label>
+                <textarea
+                  name="full_address"
+                  value={formData.full_address}
+                  onChange={handleInputChange}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter complete address"
+                />
               </div>
 
               {/* Contact Information */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Contact Information (Optional)
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Contact Person Name
-                    </label>
-                    <input
-                      type="text"
-                      name="contact_person_name"
-                      value={formData.contact_person_name}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Full name"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Contact Phone
-                    </label>
-                    <input
-                      type="tel"
-                      name="contact_person_phone"
-                      value={formData.contact_person_phone}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Phone number"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Contact Email
-                    </label>
-                    <input
-                      type="email"
-                      name="contact_person_email"
-                      value={formData.contact_person_email}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="email@example.com"
-                    />
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Contact Person
+                  </label>
+                  <input
+                    type="text"
+                    name="contact_person_name"
+                    value={formData.contact_person_name}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Contact Phone
+                  </label>
+                  <input
+                    type="tel"
+                    name="contact_person_phone"
+                    value={formData.contact_person_phone}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Contact Email
+                  </label>
+                  <input
+                    type="email"
+                    name="contact_person_email"
+                    value={formData.contact_person_email}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+              {/* Status */}
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  name="is_active"
+                  checked={formData.is_active}
+                  onChange={handleInputChange}
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label className="ml-2 text-sm text-gray-700">
+                  Active Location
+                </label>
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-end space-x-3 pt-6 border-t">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={formLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {formLoading ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                       <span>Saving...</span>
                     </>
                   ) : (
                     <>
-                      <Save className="w-4 h-4" />
+                      <Save className="w-4 h-4 mr-2" />
                       <span>
                         {editingLocation ? "Update" : "Save"} Location
                       </span>
@@ -671,112 +638,114 @@ const LocationMasterForm = ({
             <div className="space-y-6">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h3 className="text-lg font-semibold text-blue-900 mb-2">
-                  Bulk Upload Instructions
+                  🚀 Smart Bulk Upload with Auto-Assignment
                 </h3>
                 <ul className="text-sm text-blue-800 space-y-1">
                   <li>
                     • Download the CSV template and fill in location details
                   </li>
-                  <li>• Select the client and SOL office for all locations</li>
-                  <li>• Upload the completed CSV file</li>
-                  <li>• The system will automatically assign location codes</li>
+                  <li>• Select the client for all locations</li>
+                  <li>
+                    • 🎯{" "}
+                    <strong>SOL offices will be automatically assigned</strong>{" "}
+                    based on city
+                  </li>
+                  <li>• LGA-level assignments get priority over state-level</li>
+                  <li>
+                    • Upload the completed CSV file and review assignment
+                    results
+                  </li>
                 </ul>
               </div>
 
-              {/* Client and SOL Office Selection */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Client <span className="text-red-500">*</span>
-                  </label>
+              {/* Client Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Client <span className="text-red-500">*</span>
+                </label>
+                {/* ✅ FIX: Add loading state and ensure clients is array */}
+                {loading ? (
+                  <div className="flex items-center px-3 py-2 border border-gray-300 rounded-md">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                    Loading clients...
+                  </div>
+                ) : (
                   <select
                     value={selectedClient}
                     onChange={(e) => setSelectedClient(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Client</option>
-                    {clients &&
-                      Array.isArray(clients) &&
+                    {/* ✅ FIX: Ensure clients is array and add fallback */}
+                    {Array.isArray(clients) && clients.length > 0 ? (
                       clients.map((client) => (
                         <option key={client.id} value={client.id}>
-                          {client.name} ({client.client_code})
+                          {client.name}
                         </option>
-                      ))}
+                      ))
+                    ) : (
+                      <option value="" disabled>
+                        {loading ? "Loading..." : "No clients available"}
+                      </option>
+                    )}
                   </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    SOL Office <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={selectedSOLOffice}
-                    onChange={(e) => setSelectedSOLOffice(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="">Select SOL Office</option>
-                    {solOffices &&
-                      Array.isArray(solOffices) &&
-                      solOffices.map((office) => (
-                        <option key={office.id} value={office.id}>
-                          {office.office_name} ({office.state_name})
-                        </option>
-                      ))}
-                  </select>
-                </div>
+                )}
               </div>
 
               {/* Template Download */}
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                <Download className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h4 className="text-md font-medium text-gray-900 mb-2">
+                  Step 1: Download Template
+                </h4>
                 <p className="text-sm text-gray-600 mb-3">
-                  Download the CSV template to get started
+                  Download the CSV template and fill in your location data
                 </p>
                 <button
                   onClick={downloadTemplate}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors inline-flex items-center space-x-2"
+                  className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100"
                 >
-                  <Download className="w-4 h-4" />
-                  <span>Download Template</span>
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Template
                 </button>
               </div>
 
               {/* File Upload */}
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h4 className="text-md font-medium text-gray-900 mb-2">
+                  Step 2: Upload CSV File
+                </h4>
+                <p className="text-sm text-gray-600 mb-3">
+                  Select your completed CSV file for bulk import
+                </p>
                 <input
                   type="file"
                   accept=".csv"
                   onChange={(e) => setUploadFile(e.target.files[0])}
-                  className="hidden"
-                  id="bulk-upload"
+                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                 />
-                <label
-                  htmlFor="bulk-upload"
-                  className="cursor-pointer text-center block"
-                >
-                  <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-sm text-gray-600 mb-1">
-                    {uploadFile ? uploadFile.name : "Click to upload CSV file"}
+                {uploadFile && (
+                  <p className="text-sm text-green-600 mt-2">
+                    ✓ File selected: {uploadFile.name}
                   </p>
-                  <p className="text-xs text-gray-500">
-                    Maximum file size: 5MB
-                  </p>
-                </label>
+                )}
               </div>
 
               {/* Upload Progress */}
               {uploadProgress > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Uploading...</span>
-                    <span>{uploadProgress}%</span>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-blue-900">
+                      Upload Progress
+                    </span>
+                    <span className="text-sm text-blue-700">
+                      {uploadProgress}%
+                    </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-blue-200 rounded-full h-2">
                     <div
                       className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${uploadProgress}%` }}
-                    ></div>
+                    />
                   </div>
                 </div>
               )}
@@ -784,62 +753,109 @@ const LocationMasterForm = ({
               {/* Upload Results */}
               {uploadResults && (
                 <div
-                  className={`border rounded-lg p-4 ${
+                  className={`p-4 rounded-lg border ${
                     uploadResults.success
                       ? "bg-green-50 border-green-200"
                       : "bg-red-50 border-red-200"
                   }`}
                 >
-                  <h4 className="font-semibold mb-2">Upload Results</h4>
-                  <div className="text-sm space-y-1">
-                    <p>Total Processed: {uploadResults.totalProcessed}</p>
-                    <p>Successful: {uploadResults.successCount}</p>
-                    <p>Errors: {uploadResults.errorCount}</p>
-                  </div>
-                  {uploadResults.errors.length > 0 && (
+                  <h4
+                    className={`font-medium mb-2 ${
+                      uploadResults.success ? "text-green-900" : "text-red-900"
+                    }`}
+                  >
+                    {uploadResults.success
+                      ? "✅ Upload Complete!"
+                      : "❌ Upload Failed"}
+                  </h4>
+
+                  {uploadResults.success && (
+                    <div className="text-sm text-green-800">
+                      <p>
+                        📊 <strong>Summary:</strong>{" "}
+                        {uploadResults.successCount} of{" "}
+                        {uploadResults.totalProcessed} locations imported
+                        successfully
+                      </p>
+
+                      {uploadResults.assignmentSummary && (
+                        <div className="mt-2 space-y-1">
+                          {uploadResults.assignmentSummary.lga_assignments >
+                            0 && (
+                            <p>
+                              📍 LGA-level assignments:{" "}
+                              {uploadResults.assignmentSummary.lga_assignments}
+                            </p>
+                          )}
+                          {uploadResults.assignmentSummary.state_assignments >
+                            0 && (
+                            <p>
+                              🏢 State-level assignments:{" "}
+                              {
+                                uploadResults.assignmentSummary
+                                  .state_assignments
+                              }
+                            </p>
+                          )}
+                          {uploadResults.assignmentSummary.no_assignments >
+                            0 && (
+                            <p>
+                              ⚠️ No SOL office found:{" "}
+                              {uploadResults.assignmentSummary.no_assignments}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {uploadResults.errors && uploadResults.errors.length > 0 && (
                     <div className="mt-3">
-                      <p className="text-sm font-medium mb-1">Errors:</p>
-                      <ul className="text-xs space-y-1">
+                      <p className="text-red-700 font-medium">Errors:</p>
+                      <ul className="text-sm text-red-600 mt-1">
                         {uploadResults.errors
                           .slice(0, 5)
                           .map((error, index) => (
-                            <li key={index} className="text-red-600">
+                            <li key={index}>
                               Row {error.row}: {error.message}
                             </li>
                           ))}
+                        {uploadResults.errors.length > 5 && (
+                          <li>
+                            ... and {uploadResults.errors.length - 5} more
+                            errors
+                          </li>
+                        )}
                       </ul>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+              {/* Bulk Upload Actions */}
+              <div className="flex justify-end space-x-3 pt-6 border-t">
                 <button
+                  type="button"
                   onClick={onClose}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleBulkUpload}
-                  disabled={
-                    !uploadFile ||
-                    !selectedClient ||
-                    !selectedSOLOffice ||
-                    formLoading
-                  }
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  disabled={formLoading || !uploadFile || !selectedClient}
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {formLoading ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                       <span>Processing...</span>
                     </>
                   ) : (
                     <>
-                      <Upload className="w-4 h-4" />
-                      <span>Upload Locations</span>
+                      <Upload className="w-4 h-4 mr-2" />
+                      <span>Upload & Auto-Assign</span>
                     </>
                   )}
                 </button>
