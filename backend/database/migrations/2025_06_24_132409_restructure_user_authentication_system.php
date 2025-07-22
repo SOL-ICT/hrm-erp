@@ -83,10 +83,34 @@ return new class extends Migration
     /**
      * Create test users for development
      */
+
+
     private function createTestUsers()
     {
-        // Test Candidate
-        $candidateId = DB::table('candidates')->insertGetId([
+
+        // Create the user first
+        $userId = DB::table('users')->insertGetId([
+            'name' => 'John Candidate',
+            'email' => 'candidate@test.com',
+            'username' => 'john.candidate',
+            'password' => Hash::make('password123'),
+            'role' => 'candidate',
+            'user_type' => 'candidate',
+            'profile_id' => null,
+            'is_active' => true,
+            'preferences' => json_encode([
+                'theme' => 'light',
+                'language' => 'en',
+                'primary_color' => '#6366f1'
+            ]),
+            'created_at' => now(),
+            'updated_at' => now(),
+]);
+
+
+        // Create the candidate with the same ID
+        DB::table('candidates')->insert([
+            'id' => $userId, //shared pk
             'email' => 'candidate@test.com',
             'password' => Hash::make('password123'),
             'first_name' => 'John',
@@ -97,30 +121,34 @@ return new class extends Migration
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        DB::table('users')->where('id', $userId)->update(['profile_id' => $userId]);
 
-        DB::table('users')->insert([
-            'name' => 'John Candidate',
-            'email' => 'candidate@test.com',
-            'username' => 'john.candidate',
-            'password' => Hash::make('password123'),
-            'role' => 'candidate',
-            'user_type' => 'candidate',
-            'profile_id' => $candidateId,
-            'is_active' => true,
-            'preferences' => json_encode([
-                'theme' => 'light',
-                'language' => 'en',
-                'primary_color' => '#6366f1'
-            ]),
+        // Create default client
+        $clientId = DB::table('clients')->insertGetId([
+            'client_code' => 'CLT001',
+            'name' => 'Test Client',
+            'slug' => 'test-client',
+            'prefix' => 'TST',
+            'address' => 'Lagos, Nigeria',
+            'status' => 'active',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
 
+        $staffTypeId = DB::table('client_staff_types')->insertGetId([
+            'client_id' => $clientId,
+            'type_code' => 'DEFAULT',
+            'title' => 'Default Staff Type',
+            'description' => 'This is a default staff type for testing purposes.',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         // Test Staff Member  
         $staffId = DB::table('staff')->insertGetId([
             'candidate_id' => null, // Staff created directly, not from candidate
-            'client_id' => 1, // You'll need to create a default client
-            'staff_type_id' => 1, // You'll need to create a default staff type
+            'client_id' => $clientId, // Use the created client ID
+            'staff_type_id' => $staffTypeId, // Use the created staff type ID
             'employee_code' => 'EMP001',
             'staff_id' => 'STF001',
             'email' => 'staff@test.com',

@@ -10,7 +10,9 @@ return new class extends Migration
     {
         Schema::create('candidate_profiles', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('candidate_id')->constrained('candidates')->onDelete('cascade');
+            //$table->foreignId('candidate_id')->constrained('candidates')->onDelete('cascade');
+            $table->foreignId('candidate_id')->unique()->constrained('candidates')->onDelete('cascade');
+            //This ensures one-to-one integrity between candidates and candidate_profiles.
 
             // Personal Details
             $table->string('first_name');

@@ -2,7 +2,14 @@
 // config/cors.php
 
 return [
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+
+    'paths' => [
+        'api/*',
+        'login',
+        'logout',
+        'sanctum/csrf-cookie',
+        'user',
+    ],
 
     'allowed_methods' => ['*'],
 

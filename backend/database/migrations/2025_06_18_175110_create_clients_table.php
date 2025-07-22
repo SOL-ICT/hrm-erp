@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('client_code', 20)->unique();
             $table->string('name')->unique();
+           // $table->string('email')->nullable()->unique(); // ✅ Add this
             $table->string('slug')->unique();
             $table->string('prefix', 10)->unique(); // For employee ID: DSA, SOL, etc.
             $table->text('address')->nullable();
