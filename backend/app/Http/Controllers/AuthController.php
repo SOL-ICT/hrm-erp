@@ -468,7 +468,119 @@ class AuthController extends Controller
         }
     }
 
+
     /**
+<<<<<<< HEAD
+=======
+     * Register a new candidate - FIXED for current database schema
+     */
+    public function register(Request $request)
+{
+    try {
+        $data = $request->validate([
+            'email'    => 'required|email|unique:candidates,email|unique:users,email',
+            'password' => 'required|string|min:8|confirmed',
+            'first_name' => 'required|string|max:255',
+            'last_name'  => 'required|string|max:255',
+            'phone'      => 'sometimes|string|max:20',
+            'date_of_birth' => 'sometimes|date',
+            // Theme preferences (optional)
+            'theme' => 'sometimes|string|in:light,dark,transparent',
+            'language' => 'sometimes|string',
+            'primary_color' => 'sometimes|string',
+        ]);
+
+        DB::beginTransaction();
+
+        // ✅ Create users record first
+        $preferences = [
+            'theme' => $data['theme'] ?? 'light',
+            'language' => $data['language'] ?? 'en',
+            'primary_color' => $data['primary_color'] ?? '#6366f1',
+        ];
+
+        // ✅ FIXED: Create users record with correct field mapping
+        $userId = DB::table('users')->insertGetId([
+            'name' => $data['first_name'] . ' ' . $data['last_name'],
+            'email' => $data['email'],
+            'username' => strtolower($data['first_name'] . '.' . $data['last_name']),
+            'email_verified_at' => now(),
+            'password' => Hash::make($data['password']),
+            'role' => 'candidate',
+            'user_type' => 'candidate',
+            'profile_id' => null,
+            'is_active' => true,
+            'preferences' => json_encode($preferences), // ✅ Store as JSON
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    
+        // ✅Create candidate record using same ID as user
+        DB::table('candidates')->insert([
+            'id' => $userId, // shared PK
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
+            'phone' => $data['phone'] ?? null,
+            'date_of_birth' => $data['date_of_birth'] ?? null,
+            'profile_completed' => false,
+            'status' => 'active',
+            'created_at' => now(),  
+            'updated_at' => now(),
+        ]);
+
+        $candidateId = $userId; // Use the same ID for candidate
+
+        // update user's profile_id to point to candidate
+       // DB::table('users')->where('id', $userId)->update(['profile_id' => $candidateId]);
+
+        // ✅Create candidate profile
+        DB::table('candidate_profiles')->insert([
+            'candidate_id' => $candidateId, // Use the same ID as user
+            'nationality' => 'Nigeria',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+            // Create user model instance for authentication
+            $user = User::find($userId);
+            Auth::login($user);
+            $request->session()->regenerate();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Registration successful',
+                'user' => [
+                    'id' => $candidateId, // Return candidate ID for frontend
+                    'user_id' => $userId,
+                    'name' => $data['first_name'] . ' ' . $data['last_name'],
+                    'email' => $data['email'],
+                    'user_type' => 'candidate',
+                    'dashboard_type' => 'candidate',
+                    'preferences' => $preferences,
+                ],
+                'candidate_id' => $candidateId, // Explicitly return candidate ID
+            ], 201);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Registration failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+>>>>>>> 70ef4b6fbc7621c6fed0a6e854f5dc2ce2221d77
      * Get user preferences with defaults.
      */
     private function getUserPreferences($user)
