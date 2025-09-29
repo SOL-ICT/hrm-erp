@@ -212,9 +212,9 @@ class ServiceLocationController extends Controller
             'unique_id' => 'nullable|string|max:50',
             'short_name' => 'nullable|string|max:100',
             'full_address' => 'nullable|string',
-            'contact_person' => 'nullable|string|max:255',
-            'contact_phone' => 'nullable|string|max:20',
-            'contact_email' => 'nullable|email|max:255',
+            'contact_person_name' => 'nullable|string|max:255',
+            'contact_person_phone' => 'nullable|string|max:20',
+            'contact_person_email' => 'nullable|email|max:255',
             'is_active' => 'boolean'
         ]);
 
@@ -237,10 +237,13 @@ class ServiceLocationController extends Controller
 
             // ✅ AUTO-ASSIGN SOL OFFICE
             $autoAssignment = $this->autoAssignSOLOffice($request->city);
-            $solOfficeId = $autoAssignment['office'] ? $autoAssignment['office']->id : null;
+            $solOfficeId = null;
+            if (isset($autoAssignment['office']) && $autoAssignment['office'] !== null) {
+                $solOfficeId = $autoAssignment['office']->id;
+            }
 
             // Generate location code if not provided
-            $locationCode = $request->unique_id ?: $this->generateLocationCode($client->client_code, $request->city);
+            $locationCode = $request->unique_id ?: $this->generateLocationCode($client->prefix, $request->city);
 
             // Create the service location
             $locationId = DB::table('service_locations')->insertGetId([
@@ -252,11 +255,11 @@ class ServiceLocationController extends Controller
                 'unique_id' => $request->unique_id,
                 'short_name' => $request->short_name,
                 'full_address' => $request->full_address,
-                'contact_person' => $request->contact_person,
-                'contact_phone' => $request->contact_phone,
-                'contact_email' => $request->contact_email,
+                'contact_person_name' => $request->contact_person_name,
+                'contact_person_phone' => $request->contact_person_phone,
+                'contact_person_email' => $request->contact_person_email,
                 'is_active' => $request->boolean('is_active', true),
-                'created_by' => Auth::check() ? Auth::user()->profile_id : 1,
+                'created_by' => Auth::id(),
                 'created_at' => now(),
                 'updated_at' => now()
             ]);
@@ -292,9 +295,9 @@ class ServiceLocationController extends Controller
             'unique_id' => 'nullable|string|max:50',
             'short_name' => 'nullable|string|max:100',
             'full_address' => 'nullable|string',
-            'contact_person' => 'nullable|string|max:255',
-            'contact_phone' => 'nullable|string|max:20',
-            'contact_email' => 'nullable|email|max:255',
+            'contact_person_name' => 'nullable|string|max:255',
+            'contact_person_phone' => 'nullable|string|max:20',
+            'contact_person_email' => 'nullable|email|max:255',
             'is_active' => 'boolean'
         ]);
 
@@ -324,7 +327,11 @@ class ServiceLocationController extends Controller
 
             if ($existingLocation->city !== $request->city) {
                 $autoAssignment = $this->autoAssignSOLOffice($request->city);
-                $solOfficeId = $autoAssignment['office'] ? $autoAssignment['office']->id : null;
+                if (isset($autoAssignment['office']) && $autoAssignment['office'] !== null) {
+                    $solOfficeId = $autoAssignment['office']->id;
+                } else {
+                    $solOfficeId = null;
+                }
             }
 
             // Update the service location
@@ -338,11 +345,10 @@ class ServiceLocationController extends Controller
                     'unique_id' => $request->unique_id,
                     'short_name' => $request->short_name,
                     'full_address' => $request->full_address,
-                    'contact_person' => $request->contact_person,
-                    'contact_phone' => $request->contact_phone,
-                    'contact_email' => $request->contact_email,
+                    'contact_person_name' => $request->contact_person_name,
+                    'contact_person_phone' => $request->contact_person_phone,
+                    'contact_person_email' => $request->contact_person_email,
                     'is_active' => $request->boolean('is_active'),
-                    'updated_by' => Auth::check() ? Auth::user()->profile_id : 1,
                     'updated_at' => now()
                 ]);
 
@@ -443,7 +449,11 @@ class ServiceLocationController extends Controller
 
                     // ✅ AUTO-ASSIGN SOL OFFICE for each location
                     $autoAssignment = $this->autoAssignSOLOffice($city);
-                    $solOfficeId = $autoAssignment['office'] ? $autoAssignment['office']->id : null;
+                    if (isset($autoAssignment['office']) && $autoAssignment['office'] !== null) {
+                        $solOfficeId = $autoAssignment['office']->id;
+                    } else {
+                        $solOfficeId = null;
+                    }
 
                     // Track assignment statistics
                     if ($autoAssignment['assignment_type'] === 'lga') {
@@ -455,17 +465,21 @@ class ServiceLocationController extends Controller
                     }
 
                     // Store assignment details for reporting
+                    $officeName = null;
+                    if (isset($autoAssignment['office']) && $autoAssignment['office'] !== null) {
+                        $officeName = $autoAssignment['office']->office_name;
+                    }
                     $assignmentSummary['assignment_details'][] = [
                         'row' => $rowNumber,
                         'city' => $city,
                         'location_name' => $locationName,
                         'assignment_type' => $autoAssignment['assignment_type'],
-                        'office_name' => $autoAssignment['office'] ? $autoAssignment['office']->office_name : null,
+                        'office_name' => $officeName,
                         'reason' => $autoAssignment['assignment_reason']
                     ];
 
                     // Generate location code
-                    $locationCode = $data['unique_id'] ?? $this->generateLocationCode($client->client_code, $city);
+                    $locationCode = $data['unique_id'] ?? $this->generateLocationCode($client->prefix, $city);
 
                     // Insert service location
                     DB::table('service_locations')->insert([
@@ -481,7 +495,7 @@ class ServiceLocationController extends Controller
                         'contact_phone' => $data['contact_phone'] ?? null,
                         'contact_email' => $data['contact_email'] ?? null,
                         'is_active' => true,
-                        'created_by' => Auth::check() ? Auth::user()->profile_id : 1,
+                        'created_by' => Auth::id(),
                         'created_at' => now(),
                         'updated_at' => now()
                     ]);
@@ -710,7 +724,6 @@ class ServiceLocationController extends Controller
                 ->whereIn('id', $request->location_ids)
                 ->update([
                     'sol_office_id' => $request->new_sol_office_id,
-                    'updated_by' => Auth::check() ? Auth::user()->profile_id : 1,
                     'updated_at' => now()
                 ]);
 
@@ -749,14 +762,14 @@ class ServiceLocationController extends Controller
     /**
      * ✅ HELPER: Generate location code
      */
-    private function generateLocationCode($clientCode, $city)
+    private function generateLocationCode($clientPrefix, $city)
     {
-        // Create a simple location code: CLIENT_CODE-CITY_INITIALS-SEQUENCE
+        // Create a simple location code: CLIENT_PREFIX-CITY_INITIALS-SEQUENCE
         $cityInitials = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $city), 0, 3));
 
         // Get next sequence number for this client and city combination
         $lastLocation = DB::table('service_locations')
-            ->where('location_code', 'LIKE', "{$clientCode}-{$cityInitials}-%")
+            ->where('location_code', 'LIKE', "{$clientPrefix}-{$cityInitials}-%")
             ->orderBy('location_code', 'desc')
             ->first();
 
@@ -768,7 +781,7 @@ class ServiceLocationController extends Controller
             }
         }
 
-        return sprintf('%s-%s-%03d', $clientCode, $cityInitials, $sequence);
+        return sprintf('%s-%s-%03d', $clientPrefix, $cityInitials, $sequence);
     }
 
     /**
@@ -784,8 +797,8 @@ class ServiceLocationController extends Controller
                 ->leftJoin('sol_offices as so', 'sl.sol_office_id', '=', 'so.id')
                 ->select(
                     'sl.*',
-                    'c.name as client_name',
-                    'c.client_code',
+                    'c.organisation_name as client_name',
+                    'c.prefix as client_code',
                     'so.office_name as sol_office_name',
                     'so.office_code as sol_office_code'
                 );
@@ -839,8 +852,8 @@ class ServiceLocationController extends Controller
                 ->where('sl.id', $id)
                 ->select(
                     'sl.*',
-                    'c.name as client_name',
-                    'c.client_code',
+                    'c.organisation_name as client_name',
+                    'c.prefix as client_code',
                     'so.office_name as sol_office_name',
                     'so.office_code as sol_office_code'
                 )
@@ -911,6 +924,109 @@ class ServiceLocationController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error fetching client locations: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get service locations grouped by client
+     */
+    public function getGroupedByClient(Request $request)
+    {
+        try {
+            $query = DB::table('service_locations as sl')
+                ->leftJoin('clients as c', 'sl.client_id', '=', 'c.id')
+                ->leftJoin('sol_offices as so', 'sl.sol_office_id', '=', 'so.id')
+                ->select(
+                    'sl.*',
+                    'c.organisation_name as client_name',
+                    'c.prefix as client_code',
+                    'so.office_name as sol_office_name',
+                    'so.office_code as sol_office_code'
+                );
+
+            // Apply filters
+            if ($request->filled('client_id')) {
+                $query->where('sl.client_id', $request->client_id);
+            }
+
+            if ($request->filled('status')) {
+                if ($request->status === 'active') {
+                    $query->where('sl.is_active', true);
+                } elseif ($request->status === 'inactive') {
+                    $query->where('sl.is_active', false);
+                }
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('sl.location_name', 'LIKE', "%{$search}%")
+                      ->orWhere('sl.city', 'LIKE', "%{$search}%")
+                      ->orWhere('sl.lga', 'LIKE', "%{$search}%")
+                      ->orWhere('c.organisation_name', 'LIKE', "%{$search}%");
+                });
+            }
+
+            $locations = $query->orderBy('c.organisation_name')
+                              ->orderBy('sl.location_name')
+                              ->get();
+
+            // Group locations by client
+            $groupedData = [];
+            $clientStats = [];
+
+            foreach ($locations as $location) {
+                $clientName = $location->client_name ?? 'Unknown Client';
+                
+                if (!isset($groupedData[$clientName])) {
+                    $groupedData[$clientName] = [
+                        'client_id' => $location->client_id,
+                        'client_name' => $clientName,
+                        'client_code' => $location->client_code,
+                        'locations' => [],
+                        'stats' => [
+                            'total_locations' => 0,
+                            'active_locations' => 0,
+                            'inactive_locations' => 0,
+                            'assigned_to_sol' => 0,
+                            'cities' => []
+                        ]
+                    ];
+                }
+
+                // Add location to client group
+                $groupedData[$clientName]['locations'][] = $location;
+                
+                // Update stats
+                $groupedData[$clientName]['stats']['total_locations']++;
+                
+                if ($location->is_active) {
+                    $groupedData[$clientName]['stats']['active_locations']++;
+                } else {
+                    $groupedData[$clientName]['stats']['inactive_locations']++;
+                }
+                
+                if ($location->sol_office_id) {
+                    $groupedData[$clientName]['stats']['assigned_to_sol']++;
+                }
+                
+                if ($location->city && !in_array($location->city, $groupedData[$clientName]['stats']['cities'])) {
+                    $groupedData[$clientName]['stats']['cities'][] = $location->city;
+                }
+            }
+
+            // Return as object (associative array) for frontend Object.entries() usage
+            return response()->json([
+                'success' => true,
+                'data' => $groupedData,
+                'message' => 'Service locations grouped by client retrieved successfully'
+            ]);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching grouped service locations: ' . $e->getMessage()
             ], 500);
         }
     }

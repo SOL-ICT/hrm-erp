@@ -1,0 +1,613 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Recruitment\RecruitmentRequest;
+use App\Models\Candidate\CandidateJobApplication;
+use App\Models\InterviewInvitation;
+use App\Models\Candidate;
+use App\Models\Recruitment\Test;
+use App\Models\Recruitment\TestAssignment;
+use App\Models\Recruitment\TestQuestion;
+use App\Mail\InterviewInvitationMail;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+                'headers' => $request->headers->all()
+            ]);
+
+            $validated = $request->validate([\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
+
+class CurrentVacanciesController extends Controller
+{
+    /**
+     * Get current vacancies with grouped applications
+     */
+    public function getCurrentVacancies(Request $request): JsonResponse
+    {
+        try {
+            $query = RecruitmentRequest::with([
+                'client',
+                'jobStructure',
+                'serviceLocation',
+                'candidateJobApplications.candidate'
+            ])
+                ->where('status', 'active')
+                ->orderBy('created_at', 'desc');
+
+            // Apply filters if provided
+            if ($request->has('client_id') && !empty($request->client_id)) {
+                $query->where('client_id', $request->client_id);
+            }
+
+            if ($request->has('priority_level') && !empty($request->priority_level)) {
+                $query->where('priority_level', $request->priority_level);
+            }
+
+            if ($request->has('search') && !empty($request->search)) {
+                $searchTerm = $request->search;
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('ticket_id', 'like', "%{$searchTerm}%")
+                        ->orWhereHas('jobStructure', function ($jobQuery) use ($searchTerm) {
+                            $jobQuery->where('job_title', 'like', "%{$searchTerm}%");
+                        });
+                });
+            }
+
+            $vacancies = $query->get();
+
+            // Check if this is a candidate request (has auth user with candidate_id)
+            $candidateId = null;
+            $user = Auth::user();
+            
+            if ($user && $user->user_type === 'candidate') {
+                // Try to get candidate ID from user profile_id first, then fallback to user id
+                $candidateId = $user->profile_id ?? $user->id;
+                Log::info('Candidate detected in current vacancies', [
+                    'candidate_id' => $candidateId,
+                    'user_id' => $user->id,
+                    'profile_id' => $user->profile_id,
+                    'fallback_used' => is_null($user->profile_id)
+                ]);
+            }
+
+            // Transform data for frontend
+            $transformedData = $vacancies->map(function ($vacancy) use ($candidateId) {
+                $applicationsCount = $vacancy->candidateJobApplications->count();
+
+                // Get interview invitations for this recruitment request
+                $invitationsCounts = [];
+                foreach ($vacancy->candidateJobApplications as $app) {
+                    $invitations = InterviewInvitation::where('recruitment_request_id', $vacancy->id)
+                        ->where('candidate_id', $app->candidate_id)
+                        ->get();
+                    $invitationsCounts[$app->candidate_id] = $invitations;
+                }
+
+                $invitedCount = count(array_filter($invitationsCounts, function ($invitations) {
+                    return $invitations->count() > 0;
+                }));
+
+                // If this is a candidate request, check their application status
+                $candidateApplication = null;
+                if ($candidateId) {
+                    $candidateApplication = $vacancy->candidateJobApplications
+                        ->where('candidate_id', $candidateId)
+                        ->first();
+                    
+                    Log::info('Application status check', [
+                        'vacancy_id' => $vacancy->id,
+                        'candidate_id' => $candidateId,
+                        'total_applications' => $vacancy->candidateJobApplications->count(),
+                        'candidate_application_found' => !is_null($candidateApplication),
+                        'application_id' => $candidateApplication ? $candidateApplication->id : null
+                    ]);
+                }
+
+                $baseData = [
+                    'id' => $vacancy->id,
+                    'ticket_id' => $vacancy->ticket_id,
+                    'job_title' => $vacancy->jobStructure ? $vacancy->jobStructure->job_title : 'N/A',
+                    'client_name' => $vacancy->client ? $vacancy->client->organisation_name : 'N/A',
+                    'number_of_vacancies' => $vacancy->number_of_vacancies,
+                    'applications_count' => $applicationsCount,
+                    'invited_count' => $invitedCount,
+                    'deadline' => $vacancy->recruitment_period_end,
+                    'priority_level' => $vacancy->priority_level,
+                    'location' => $vacancy->serviceLocation ? $vacancy->serviceLocation->name : 'N/A',
+                    'status' => $vacancy->status,
+                    'created_at' => $vacancy->created_at,
+                    'description' => $vacancy->description,
+                ];
+
+                // Add candidate-specific fields if this is a candidate request
+                if ($candidateId) {
+                    $baseData['has_applied'] = !is_null($candidateApplication);
+                    $baseData['application_status'] = $candidateApplication ? $candidateApplication->application_status : null;
+                    $baseData['applied_at'] = $candidateApplication ? $candidateApplication->applied_at : null;
+                    $baseData['application_id'] = $candidateApplication ? $candidateApplication->id : null;
+                } else {
+                    // For admin requests, include applications array
+                    $baseData['applications'] = $vacancy->candidateJobApplications->map(function ($app) use ($vacancy) {
+                        // Get interview invitations for this specific candidate and recruitment request
+                        $invitations = InterviewInvitation::where('recruitment_request_id', $vacancy->id)
+                            ->where('candidate_id', $app->candidate_id)
+                            ->latest()
+                            ->get();
+
+                        $latestInvitation = $invitations->first();
+
+                        return [
+                            'id' => $app->id,
+                            'candidate_id' => $app->candidate_id,
+                            'candidate_name' => $app->candidate ? ($app->candidate->first_name . ' ' . $app->candidate->last_name) : 'N/A',
+                            'candidate_email' => $app->candidate ? $app->candidate->email : 'N/A',
+                            'candidate_phone' => $app->candidate ? $app->candidate->phone : 'N/A',
+                            'status' => $app->application_status,
+                            'applied_at' => $app->applied_at,
+                            'expected_salary' => $app->salary_expectations['amount'] ?? null,
+                            'available_start_date' => $app->availability['start_date'] ?? null,
+                            'eligibility_score' => $app->eligibility_score,
+                            'is_eligible' => $app->is_eligible,
+                            'cover_letter' => $app->cover_letter,
+                            'has_invitation' => $invitations->count() > 0,
+                            'invitation_status' => $latestInvitation ? $latestInvitation->status : null,
+                            'last_invitation_sent' => $latestInvitation ? $latestInvitation->sent_at : null,
+                        ];
+                    });
+                }
+
+                return $baseData;
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'vacancies' => $transformedData,
+                    'summary' => [
+                        'total_vacancies' => $vacancies->count(),
+                        'total_applications' => $vacancies->sum(function ($v) {
+                            return $v->candidateJobApplications->count();
+                        }),
+                        'total_invited' => $vacancies->sum(function ($v) {
+                            $invitedCount = 0;
+                            foreach ($v->candidateJobApplications as $app) {
+                                $hasInvitation = InterviewInvitation::where('recruitment_request_id', $v->id)
+                                    ->where('candidate_id', $app->candidate_id)
+                                    ->exists();
+                                if ($hasInvitation) {
+                                    $invitedCount++;
+                                }
+                            }
+                            return $invitedCount;
+                        })
+                    ]
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching current vacancies: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch current vacancies',
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error'
+            ], 500);
+        }
+    }
+
+    /**
+     * Send interview invitations
+     */
+    public function sendInterviewInvitations(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'recruitment_request_id' => 'required|exists:recruitment_requests,id',
+                'candidate_ids' => 'required|array|min:1',
+                'candidate_ids.*' => 'exists:candidates,id',
+                'interview_date' => 'nullable|date|after:now',
+                'interview_time' => 'nullable|string',
+                'location' => 'nullable|string',
+                'interview_type' => 'nullable|in:in_person,video,phone',
+                'message' => 'nullable|string'
+            ]);
+
+            $recruitmentRequest = RecruitmentRequest::findOrFail($request->recruitment_request_id);
+            $candidateIds = $request->candidate_ids;
+
+            $invitations = [];
+            $errors = [];
+
+            DB::beginTransaction();
+
+            foreach ($candidateIds as $candidateId) {
+                try {
+                    // Check if candidate has application for this recruitment request
+                    $application = CandidateJobApplication::where([
+                        'recruitment_request_id' => $request->recruitment_request_id,
+                        'candidate_id' => $candidateId
+                    ])->first();
+
+                    if (!$application) {
+                        $errors[] = "No application found for candidate ID: {$candidateId}";
+                        continue;
+                    }
+
+                    // Check if invitation already exists
+                    $existingInvitation = InterviewInvitation::where([
+                        'recruitment_request_id' => $request->recruitment_request_id,
+                        'candidate_id' => $candidateId,
+                        'status' => ['sent', 'pending']
+                    ])->first();
+
+                    if ($existingInvitation) {
+                        $errors[] = "Invitation already sent to candidate ID: {$candidateId}";
+                        continue;
+                    }
+
+                    // Create invitation
+                    $invitation = InterviewInvitation::create([
+                        'recruitment_request_id' => $request->recruitment_request_id,
+                        'candidate_id' => $candidateId,
+                        'job_application_id' => $application->job_application_id,
+                        'interview_date' => $request->interview_date,
+                        'interview_time' => $request->interview_time,
+                        'location' => $request->location,
+                        'interview_type' => $request->interview_type ?? 'in_person',
+                        'message' => $request->message,
+                        'status' => 'sent',
+                        'sent_by' => Auth::id(),
+                        'sent_at' => now()
+                    ]);
+
+                    $invitations[] = $invitation;
+
+                    // Send email notification (implement based on your email system)
+                    $this->sendInterviewInvitationEmail($invitation);
+                } catch (\Exception $e) {
+                    $errors[] = "Failed to send invitation to candidate ID {$candidateId}: " . $e->getMessage();
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'sent_count' => count($invitations),
+                    'error_count' => count($errors),
+                    'invitations' => $invitations,
+                    'errors' => $errors
+                ],
+                'message' => count($invitations) > 0 ?
+                    "Successfully sent {count($invitations)} interview invitations" :
+                    "No invitations were sent"
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            DB::rollback();
+            Log::error('Error sending interview invitations: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send interview invitations',
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get interview invitations for a recruitment request
+     */
+    public function getInterviewInvitations(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'recruitment_request_id' => 'required|exists:recruitment_requests,id'
+            ]);
+
+            $invitations = InterviewInvitation::with(['candidate', 'sentBy'])
+                ->where('recruitment_request_id', $request->recruitment_request_id)
+                ->orderBy('sent_at', 'desc')
+                ->get();
+
+            $transformedInvitations = $invitations->map(function ($invitation) {
+                return [
+                    'id' => $invitation->id,
+                    'candidate_name' => ($invitation->candidate->first_name ?? '') . ' ' . ($invitation->candidate->last_name ?? ''),
+                    'candidate_email' => $invitation->candidate->email ?? '',
+                    'interview_date' => $invitation->interview_date,
+                    'interview_time' => $invitation->interview_time,
+                    'location' => $invitation->location,
+                    'interview_type' => $invitation->interview_type,
+                    'status' => $invitation->status,
+                    'sent_at' => $invitation->sent_at,
+                    'responded_at' => $invitation->responded_at,
+                    'sent_by' => $invitation->sentBy->name ?? 'Unknown'
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $transformedInvitations
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching interview invitations: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch interview invitations',
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error'
+            ], 500);
+        }
+    }
+
+    /**
+     * Send interview invitation email
+     */
+    private function sendInterviewInvitationEmail(InterviewInvitation $invitation)
+    {
+        try {
+            // Send email using Laravel's mail system
+            Mail::to($invitation->candidate->email)->send(
+                new InterviewInvitationMail($invitation)
+            );
+
+            Log::info("Interview invitation email sent successfully", [
+                'candidate_id' => $invitation->candidate_id,
+                'recruitment_request_id' => $invitation->recruitment_request_id,
+                'invitation_id' => $invitation->id
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to send interview invitation email", [
+                'candidate_id' => $invitation->candidate_id,
+                'recruitment_request_id' => $invitation->recruitment_request_id,
+                'invitation_id' => $invitation->id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Send test invitations to selected candidates
+     */
+    public function sendTestInvitations(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'recruitment_request_id' => 'required|exists:recruitment_requests,id',
+                'candidate_ids' => 'required|array|min:1',
+                'candidate_ids.*' => 'exists:candidates,id',
+                'existing_test_id' => 'nullable|exists:tests,id',
+                'test_data' => 'required_without:existing_test_id|array',
+                'test_data.title' => 'required_with:test_data|string|max:255',
+                'test_data.instructions' => 'required_with:test_data|string',
+                'test_data.time_limit' => 'required_with:test_data|integer|min:1',
+                'test_data.pass_score' => 'required_with:test_data|integer|min:0|max:100',
+                'test_data.questions' => 'required_with:test_data|array|min:1',
+                'test_data.questions.*.question' => 'required_with:test_data|string',
+                'test_data.questions.*.type' => 'required_with:test_data|string|in:multiple_choice,true_false,short_answer',
+                'test_data.questions.*.options' => 'required_with:test_data|array',
+                'test_data.questions.*.correct_answers' => 'required_with:test_data|array',
+                'test_data.questions.*.order' => 'required_with:test_data|integer',
+                'test_message' => 'nullable|string',
+            ]);
+
+            $recruitmentRequest = RecruitmentRequest::findOrFail($validated['recruitment_request_id']);
+            $sentCount = 0;
+            $failedCandidates = [];
+
+            DB::beginTransaction();
+
+            // Create or use existing test
+            if (isset($validated['existing_test_id'])) {
+                $test = Test::findOrFail($validated['existing_test_id']);
+            } else {
+                // Create a new test
+                $testData = $validated['test_data'];
+                $test = Test::create([
+                    'title' => $testData['title'],
+                    'description' => 'Test for recruitment request: ' . $recruitmentRequest->ticket_id,
+                    'instructions' => $testData['instructions'],
+                    'time_limit' => $testData['time_limit'],
+                    'pass_score' => $testData['pass_score'],
+                    'status' => 'active',
+                    'created_by' => Auth::id(),
+                ]);
+
+                // Create questions for the new test
+                foreach ($testData['questions'] as $questionData) {
+                    TestQuestion::create([
+                        'test_id' => $test->id,
+                        'question' => $questionData['question'],
+                        'type' => $questionData['type'],
+                        'options' => json_encode($questionData['options']),
+                        'correct_answers' => json_encode($questionData['correct_answers']),
+                        'points' => 1,
+                        'order_number' => $questionData['order'],
+                        'required' => true,
+                    ]);
+                }
+            }
+
+            // Create test assignments for each candidate
+            $invitationMessage = $validated['test_message'] ?? "You have been invited to take the test: {$test->title}";
+            
+            foreach ($validated['candidate_ids'] as $candidateId) {
+                try {
+                    $candidate = Candidate::findOrFail($candidateId);
+
+                    // Check if assignment already exists
+                    $existingAssignment = TestAssignment::where('test_id', $test->id)
+                        ->where('candidate_id', $candidateId)
+                        ->where('recruitment_request_id', $validated['recruitment_request_id'])
+                        ->first();
+
+                    if (!$existingAssignment) {
+                        $assignment = TestAssignment::create([
+                            'test_id' => $test->id,
+                            'candidate_id' => $candidateId,
+                            'recruitment_request_id' => $validated['recruitment_request_id'],
+                            'status' => 'pending',
+                            'assigned_at' => now(),
+                            'expires_at' => now()->addDays(7), // Test expires in 7 days
+                            'invitation_message' => $invitationMessage,
+                            'email_sent' => true, // We'll assume email is sent successfully
+                        ]);
+
+                        Log::info("Test assignment created", [
+                            'assignment_id' => $assignment->id,
+                            'candidate_id' => $candidateId,
+                            'test_id' => $test->id,
+                            'recruitment_request_id' => $validated['recruitment_request_id']
+                        ]);
+
+                        $sentCount++;
+                    } else {
+                        Log::info("Test assignment already exists", [
+                            'candidate_id' => $candidateId,
+                            'test_id' => $test->id
+                        ]);
+                        $sentCount++; // Count as sent since assignment exists
+                    }
+
+                } catch (\Exception $e) {
+                    Log::error("Failed to create test assignment for candidate {$candidateId}", [
+                        'error' => $e->getMessage()
+                    ]);
+                    $failedCandidates[] = $candidateId;
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Test invitations sent successfully',
+                'data' => [
+                    'sent_count' => $sentCount,
+                    'failed_count' => count($failedCandidates),
+                    'failed_candidates' => $failedCandidates,
+                    'test_id' => $test->id,
+                    'test_title' => $test->title
+                ]
+            ]);
+
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to send test invitations: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send test invitations: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get test invitations for a recruitment request
+     */
+    public function getTestInvitations(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'recruitment_request_id' => 'required|exists:recruitment_requests,id',
+            ]);
+
+            $assignments = TestAssignment::with(['test', 'candidate'])
+                ->where('recruitment_request_id', $validated['recruitment_request_id'])
+                ->orderBy('assigned_at', 'desc')
+                ->get();
+
+            $data = $assignments->map(function ($assignment) {
+                return [
+                    'id' => $assignment->id,
+                    'test_id' => $assignment->test_id,
+                    'test_title' => $assignment->test->title,
+                    'test_time_limit' => $assignment->test->time_limit,
+                    'candidate_id' => $assignment->candidate_id,
+                    'candidate_name' => $assignment->candidate->first_name . ' ' . $assignment->candidate->last_name,
+                    'candidate_email' => $assignment->candidate->email,
+                    'status' => $assignment->status,
+                    'assigned_at' => $assignment->assigned_at,
+                    'started_at' => $assignment->started_at,
+                    'completed_at' => $assignment->completed_at,
+                    'expires_at' => $assignment->expires_at,
+                    'email_sent' => $assignment->email_sent,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $data
+            ]);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch test invitations: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch test invitations'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get available tests that can be reused
+     */
+    public function getAvailableTests(Request $request): JsonResponse
+    {
+        try {
+            $tests = Test::where('status', 'active')
+                ->with(['questions'])
+                ->orderBy('title')
+                ->get(['id', 'title', 'description', 'time_limit', 'pass_score', 'created_at']);
+
+            $data = $tests->map(function ($test) {
+                return [
+                    'id' => $test->id,
+                    'title' => $test->title,
+                    'description' => $test->description,
+                    'time_limit' => $test->time_limit,
+                    'pass_score' => $test->pass_score,
+                    'question_count' => $test->questions->count(),
+                    'created_at' => $test->created_at,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $data
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch available tests: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch available tests'
+            ], 500);
+        }
+    }
+}

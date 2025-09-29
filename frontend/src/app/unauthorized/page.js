@@ -1,9 +1,15 @@
 "use client";
 
-import { useAuth } from "../components/AuthContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function UnauthorizedPage() {
-  const { user, getDashboardRoute } = useAuth();
+  const { user } = useAuth();
+
+  // Generate dashboard route based on user role
+  const getDashboardRoute = () => {
+    if (!user) return "/";
+    return `/dashboard/${user.dashboard_type || "candidate"}`;
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -30,7 +36,7 @@ export default function UnauthorizedPage() {
           </h1>
 
           <p className="text-gray-600 mb-6">
-            You don't have permission to access this page. Please contact your
+            You don&apos;t have permission to access this page. Please contact your
             administrator if you believe this is an error.
           </p>
 

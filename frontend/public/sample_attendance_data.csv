@@ -1,0 +1,11 @@
+employee_name,employee_code,designation,days_worked,department,basic_salary
+John Doe,EMP001,Software Engineer,22,IT,450000
+Jane Smith,EMP002,Project Manager,20,IT,600000
+Michael Johnson,EMP003,Designer,18,Design,350000
+Sarah Wilson,EMP004,HR Specialist,21,Human Resources,400000
+David Brown,EMP005,Accountant,19,Finance,380000
+Lisa Davis,EMP006,Marketing Manager,22,Marketing,520000
+Robert Taylor,EMP007,Sales Representative,17,Sales,320000
+Emma Garcia,EMP008,Operations Manager,21,Operations,480000
+James Martinez,EMP009,Quality Analyst,20,Quality Assurance,360000
+Ashley Anderson,EMP010,Administrative Assistant,22,Administration,280000

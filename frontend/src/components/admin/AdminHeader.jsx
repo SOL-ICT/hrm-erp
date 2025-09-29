@@ -17,14 +17,18 @@ import {
 
 const AdminHeader = ({
   currentTheme,
+  currentThemeKey,
   preferences,
   user,
   isSidebarCollapsed,
   onToggleSidebar,
+  onThemeChange,
+  availableThemes,
 }) => {
   const { logout } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
 
   // SOL Colors
   const MIDNIGHT_BLUE = "#191970";
@@ -49,7 +53,7 @@ const AdminHeader = ({
     },
     {
       id: 2,
-      title: "Recruitment Request",
+      title: "Vacancy Declaration",
       message: "Access Bank - 15 new positions",
       time: "12 mins ago",
       type: "success",
@@ -69,7 +73,7 @@ const AdminHeader = ({
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-[#011b3f] to-[#0f0f3d] border-b border-slate-600/30 backdrop-blur-lg shadow-xl"
+      className={`fixed top-0 left-0 right-0 z-[60] ${currentTheme.headerBg} ${currentTheme.border} backdrop-blur-lg shadow-xl`}
       style={{ height: "64px" }} // Reduced from 80px to 64px for compactness
     >
       <div className="px-4 py-2 h-full">
@@ -83,7 +87,7 @@ const AdminHeader = ({
             {/* Sidebar Toggle */}
             <button
               onClick={onToggleSidebar}
-              className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+              className={`p-1.5 rounded-lg ${currentTheme.textSecondary} hover:${currentTheme.textPrimary} ${currentTheme.hover} transition-colors`}
             >
               {isSidebarCollapsed ? (
                 <Menu className="w-4 h-4" />
@@ -93,15 +97,23 @@ const AdminHeader = ({
             </button>
             {/* Search Bar - Compact */}
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+              <Search
+                className={`w-3.5 h-3.5 absolute left-2.5 top-2.5 ${currentTheme.textMuted}`}
+              />
               <input
                 type="text"
                 placeholder="Search..."
-                className="w-64 pl-8 pr-3 py-2 text-sm bg-white/10 border border-white/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all"
+                className={`w-64 pl-8 pr-3 py-2 text-sm ${
+                  currentThemeKey === "light"
+                    ? "bg-gray-100 border-gray-300 text-gray-900 placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500"
+                    : "bg-white/10 border-white/20 text-white placeholder-slate-400 focus:ring-white/30 focus:border-white/40"
+                } rounded-lg focus:outline-none focus:ring-2 transition-all`}
               />
             </div>
             {/* Date & Time - Compact */}
-            <div className="hidden md:flex items-center space-x-3 text-slate-300">
+            <div
+              className={`hidden md:flex items-center space-x-3 ${currentTheme.textSecondary}`}
+            >
               <div className="flex items-center space-x-1.5">
                 <Calendar className="w-3.5 h-3.5" />
                 <span className="text-xs font-medium">
@@ -132,7 +144,7 @@ const AdminHeader = ({
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-all"
+                className={`relative p-2 rounded-lg ${currentTheme.textSecondary} hover:${currentTheme.textPrimary} ${currentTheme.hover} transition-all`}
               >
                 <Bell className="w-4 h-4" />
                 {unreadCount > 0 && (
@@ -196,15 +208,177 @@ const AdminHeader = ({
                 </div>
               )}
             </div>
+            {/* Theme Switcher */}
+            <div className="relative">
+              <button
+                onClick={() => setShowThemeMenu(!showThemeMenu)}
+                className={`p-2 rounded-lg ${currentTheme.textSecondary} hover:${currentTheme.textPrimary} ${currentTheme.hover} transition-all`}
+                title="Change Theme"
+              >
+                {currentThemeKey === "light" ? (
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+                    />
+                  </svg>
+                ) : currentThemeKey === "transparent" ? (
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                    />
+                  </svg>
+                )}
+              </button>
+
+              {/* Theme Menu */}
+              {showThemeMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 z-50">
+                  <div className="p-3 border-b border-gray-100">
+                    <h3 className="text-sm font-semibold text-gray-900">
+                      Theme Settings
+                    </h3>
+                  </div>
+                  <div className="p-1">
+                    <button
+                      onClick={() => {
+                        onThemeChange("light");
+                        setShowThemeMenu(false);
+                      }}
+                      className={`w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors ${
+                        currentThemeKey === "light"
+                          ? "bg-blue-50 text-blue-700 border border-blue-200"
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+                        />
+                      </svg>
+                      <span>Light Theme</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onThemeChange("dark");
+                        setShowThemeMenu(false);
+                      }}
+                      className={`w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors ${
+                        currentThemeKey === "dark"
+                          ? "bg-blue-50 text-blue-700 border border-blue-200"
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                        />
+                      </svg>
+                      <span>Dark Theme</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onThemeChange("transparent");
+                        setShowThemeMenu(false);
+                      }}
+                      className={`w-full flex items-center space-x-3 px-3 py-2 text-xs rounded-lg transition-colors ${
+                        currentThemeKey === "transparent"
+                          ? "bg-blue-50 text-blue-700 border border-blue-200"
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
+                      </svg>
+                      <span>Transparent</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             {/* Settings */}
-            <button className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-all">
+            <button
+              className={`p-2 rounded-lg ${currentTheme.textSecondary} hover:${currentTheme.textPrimary} ${currentTheme.hover} transition-all`}
+              title="System Settings"
+            >
               <Settings className="w-4 h-4" />
             </button>
             {/* User Profile */}
             <div className="relative">
               <button
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center space-x-2 px-2 py-1.5 bg-white/10 rounded-lg border border-white/20 hover:bg-white/15 transition-all"
+                className={`flex items-center space-x-2 px-2 py-1.5 ${
+                  currentThemeKey === "light"
+                    ? "bg-gray-100 border-gray-300 hover:bg-gray-200"
+                    : "bg-white/10 border-white/20 hover:bg-white/15"
+                } rounded-lg border transition-all`}
               >
                 <div
                   className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-semibold text-xs shadow-md"
@@ -215,14 +389,18 @@ const AdminHeader = ({
                   {user?.name?.charAt(0)?.toUpperCase() || "S"}
                 </div>
                 <div className="hidden sm:block text-left">
-                  <p className="text-xs font-semibold text-white leading-tight">
+                  <p
+                    className={`text-xs font-semibold ${currentTheme.textPrimary} leading-tight`}
+                  >
                     {user?.name || "SOL Admin"}
                   </p>
-                  <p className="text-[10px] text-slate-300 leading-tight">
+                  <p
+                    className={`text-[10px] ${currentTheme.textSecondary} leading-tight`}
+                  >
                     System Admin
                   </p>
                 </div>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
+                <ChevronDown className={`w-3 h-3 ${currentTheme.textMuted}`} />
               </button>
 
               {/* Profile Menu */}

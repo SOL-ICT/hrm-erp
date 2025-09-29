@@ -1,18 +1,14 @@
 "use client";
 import React from "react";
 
-const NextOfKin = ({
-  contacts,
-  currentTheme,
-  preferences,
-  onAdd,
-  onEdit,
-}) => {
+const NextOfKin = ({ contacts, currentTheme, preferences, onAdd, onEdit }) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-2xl font-bold ${currentTheme.textPrimary} mb-2 flex items-center`}>
+          <h1
+            className={`text-2xl font-bold ${currentTheme.textPrimary} mb-2 flex items-center`}
+          >
             <span className="mr-2">👫</span>
             Next Of Kin
           </h1>
@@ -26,7 +22,7 @@ const NextOfKin = ({
           style={{
             background: `linear-gradient(135deg, ${
               preferences.primaryColor || "#6366f1"
-            }, ${(preferences.primaryColor || "#6366f1")}dd)`,
+            }, ${preferences.primaryColor || "#6366f1"}dd)`,
           }}
         >
           Add Next Of Kin
@@ -43,7 +39,9 @@ const NextOfKin = ({
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center mb-1">
-                    <h3 className={`text-xl font-bold ${currentTheme.textPrimary}`}>
+                    <h3
+                      className={`text-xl font-bold ${currentTheme.textPrimary}`}
+                    >
                       {contact.full_name}
                     </h3>
                     {contact.is_primary && (
@@ -55,7 +53,7 @@ const NextOfKin = ({
                   <p className={`text-base ${currentTheme.textSecondary} mb-1`}>
                     {contact.relationship}
                   </p>
-                  
+
                   <div className="space-y-1">
                     <p className={`text-sm ${currentTheme.textSecondary}`}>
                       📞 {contact.phone_primary}
@@ -70,6 +68,17 @@ const NextOfKin = ({
                         ✉️ {contact.email}
                       </p>
                     )}
+                    <p className={`text-sm ${currentTheme.textSecondary}`}>
+                      📍{" "}
+                      {[
+                        contact.emergency_address,
+                        contact.emergency_address_line_2,
+                        contact.emergency_local_government_residence,
+                        contact.emergency_state_of_residence,
+                      ]
+                        .filter((field) => field && field.trim() !== "")
+                        .join(", ")}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -106,15 +115,19 @@ const NextOfKin = ({
               style={{
                 background: `linear-gradient(135deg, ${
                   preferences.primaryColor || "#6366f1"
-                }, ${(preferences.primaryColor || "#6366f1")}dd)`,
+                }, ${preferences.primaryColor || "#6366f1"}dd)`,
               }}
             >
               👫
             </div>
-            <h3 className={`text-xl font-bold ${currentTheme.textPrimary} mb-4`}>
+            <h3
+              className={`text-xl font-bold ${currentTheme.textPrimary} mb-4`}
+            >
               No Next of Kin Added
             </h3>
-            <p className={`text-base ${currentTheme.textSecondary} mb-4 leading-relaxed`}>
+            <p
+              className={`text-base ${currentTheme.textSecondary} mb-4 leading-relaxed`}
+            >
               Add your Next of Kin for safety and verification purposes.
             </p>
             <button
@@ -123,7 +136,7 @@ const NextOfKin = ({
               style={{
                 background: `linear-gradient(135deg, ${
                   preferences.primaryColor || "#6366f1"
-                }, ${(preferences.primaryColor || "#6366f1")}dd)`,
+                }, ${preferences.primaryColor || "#6366f1"}dd)`,
               }}
             >
               Add Your First Contact

@@ -20,6 +20,8 @@ return new class extends Migration
             $table->string('reason_for_leaving')->nullable();
             $table->decimal('last_salary', 12, 2)->nullable();
             $table->timestamps();
+
+            $table->index('candidate_id');
         });
     }
 

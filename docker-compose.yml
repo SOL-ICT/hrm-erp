@@ -1,7 +1,13 @@
-version: '3.8'
+# 🚀 HRM-ERP Development Environment
+# Usage: docker-compose up -d
+# Access: Frontend http://localhost:3000 | Backend http://localhost:8000 | DB http://localhost:8080on: "3.8"
+
+# � HRM-ERP Development Environment
+# Usage: docker-compose up -d
+# Access: Frontend http://localhost:3000 | Backend http://localhost:8000 | DB http://localhost:8080
 
 services:
-  # Laravel Backend API
+  # Laravel Backend API - Optimized for Development
   laravel-api:
     build:
       context: ./backend
@@ -10,22 +16,34 @@ services:
     restart: unless-stopped
     working_dir: /var/www
     volumes:
-      - ./backend:/var/www
+      - ./backend:/var/www:cached # Cached mount for better performance
       - ./backend/storage:/var/www/storage
       - ./backend/bootstrap/cache:/var/www/bootstrap/cache
+      - /var/www/vendor # Anonymous volume for vendor directory
     ports:
       - "8000:8000"
     environment:
+      # Database Configuration
       - DB_CONNECTION=mysql
       - DB_HOST=mysql
       - DB_PORT=3306
       - DB_DATABASE=hrm_database
       - DB_USERNAME=hrm_user
       - DB_PASSWORD=hrm_password
+      # Redis Configuration
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - APP_ENV=local
-      - APP_DEBUG=true
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+      # Laravel Development Settings
+      - APP_ENV=${APP_ENV:-local}
+      - APP_DEBUG=${APP_DEBUG:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-error}
+      - DB_SLOW_QUERY_LOG=false
+      # PHP Performance Optimizations
+      - PHP_OPCACHE_ENABLE=1
+      - PHP_OPCACHE_REVALIDATE_FREQ=0 # Always check for changes in development
     depends_on:
       mysql:
         condition: service_healthy
@@ -34,12 +52,15 @@ services:
     networks:
       - hrm-network
     command: >
-      sh -c "composer install --no-dev --optimize-autoloader &&
-             php artisan config:cache &&
-             php artisan route:cache &&
-             php artisan serve --host=0.0.0.0 --port=8000"
+      sh -c "
+        composer install --optimize-autoloader --no-scripts &&
+        php artisan config:cache &&
+        php artisan route:cache &&
+        php artisan view:cache &&
+        php -d opcache.enable=1 -d opcache.enable_cli=1 artisan serve --host=0.0.0.0 --port=8000
+      "
 
-  # Next.js Frontend
+  # Next.js Frontend - Optimized for Development
   nextjs-frontend:
     build:
       context: ./frontend
@@ -47,23 +68,36 @@ services:
     container_name: hrm-nextjs-frontend
     restart: unless-stopped
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+      - ./frontend:/app:cached # Cached mount for better performance
+      - /app/node_modules # Anonymous volume for node_modules
+      - /app/.next # Anonymous volume for Next.js build cache
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
+      # Next.js Configuration
+      - NODE_ENV=${NODE_ENV:-development}
       - NEXT_PUBLIC_API_URL=http://localhost:8000/api
       - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      # Performance Optimizations
+      - NEXT_TELEMETRY_DISABLED=1
+      # File Watching (fixes hot reload in Docker)
       - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=1000
       - WATCHPACK_POLLING=true
+      # Stability fixes for Docker
+      - NEXT_PRIVATE_STANDALONE=true
+      - NEXT_PRIVATE_SKIP_STATIC_GENERATION=true
     depends_on:
       - laravel-api
     networks:
       - hrm-network
+    command: >
+      sh -c "
+        npm install &&
+        npm run dev
+      "
 
-  # MySQL Database
+  # MySQL Database - Development Optimized
   mysql:
     image: mysql:8.0
     container_name: hrm-mysql
@@ -71,24 +105,45 @@ services:
     ports:
       - "3306:3306"
     environment:
+      # Database Configuration
       - MYSQL_DATABASE=hrm_database
       - MYSQL_USER=hrm_user
       - MYSQL_PASSWORD=hrm_password
       - MYSQL_ROOT_PASSWORD=root_password
       - MYSQL_CHARSET=utf8mb4
       - MYSQL_COLLATION=utf8mb4_unicode_ci
+      # Performance Optimizations for Development
+      - MYSQL_INNODB_BUFFER_POOL_SIZE=256M
+      - MYSQL_INNODB_LOG_FILE_SIZE=64M
     volumes:
       - mysql_data:/var/lib/mysql
       - ./mysql/init:/docker-entrypoint-initdb.d
       - ./mysql/conf:/etc/mysql/conf.d
     networks:
       - hrm-network
+    # Performance optimized MySQL configuration
+    command: >
+      --innodb-buffer-pool-size=256M
+      --innodb-redo-log-capacity=134217728
+      --slow-query-log=0
+      --sync-binlog=0
+      --innodb-flush-log-at-trx-commit=2
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "hrm_user", "-phrm_password"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "hrm_user",
+          "-phrm_password",
+        ]
       timeout: 20s
       retries: 10
 
-  # Redis for Caching/Sessions
+  # Redis for Caching/Sessions - Memory Optimized
   redis:
     image: redis:7-alpine
     container_name: hrm-redis
@@ -99,7 +154,8 @@ services:
       - redis_data:/data
     networks:
       - hrm-network
-    command: redis-server --appendonly yes
+    # Development-optimized Redis with memory limits
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
 
   # phpMyAdmin for Database Management
   phpmyadmin:
@@ -143,8 +199,8 @@ services:
     container_name: hrm-mailhog
     restart: unless-stopped
     ports:
-      - "1025:1025"  # SMTP
-      - "8025:8025"  # Web UI
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
     networks:
       - hrm-network
 

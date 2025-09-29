@@ -1,19 +1,64 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import ProfileEdit from "./ProfileEdit";
-import EducationModal from "./EducationModal";
+//import EducationModal from "./EducationModal";
 import ExperienceModal from "./ExperienceModal";
 import EmergencyContactModal from "./EmergencyContactModal";
 import NextOfKin from "./NextofKin";
 import FamilyContact from "./FamilyContact";
 import EmergencyContact from "./EmergencyContact";
+//import EducationItem from "./EducationItem";
+import EducationSection from "./EducationSection";
+import SecondaryEducation from "./SecondaryEducation";
+import TertiaryEducation from "./TertiaryEducation";
+import ApplyForPosition from "./ApplyForPosition";
+import TestCenter from "./TestCenter";
+import InterviewManager from "./InterviewManager";
+import AcceptOfferSection from "./AcceptOfferSection";
+//import PrimaryEducationForm from './PrimaryEducationForm';
+//import SecondaryEducationForm from './SecondaryEducationForm';
+//import TertiaryEducationForm from './TertiaryEducationForm';
+//import ReactModal from 'react-modal'; not working in nextjs
+//import Modal from "../common/Modal.jsx";
 
+// Inline Modal component (temporary)
+const InlineModal = ({ children, onClose }) => {
+  React.useEffect(() => {
+    const handleKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl p-6 max-w-lg w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
+
+// Accept Offer Section Component
 const CandidateDashboard = () => {
-  const { user, loading, isAuthenticated, logout, getUserPreferences,sanctumRequest } =
-    useAuth();
+  const {
+    user,
+    loading,
+    isAuthenticated,
+    logout,
+    getUserPreferences,
+    sanctumRequest,
+  } = useAuth();
+
   const [activeSection, setActiveSection] = useState("overview");
   const [candidateProfile, setCandidateProfile] = useState(null);
   const [profileCompletion, setProfileCompletion] = useState(0);
@@ -25,15 +70,30 @@ const CandidateDashboard = () => {
     profileViews: 0,
   });
   const [candidateEducation, setCandidateEducation] = useState([]);
+
+  // TODO: Implement primary education save handler when PrimaryEducationForm is created
+  // const handlePrimarySave = (values) => {
+  //   console.log("Primary form submitted:", values);
+  //   // TODO: here you could POST to your API or merge into state
+  //   // then close the modal:
+  //   setEducationModal({
+  //     isOpen: false,
+  //     formType: null,
+  //     editingEducation: null,
+  //   });
+  // };
+
+  // console.log("🔖 isEduModalOpen =", isEduModalOpen);
   const [candidateExperience, setCandidateExperience] = useState([]);
   const [emergencyContacts, setEmergencyContacts] = useState([]);
-  const [statesLgas, setStatesLgas] = useState([]);
+  // const [statesLgas, setStatesLgas] = useState([]); // TODO: Remove if not used in render
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Modal states
   const [educationModal, setEducationModal] = useState({
     isOpen: false,
+    formtype: null, // 'primary', 'secondary' or 'tertiary'
     editingEducation: null,
   });
   const [experienceModal, setExperienceModal] = useState({
@@ -107,7 +167,9 @@ const CandidateDashboard = () => {
       return;
     }
 
-    if (user) {
+    // Only fetch data if user is authenticated and we have a valid user object
+    if (user && isAuthenticated && !loading) {
+      console.log("🚀 Fetching candidate data for user:", user);
       fetchAllCandidateData();
     }
   }, [user, loading, isAuthenticated, router]);
@@ -132,11 +194,10 @@ const CandidateDashboard = () => {
 
   const fetchCandidateProfile = async () => {
     try {
-      const response = await fetch(
+      const response = await sanctumRequest(
         `http://localhost:8000/api/candidates/${user.id}/profile`,
         {
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          method: "GET",
         }
       );
 
@@ -160,7 +221,8 @@ const CandidateDashboard = () => {
           local_government: "",
           phone_primary: "",
           address_current: "",
-          blood_group: "",
+          address_permanent: "",
+          // blood_group: "",
           position: "Candidate",
           department: "Human Resources",
           employee_id: `CAND${user.id}`,
@@ -175,36 +237,42 @@ const CandidateDashboard = () => {
 
   const fetchCandidateEducation = async () => {
     try {
-      const response = await fetch(
+      const response = await sanctumRequest(
         `http://localhost:8000/api/candidates/${user.id}/education`,
         {
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          method: "GET",
         }
       );
       if (response.ok) {
         const data = await response.json();
+        console.log("✅ Education data received:", data);
         setCandidateEducation(data.education || []);
+      } else {
+        console.error(
+          "❌ Education fetch failed:",
+          response.status,
+          await response.text()
+        );
       }
     } catch (error) {
+      console.error("Error fetching education:", error);
       setCandidateEducation([]);
     }
   };
 
   const fetchCandidateExperience = async () => {
     try {
-      const response = await fetch(
+      const response = await sanctumRequest(
         `http://localhost:8000/api/candidates/${user.id}/experience`,
         {
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          method: "GET",
         }
       );
       if (response.ok) {
         const data = await response.json();
-        setCandidateExperience(data.experience || []);
+        setCandidateExperience(data.data || []);
       }
-    } catch (error) {
+    } catch {
       setCandidateExperience([]);
     }
   };
@@ -223,7 +291,7 @@ const CandidateDashboard = () => {
         const data = await response.json();
         setEmergencyContacts(data.contacts || []);
       }
-    } catch (error) {
+    } catch {
       setEmergencyContacts([]);
     }
   };
@@ -235,21 +303,20 @@ const CandidateDashboard = () => {
         headers: { "Content-Type": "application/json" },
       });
       if (response.ok) {
-        const data = await response.json();
-        setStatesLgas(data.states_lgas || []);
+        // const data = await response.json(); // TODO: Remove if not using states/LGAs
+        // setStatesLgas(data.states_lgas || []);
       }
-    } catch (error) {
-      setStatesLgas([]);
+    } catch {
+      // setStatesLgas([]);
     }
   };
 
   const fetchDashboardStats = async () => {
     try {
-      const response = await fetch(
+      const response = await sanctumRequest(
         `http://localhost:8000/api/candidates/${user.id}/dashboard-stats`,
         {
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          method: "GET",
         }
       );
       if (response.ok) {
@@ -281,8 +348,9 @@ const CandidateDashboard = () => {
       "state_of_origin",
       "local_government",
       "phone_primary",
-      "address_current",
-      "blood_group",
+      "full_current_address",
+      "full_permanent_address",
+      //"blood_group",
     ];
 
     const completedFields = requiredFields.filter(
@@ -296,14 +364,12 @@ const CandidateDashboard = () => {
   };
 
   const handleProfileSave = async (updatedProfile) => {
-  
-
-  console.log("Saving profile...");
-  console.log("User object:", user);
-  console.log("Updated profile data:", updatedProfile);
+    console.log("Saving profile...");
+    console.log("User object:", user);
+    console.log("Updated profile data:", updatedProfile);
 
     try {
-      const response = await sanctumRequest (
+      const response = await sanctumRequest(
         `http://localhost:8000/api/candidates/${user.id}/profile`,
         {
           method: "PUT",
@@ -312,30 +378,36 @@ const CandidateDashboard = () => {
       );
       if (response.ok) {
         const data = await response.json();
+        console.log("✅ Profile save successful:", data);
         setCandidateProfile(data.profile);
         calculateProfileCompletion(data.profile);
         setIsEditingProfile(false);
-      }
-      else {
+      } else {
         console.error("❌ Failed response:", response.status);
-    }
+        // Get the error details
+        const errorText = await response.text();
+        console.error("❌ Error details:", errorText);
+        alert(`Failed to save profile: ${errorText}`);
+      }
     } catch (error) {
       console.error("Failed to save profile:", error);
+      alert(`Error saving profile: ${error.message}`);
     }
   };
 
-  const handleEducationSave = (newEducation) => {
-    setCandidateEducation((prev) => {
-      if (educationModal.editingEducation) {
-        return prev.map((edu) =>
-          edu.id === educationModal.editingEducation.id ? newEducation : edu
-        );
-      } else {
-        return [newEducation, ...prev];
-      }
-    });
-    setEducationModal({ isOpen: false, editingEducation: null });
-  };
+  // TODO: Implement education save handler when EducationModal is restored
+  // const handleEducationSave = (newEducation) => {
+  //   setCandidateEducation((prev) => {
+  //     if (educationModal.editingEducation) {
+  //       return prev.map((edu) =>
+  //         edu.id === educationModal.editingEducation.id ? newEducation : edu
+  //       );
+  //     } else {
+  //       return [newEducation, ...prev];
+  //     }
+  //   });
+  //   setEducationModal({ isOpen: false, editingEducation: null });
+  // };
 
   const handleExperienceSave = (newExperience) => {
     setCandidateExperience((prev) => {
@@ -367,7 +439,6 @@ const CandidateDashboard = () => {
     logout();
   };
 
-
   // you mean here ??
 
   if (loading || isLoading) {
@@ -390,19 +461,17 @@ const CandidateDashboard = () => {
     );
   }
 
-
   // 3 constants for 3 types of contacts
 
   const emergencyOnly = emergencyContacts.filter(
-  (c) => c.contact_type === "Emergency Contact"
-);
-const nextOfKinOnly = emergencyContacts.filter(
-  (c) => c.contact_type === "Next of Kin"
-);
-const familyOnly = emergencyContacts.filter(
-  (c) => c.contact_type === "Family Contact"
-);
-
+    (c) => c.contact_type === "Emergency Contact"
+  );
+  const nextOfKinOnly = emergencyContacts.filter(
+    (c) => c.contact_type === "Next of Kin"
+  );
+  const familyOnly = emergencyContacts.filter(
+    (c) => c.contact_type === "Family Contact"
+  );
 
   if (!isAuthenticated) {
     return null;
@@ -433,11 +502,16 @@ const familyOnly = emergencyContacts.filter(
       count: emergencyContacts.length,
     },
     {
-      id: "applications",
-      name: "Applications",
-      icon: "📋",
+      id: "apply-position",
+      name: "Apply for Position",
+      icon: "📝",
       section: "MAIN",
-      count: dashboardStats.applications,
+    },
+    {
+      id: "test-center",
+      name: "Test Center",
+      icon: "📊",
+      section: "MAIN",
     },
     {
       id: "interviews",
@@ -446,6 +520,15 @@ const familyOnly = emergencyContacts.filter(
       section: "MAIN",
       count: dashboardStats.interviews,
     },
+
+    {
+      id: "applications",
+      name: "Accept Offer",
+      icon: "📋",
+      section: "MAIN",
+      count: dashboardStats.applications,
+    },
+
     { id: "documents", name: "Documents", icon: "📄", section: "TOOLS" },
     { id: "calendar", name: "Calendar", icon: "📅", section: "TOOLS" },
     {
@@ -814,6 +897,7 @@ const familyOnly = emergencyContacts.filter(
 
                 <div className="flex space-x-4">
                   <button
+                    onClick={() => setActiveSection("apply-position")}
                     className="px-6 py-3 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
                     style={{
                       background: `linear-gradient(135deg, ${
@@ -822,6 +906,18 @@ const familyOnly = emergencyContacts.filter(
                     }}
                   >
                     Apply for Position
+                  </button>
+                  <button
+                    onClick={() => setActiveSection("test-center")}
+                    className="px-6 py-3 bg-green-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                  >
+                    Test Center
+                  </button>
+                  <button
+                    onClick={() => setActiveSection("interviews")}
+                    className="px-6 py-3 bg-purple-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                  >
+                    Interviews
                   </button>
                   <button
                     onClick={() => setActiveSection("profile")}
@@ -1091,9 +1187,8 @@ const familyOnly = emergencyContacts.filter(
                             icon: "📱",
                           },
                           {
-                            label: "Blood Group",
-                            value: candidateProfile.blood_group,
-                            icon: "🩸",
+                            label: "Secondary Phone Number",
+                            value: candidateProfile.phone_secondary,
                           },
                         ].map((field, index) => (
                           <div
@@ -1136,7 +1231,31 @@ const familyOnly = emergencyContacts.filter(
                           <p
                             className={`text-lg font-semibold ${currentTheme.textPrimary} transition-colors`}
                           >
-                            {candidateProfile.address_current || (
+                            {candidateProfile.full_current_address || (
+                              <span
+                                className={`${currentTheme.textMuted} italic text-sm`}
+                              >
+                                Not provided
+                              </span>
+                            )}
+                          </p>
+                        </div>
+
+                        <div
+                          className={`md:col-span-3 lg:col-span-3 ${currentTheme.cardBg} rounded-xl p-5 ${currentTheme.border} hover:shadow-md transition-all group`}
+                        >
+                          <div className="flex items-center mb-3">
+                            <span className="text-xl mr-3">🏠</span>
+                            <label
+                              className={`text-xs font-bold uppercase tracking-wide ${currentTheme.textMuted}`}
+                            >
+                              Permanent Address
+                            </label>
+                          </div>
+                          <p
+                            className={`text-lg font-semibold ${currentTheme.textPrimary} transition-colors`}
+                          >
+                            {candidateProfile.full_permanent_address || (
                               <span
                                 className={`${currentTheme.textMuted} italic text-sm`}
                               >
@@ -1153,151 +1272,93 @@ const familyOnly = emergencyContacts.filter(
             </div>
           )}
 
+          {/* end Profile Section */}
+
           {/* Education Section */}
           {activeSection === "education" && (
-            <div className="space-y-8">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1
-                    className={`text-4xl font-bold ${currentTheme.textPrimary} mb-2 flex items-center`}
-                  >
-                    <span className="mr-3">🎓</span>
-                    Education
-                  </h1>
-                  <p className={`text-xl ${currentTheme.textSecondary}`}>
-                    Manage your educational qualifications and certifications
-                  </p>
-                </div>
+            <EducationSection
+              currentTheme={currentTheme}
+              preferences={preferences}
+              candidateEducation={candidateEducation}
+              setEducationModal={setEducationModal}
+              initialPrimaryData={candidateEducation?.primary || null}
+            />
+          )}
+          {/* end primary Education Section */}
 
-                <button
-                  onClick={() =>
+          {/* add spacing between sections */}
+          <div className="my-8 border-t border-gray-200"></div>
+
+          {/* <SecondaryEducation /> */}
+
+          {activeSection === "education" && (
+            <SecondaryEducation
+              currentTheme={currentTheme}
+              preferences={preferences}
+              user={user}
+              initialData={candidateEducation?.secondary || []}
+            />
+          )}
+          {/* end Secondary Education Section */}
+          {/* add spacing between sections */}
+          <div className="my-8 border-t border-gray-200"></div>
+
+          {/* Tertiary Education Section */}
+
+          {activeSection === "education" && (
+            <TertiaryEducation
+              currentTheme={currentTheme}
+              preferences={preferences}
+              user={user}
+              initialData={candidateEducation?.tertiary || []}
+            />
+          )}
+          {/* end Tertiary Education Section */}
+
+          {/* === Modal (always in the tree, outside of activeSection) === */}
+          {educationModal.isOpen && (
+            <InlineModal
+              onClose={() =>
+                setEducationModal({
+                  isOpen: false,
+                  formType: null,
+                  editingEducation: null,
+                })
+              }
+            >
+              {/* TODO: Implement PrimaryEducationForm component */}
+              {/* {educationModal.formType === "primary" && (
+                <PrimaryEducationForm
+                  onSave={handlePrimarySave}
+                  onCancel={() =>
                     setEducationModal({
-                      isOpen: true,
+                      isOpen: false,
+                      formType: null,
                       editingEducation: null,
                     })
                   }
-                  className="px-8 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
-                  style={{
-                    background: `linear-gradient(135deg, ${
-                      preferences.primaryColor || "#6366f1"
-                    }, ${preferences.primaryColor || "#6366f1"}dd)`,
-                  }}
-                >
-                  Add Education
-                </button>
-              </div>
-
-              {candidateEducation.length > 0 ? (
-                <div className="space-y-6">
-                  {candidateEducation.map((education, index) => (
-                    <div
-                      key={education.id || index}
-                      className={`${currentTheme.cardBg} backdrop-blur-md rounded-2xl p-6 ${currentTheme.border} shadow-xl hover:shadow-2xl transition-all duration-300`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3
-                            className={`text-2xl font-bold ${currentTheme.textPrimary} mb-2`}
-                          >
-                            {education.qualification_type}
-                          </h3>
-                          <p
-                            className={`text-lg ${currentTheme.textSecondary} mb-2`}
-                          >
-                            {education.institution_name}
-                          </p>
-                          <p
-                            className={`text-sm ${currentTheme.textMuted} mb-2`}
-                          >
-                            {education.field_of_study} • {education.start_year}
-                            {education.end_year
-                              ? ` - ${education.end_year}`
-                              : " - Present"}
-                          </p>
-                          {education.grade_result && (
-                            <p
-                              className={`text-sm ${currentTheme.textSecondary} font-medium`}
-                            >
-                              Grade: {education.grade_result}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-3">
-                          <button
-                            onClick={() =>
-                              setEducationModal({
-                                isOpen: true,
-                                editingEducation: education,
-                              })
-                            }
-                            className={`p-3 ${currentTheme.cardBg} rounded-xl ${currentTheme.border} ${currentTheme.hover} transition-all`}
-                          >
-                            <svg
-                              className={`h-5 w-5 ${currentTheme.textSecondary}`}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div
-                  className={`${currentTheme.cardBg} backdrop-blur-md rounded-2xl p-16 ${currentTheme.border} shadow-xl text-center`}
-                >
-                  <div className="max-w-md mx-auto">
-                    <div
-                      className="w-24 h-24 mx-auto rounded-full flex items-center justify-center text-4xl mb-6 shadow-2xl"
-                      style={{
-                        background: `linear-gradient(135deg, ${
-                          preferences.primaryColor || "#6366f1"
-                        }, ${preferences.primaryColor || "#6366f1"}dd)`,
-                      }}
-                    >
-                      🎓
-                    </div>
-                    <h3
-                      className={`text-3xl font-bold ${currentTheme.textPrimary} mb-4`}
-                    >
-                      No Education Records
-                    </h3>
-                    <p
-                      className={`text-lg ${currentTheme.textSecondary} mb-8 leading-relaxed`}
-                    >
-                      Add your educational qualifications to complete your
-                      profile and improve your chances with employers.
-                    </p>
-                    <button
-                      onClick={() =>
-                        setEducationModal({
-                          isOpen: true,
-                          editingEducation: null,
-                        })
-                      }
-                      className="px-8 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
-                      style={{
-                        background: `linear-gradient(135deg, ${
-                          preferences.primaryColor || "#6366f1"
-                        }, ${preferences.primaryColor || "#6366f1"}dd)`,
-                      }}
-                    >
-                      Add Your First Education
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+                />
+              )} */}
+              {/* {educationModal.formType === "secondary" && (
+                  <SecondaryEducationForm
+                    onSave={handleSecondarySave}
+                    onCancel={() =>
+                      setEducationModal({ isOpen: false, formType: null, editingEducation: null })
+                    }
+                  />
+                )} */}
+              {/* {educationModal.formType === "tertiary" && (
+                  <TertiaryEducationForm
+                    onSave={handleTertiarySave}
+                    onCancel={() =>
+                      setEducationModal({ isOpen: false, formType: null, editingEducation: null })
+                    }
+                  />
+                )} */}
+            </InlineModal>
           )}
+
+          {/* end Education Section */}
 
           {/* Experience Section */}
           {activeSection === "experience" && (
@@ -1463,7 +1524,13 @@ const familyOnly = emergencyContacts.filter(
                 contacts={emergencyOnly}
                 currentTheme={currentTheme}
                 preferences={preferences}
-                onAdd={() => setContactModal({ isOpen: true, editingContact: null, type: "Emergency Contact" })}
+                onAdd={() =>
+                  setContactModal({
+                    isOpen: true,
+                    editingContact: null,
+                    type: "Emergency Contact",
+                  })
+                }
                 onEdit={(contact) =>
                   setContactModal({ isOpen: true, editingContact: contact })
                 }
@@ -1473,14 +1540,20 @@ const familyOnly = emergencyContacts.filter(
           {/* End of Emergency Contacts Section */}
 
           <div className="my-6"></div>
-          
+
           {/* Next of Kin Section */}
           {activeSection === "emergency" && (
             <NextOfKin
               contacts={nextOfKinOnly}
               currentTheme={currentTheme}
               preferences={preferences}
-              onAdd={() => setContactModal({ isOpen: true, editingContact: null, type: "Next of Kin" })}
+              onAdd={() =>
+                setContactModal({
+                  isOpen: true,
+                  editingContact: null,
+                  type: "Next of Kin",
+                })
+              }
               onEdit={(contact) =>
                 setContactModal({ isOpen: true, editingContact: contact })
               }
@@ -1488,17 +1561,23 @@ const familyOnly = emergencyContacts.filter(
           )}
 
           {/* End ofNext of Kin Section */}
-          
-           <div className="my-6"></div>
+
+          <div className="my-6"></div>
 
           {/* family contact Section */}
-          
+
           {activeSection === "emergency" && (
             <FamilyContact
               contacts={familyOnly}
               currentTheme={currentTheme}
               preferences={preferences}
-              onAdd={() => setContactModal({ isOpen: true, editingContact: null, type: "Family Contact" })}
+              onAdd={() =>
+                setContactModal({
+                  isOpen: true,
+                  editingContact: null,
+                  type: "Family Contact",
+                })
+              }
               onEdit={(contact) =>
                 setContactModal({ isOpen: true, editingContact: contact })
               }
@@ -1507,12 +1586,45 @@ const familyOnly = emergencyContacts.filter(
 
           {/* End family contact Section */}
 
+          {/* Apply for Position Section */}
+          {activeSection === "apply-position" && (
+            <ApplyForPosition
+              candidateProfile={candidateProfile}
+              currentTheme={currentTheme}
+              onClose={() => setActiveSection("overview")}
+            />
+          )}
 
+          {/* Test Center Section */}
+          {activeSection === "test-center" && (
+            <TestCenter
+              candidateProfile={candidateProfile}
+              currentTheme={currentTheme}
+              onClose={() => setActiveSection("overview")}
+            />
+          )}
+
+          {/* Interview Manager Section */}
+          {activeSection === "interviews" && (
+            <InterviewManager
+              candidateProfile={candidateProfile}
+              currentTheme={currentTheme}
+              onClose={() => setActiveSection("overview")}
+            />
+          )}
+
+          {/* Accept Offer Section */}
+          {activeSection === "applications" && (
+            <AcceptOfferSection
+              currentTheme={currentTheme}
+              preferences={preferences}
+              candidateProfile={candidateProfile}
+              user={user}
+            />
+          )}
 
           {/* Other sections with professional empty states */}
           {[
-            "applications",
-            "interviews",
             "documents",
             "calendar",
             "messages",
@@ -1527,8 +1639,6 @@ const familyOnly = emergencyContacts.filter(
                         className={`text-4xl font-bold ${currentTheme.textPrimary} mb-2 capitalize flex items-center`}
                       >
                         <span className="mr-3">
-                          {section === "applications" && "📋"}
-                          {section === "interviews" && "🎯"}
                           {section === "documents" && "📄"}
                           {section === "calendar" && "📅"}
                           {section === "messages" && "💬"}
@@ -1537,10 +1647,6 @@ const familyOnly = emergencyContacts.filter(
                         {section}
                       </h1>
                       <p className={`text-xl ${currentTheme.textSecondary}`}>
-                        {section === "applications" &&
-                          "Track and manage all your job applications"}
-                        {section === "interviews" &&
-                          "Schedule and prepare for upcoming interviews"}
                         {section === "documents" &&
                           "Upload and organize your professional documents"}
                         {section === "calendar" &&
@@ -1559,8 +1665,6 @@ const familyOnly = emergencyContacts.filter(
                         }, ${preferences.primaryColor || "#6366f1"}dd)`,
                       }}
                     >
-                      {section === "applications" && "New Application"}
-                      {section === "interviews" && "Schedule Interview"}
                       {section === "documents" && "Upload Document"}
                       {section === "calendar" && "Add Event"}
                       {section === "messages" && "New Message"}
@@ -1580,8 +1684,6 @@ const familyOnly = emergencyContacts.filter(
                           }, ${preferences.primaryColor || "#6366f1"}dd)`,
                         }}
                       >
-                        {section === "applications" && "📋"}
-                        {section === "interviews" && "🎯"}
                         {section === "documents" && "📄"}
                         {section === "calendar" && "📅"}
                         {section === "messages" && "💬"}
@@ -1629,7 +1731,7 @@ const familyOnly = emergencyContacts.filter(
       </div>
 
       {/* Modals */}
-      <EducationModal
+      {/* <EducationModal
         isOpen={educationModal.isOpen}
         onClose={() =>
           setEducationModal({ isOpen: false, editingEducation: null })
@@ -1637,7 +1739,7 @@ const familyOnly = emergencyContacts.filter(
         onSave={handleEducationSave}
         education={educationModal.editingEducation}
         candidateId={user?.id}
-      />
+      /> */}
 
       <ExperienceModal
         isOpen={experienceModal.isOpen}

@@ -22,6 +22,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // You can also configure stateful API here if needed
         $middleware->statefulApi();
+
+        // Register cache response middleware
+        $middleware->alias([
+            'cache.response' => \App\Http\Middleware\CacheResponseMiddleware::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

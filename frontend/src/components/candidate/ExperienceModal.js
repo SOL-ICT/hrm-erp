@@ -95,21 +95,23 @@ export default function ExperienceModal({
     }
   };
 
-  const formatSalary = (value) => {
-    const numericValue = value.replace(/[^\d]/g, "");
-    if (numericValue) {
-      return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    }
-    return "";
-  };
+  // TODO: Implement salary formatting when salary field is restored
+  // const formatSalary = (value) => {
+  //   const numericValue = value.replace(/[^\d]/g, "");
+  //   if (numericValue) {
+  //     return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  //   }
+  //   return "";
+  // };
 
-  const handleSalaryChange = (e) => {
-    const formattedValue = formatSalary(e.target.value);
-    setFormData((prev) => ({
-      ...prev,
-      last_salary: formattedValue,
-    }));
-  };
+  // TODO: Implement salary handling when salary field is restored
+  // const handleSalaryChange = (e) => {
+  //   const formattedValue = formatSalary(e.target.value);
+  //   setFormData((prev) => ({
+  //     ...prev,
+  //     last_salary: formattedValue,
+  //   }));
+  // };
 
   const validateForm = () => {
     const newErrors = {};
@@ -344,7 +346,7 @@ export default function ExperienceModal({
             </label>
           </div>
 
-          <div>
+          {/* <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Last Salary (₦)
             </label>
@@ -362,7 +364,7 @@ export default function ExperienceModal({
             <p className="text-xs text-gray-500 mt-1">
               Monthly salary (optional - for matching purposes)
             </p>
-          </div>
+          </div> */}
 
           {!formData.is_current && (
             <div>

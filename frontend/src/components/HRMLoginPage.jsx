@@ -669,7 +669,7 @@ const HRMLoginPage = () => {
 
             <div className="mt-6 flex justify-center space-x-4">
               <button className="p-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors">
-                <span className="text-sm">f</span>
+                <span className="text-sm">fb</span>
               </button>
               <button className="p-2 rounded-full bg-gradient-to-r from-blue-500 to-red-500 text-white hover:from-pblue-600 hover:to-pink-600 transition-all">
                 <span className="text-sm">ig</span>

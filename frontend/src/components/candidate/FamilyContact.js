@@ -10,18 +10,25 @@ const FamilyContact = ({
 }) => {
   return (
     // Main container spacing - Reduce from space-y-8 to space-y-4 or 6
-    <div className="space-y-4"> {/* Adjusted from space-y-8 */}
-
+    <div className="space-y-4">
+      {" "}
+      {/* Adjusted from space-y-8 */}
       <div className="flex items-center justify-between">
         <div>
           {/* Main title: Reduce from text-4xl to text-2xl or text-3xl, reduce mb-2 */}
-          <h1 className={`text-2xl font-bold ${currentTheme.textPrimary} mb-1 flex items-center`}> {/* Adjusted from text-4xl mb-2 */}
+          <h1
+            className={`text-2xl font-bold ${currentTheme.textPrimary} mb-1 flex items-center`}
+          >
+            {" "}
+            {/* Adjusted from text-4xl mb-2 */}
             {/* Emoji margin: Reduce from mr-3 */}
             <span className="mr-2">👨‍👩‍👧‍👦</span> {/* Adjusted from mr-3 */}
             Family Contacts
           </h1>
           {/* Description: Reduce from text-xl to text-base or text-lg */}
-          <p className={`text-base ${currentTheme.textSecondary}`}> {/* Adjusted from text-xl */}
+          <p className={`text-base ${currentTheme.textSecondary}`}>
+            {" "}
+            {/* Adjusted from text-xl */}
             Manage your family contacts
           </p>
         </div>
@@ -32,16 +39,17 @@ const FamilyContact = ({
           style={{
             background: `linear-gradient(135deg, ${
               preferences.primaryColor || "#6366f1"
-            }, ${(preferences.primaryColor || "#6366f1")}dd)`,
+            }, ${preferences.primaryColor || "#6366f1"}dd)`,
           }}
         >
           Add Family Contact
         </button>
       </div>
-
       {contacts.length > 0 ? (
         // List of contacts container spacing - Reduce from space-y-6 to space-y-3 or 4
-        <div className="space-y-3"> {/* Adjusted from space-y-6 */}
+        <div className="space-y-3">
+          {" "}
+          {/* Adjusted from space-y-6 */}
           {contacts.map((contact, index) => (
             // Card padding: Reduce from p-6 to p-3 or p-4. Reduce rounded-2xl to rounded-lg or rounded-xl
             <div
@@ -51,27 +59,41 @@ const FamilyContact = ({
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   {/* Contact name: Reduce from text-2xl to text-xl or text-lg */}
-                  <div className="flex items-center mb-1"> {/* Adjusted from mb-2 */}
-                    <h3 className={`text-xl font-bold ${currentTheme.textPrimary}`}> {/* Adjusted from text-2xl */}
+                  <div className="flex items-center mb-1">
+                    {" "}
+                    {/* Adjusted from mb-2 */}
+                    <h3
+                      className={`text-xl font-bold ${currentTheme.textPrimary}`}
+                    >
+                      {" "}
+                      {/* Adjusted from text-2xl */}
                       {contact.full_name}
                     </h3>
                     {contact.is_primary && (
                       // Primary tag padding/margin: Reduce from ml-3 px-3 py-1
-                      <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-full font-medium"> {/* Adjusted from ml-3 px-3 py-1 */}
+                      <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-full font-medium">
+                        {" "}
+                        {/* Adjusted from ml-3 px-3 py-1 */}
                         Primary
                       </span>
                     )}
                   </div>
                   {/* Relationship: Reduce from text-lg to text-base, reduce mb-2 */}
-                  <p className={`text-base ${currentTheme.textSecondary} mb-1`}> {/* Adjusted from text-lg mb-2 */}
+                  <p className={`text-base ${currentTheme.textSecondary} mb-1`}>
+                    {" "}
+                    {/* Adjusted from text-lg mb-2 */}
                     {contact.relationship}
                   </p>
                   {/* Contact type: Reduce from mb-3 */}
-                  <p className={`text-sm ${currentTheme.textMuted} mb-2`}> {/* Adjusted from mb-3 */}
+                  <p className={`text-sm ${currentTheme.textMuted} mb-2`}>
+                    {" "}
+                    {/* Adjusted from mb-3 */}
                     {contact.contact_type}
                   </p>
                   {/* Contact details spacing: Reduce from space-y-2 to space-y-1 */}
-                  <div className="space-y-1"> {/* Adjusted from space-y-2 */}
+                  <div className="space-y-1">
+                    {" "}
+                    {/* Adjusted from space-y-2 */}
                     <p className={`text-sm ${currentTheme.textSecondary}`}>
                       📞 {contact.phone_primary}
                     </p>
@@ -85,9 +107,22 @@ const FamilyContact = ({
                         ✉️ {contact.email}
                       </p>
                     )}
+                    <p className={`text-sm ${currentTheme.textSecondary}`}>
+                      📍{" "}
+                      {[
+                        contact.emergency_address,
+                        contact.emergency_address_line_2,
+                        contact.emergency_local_government_residence,
+                        contact.emergency_state_of_residence,
+                      ]
+                        .filter((field) => field && field.trim() !== "")
+                        .join(", ")}
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2"> {/* Adjusted from space-x-3 */}
+                <div className="flex items-center space-x-2">
+                  {" "}
+                  {/* Adjusted from space-x-3 */}
                   {/* Edit button padding: Reduce from p-3 to p-2 */}
                   <button
                     onClick={() => onEdit(contact)}
@@ -125,17 +160,25 @@ const FamilyContact = ({
               style={{
                 background: `linear-gradient(135deg, ${
                   preferences.primaryColor || "#6366f1"
-                }, ${(preferences.primaryColor || "#6366f1")}dd)`,
+                }, ${preferences.primaryColor || "#6366f1"}dd)`,
               }}
             >
               👨‍👩‍👧‍👦
             </div>
             {/* Empty state heading: Reduce from text-3xl to text-xl or text-2xl. Reduce mb-4 to mb-2 */}
-            <h3 className={`text-xl font-bold ${currentTheme.textPrimary} mb-2`}> {/* Adjusted from text-3xl mb-4 */}
+            <h3
+              className={`text-xl font-bold ${currentTheme.textPrimary} mb-2`}
+            >
+              {" "}
+              {/* Adjusted from text-3xl mb-4 */}
               No Family Contacts
             </h3>
             {/* Empty state description: Reduce from text-lg to text-base. Reduce mb-8 to mb-4 */}
-            <p className={`text-base ${currentTheme.textSecondary} mb-4 leading-normal`}> {/* Adjusted from text-lg mb-8 leading-relaxed */}
+            <p
+              className={`text-base ${currentTheme.textSecondary} mb-4 leading-normal`}
+            >
+              {" "}
+              {/* Adjusted from text-lg mb-8 leading-relaxed */}
               Add family contacts for safety and verification purposes.
             </p>
             {/* Button padding: Same as top button - px-4 py-2 */}
@@ -145,7 +188,7 @@ const FamilyContact = ({
               style={{
                 background: `linear-gradient(135deg, ${
                   preferences.primaryColor || "#6366f1"
-                }, ${(preferences.primaryColor || "#6366f1")}dd)`,
+                }, ${preferences.primaryColor || "#6366f1"}dd)`,
               }}
             >
               Add Your First Contact

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import AddressForm from "./AddressForm"; // Import the AddressForm component
 
 export default function EmergencyContactModal({
   isOpen,
@@ -9,7 +10,7 @@ export default function EmergencyContactModal({
   onSave,
   contact = null,
   candidateId,
-  type,// "Emergency Contact" or "Next of Kin" or "Family Contact"
+  type, // "Emergency Contact" or "Next of Kin" or "Family Contact"
 }) {
   const { getUserPreferences, sanctumRequest } = useAuth();
   const preferences = getUserPreferences();
@@ -28,7 +29,7 @@ export default function EmergencyContactModal({
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
- // const contactTypes = ["Emergency Contact", "Next of Kin", "Family Contact"];
+  // const contactTypes = ["Emergency Contact", "Next of Kin", "Family Contact"];
 
   const relationships = [
     "Parent",
@@ -64,6 +65,11 @@ export default function EmergencyContactModal({
         email: contact.email || "",
         address: contact.address || "",
         is_primary: contact.is_primary || false,
+        state_of_residence_current: contact.emergency_state_of_residence || "",
+        local_government_residence_current:
+          contact.emergency_local_government_residence || "",
+        address_current: contact.emergency_address || "",
+        address_line_2_current: contact.emergency_address_line_2 || "",
       });
     } else {
       // Add mode - reset form
@@ -77,6 +83,10 @@ export default function EmergencyContactModal({
         email: "",
         address: "",
         is_primary: false,
+        state_of_residence_current: "",
+        local_government_residence_current: "",
+        address_current: "",
+        address_line_2_current: "",
       });
     }
     setErrors({});
@@ -143,12 +153,14 @@ export default function EmergencyContactModal({
     const newErrors = {};
 
     // Required fields
-    {/*
+    {
+      /*
       
     if (!formData.contact_type.trim()) {
       newErrors.contact_type = "Contact type is required";
     }
-    */}
+    */
+    }
 
     if (!formData.full_name.trim()) {
       newErrors.full_name = "Full name is required";
@@ -192,6 +204,7 @@ export default function EmergencyContactModal({
     if (!validateForm()) {
       return;
     }
+
     console.log("🚀 Contact Type:", formData.contact_type); // to check if form type based on current modal
     try {
       const url = contact
@@ -200,11 +213,27 @@ export default function EmergencyContactModal({
 
       const method = contact ? "PUT" : "POST";
 
+      // Transform formData to match API/database column names
+      const submissionData = {
+        contact_type: formData.contact_type,
+        full_name: formData.full_name,
+        relationship: formData.relationship,
+        phone_primary: formData.phone_primary,
+        phone_secondary: formData.phone_secondary,
+        email: formData.email,
+        is_primary: formData.is_primary,
+        emergency_state_of_residence: formData.state_of_residence_current,
+        emergency_local_government_residence:
+          formData.local_government_residence_current,
+        emergency_address: formData.address_current,
+        emergency_address_line_2: formData.address_line_2_current,
+      };
+
       const response = await sanctumRequest(url, {
         method,
-       // credentials: "include",
-       // headers: { "Content-Type": "application/json" },
-       body: JSON.stringify(formData),
+        credentials: "include", // Required for Sanctum authentication
+        headers: { "Content-Type": "application/json" }, // Ensure JSON payload
+        body: JSON.stringify(submissionData),
       });
 
       if (response.ok) {
@@ -213,9 +242,9 @@ export default function EmergencyContactModal({
         onClose();
       } else {
         const errorData = await response.json();
-        if (errorData.errors) {
-          setErrors(errorData.errors);
-        }
+        setErrors(
+          errorData.errors || { general: "An unexpected error occurred." }
+        );
       }
     } catch (error) {
       console.error("Failed to save emergency contact:", error);
@@ -398,19 +427,16 @@ export default function EmergencyContactModal({
           </div>
 
           {/* Address */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Address
-            </label>
-            <textarea
-              name="address"
-              value={formData.address}
-              onChange={handleInputChange}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Full residential address..."
-            />
-          </div>
+
+          <AddressForm
+            formData={formData}
+            setFormData={setFormData}
+            errors={errors}
+            handleInputChange={handleInputChange}
+            type="current"
+          />
+
+          {/* end Address */}
 
           {/* Primary Contact */}
           <div className="flex items-center">

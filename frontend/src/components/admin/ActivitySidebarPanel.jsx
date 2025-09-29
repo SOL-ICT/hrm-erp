@@ -58,7 +58,7 @@ const ActivitySidebarPanel = ({
     },
     {
       name: "GTBank Nigeria",
-      action: "Recruitment request processed",
+      action: "Vacancy Declaration processed",
       time: "1 day ago",
       type: "recruitment",
       icon: "👥",
@@ -82,11 +82,11 @@ const ActivitySidebarPanel = ({
       onClick: () => onActionClick?.("client-contract", "add"),
     },
     {
-      action: "Post Vacancy",
+      action: "Post Vacancy Declaration",
       icon: Briefcase,
       color: "purple",
       gradient: "from-purple-500 to-purple-600",
-      onClick: () => onActionClick?.("vacancy-setup", "add"),
+      onClick: () => onActionClick?.("recruitment-request", "add"),
     },
     {
       action: "View Reports",
