@@ -19,13 +19,12 @@ import {
   RefreshCw,
   CheckCircle,
   ChevronDown,
+  ChevronRight,
+  List,
+  Grid3X3,
 } from "lucide-react";
 import LocationMasterForm from "./LocationMasterForm";
-import ServiceRequestForm from "./ServiceRequestForm";
-import {
-  serviceLocationAPI,
-  serviceRequestAPI,
-} from "../../../../../../services/api";
+import { serviceLocationsAPI } from "../../../../../../services/api";
 
 const ClientService = ({ currentTheme, preferences, onBack }) => {
   // Main state
@@ -34,6 +33,7 @@ const ClientService = ({ currentTheme, preferences, onBack }) => {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterClient, setFilterClient] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState("grouped"); // New: 'flat' or 'grouped'
 
   // Form states
   const [showLocationForm, setShowLocationForm] = useState(false);
@@ -43,6 +43,7 @@ const ClientService = ({ currentTheme, preferences, onBack }) => {
 
   // Data states
   const [locations, setLocations] = useState([]);
+  const [groupedLocations, setGroupedLocations] = useState([]);
   const [services, setServices] = useState([]);
   const [groupedServices, setGroupedServices] = useState({});
   const [expandedClient, setExpandedClient] = useState(null);
@@ -74,7 +75,14 @@ const ClientService = ({ currentTheme, preferences, onBack }) => {
     } else if (activeTab === "request-master") {
       loadServices();
     }
-  }, [activeTab, currentPage, searchTerm, filterStatus, filterClient]);
+  }, [
+    activeTab,
+    currentPage,
+    searchTerm,
+    filterStatus,
+    filterClient,
+    viewMode,
+  ]);
 
   // Load locations function
   const loadLocations = async () => {
@@ -88,18 +96,34 @@ const ClientService = ({ currentTheme, preferences, onBack }) => {
         client: filterClient,
       };
 
-      const response = await serviceLocationAPI.getAll(params);
+      // Choose API based on view mode
+      const response =
+        viewMode === "grouped"
+          ? await serviceLocationsAPI.getGroupedByClient(params)
+          : await serviceLocationsAPI.getAll(params);
+
       if (response.success) {
-        const locationData = response.data || [];
-        setLocations(locationData);
-        setPagination(response.pagination || pagination);
-        updateLocationStats(locationData);
+        if (viewMode === "grouped") {
+          setGroupedLocations(response.data || []);
+          // For grouped view, flatten for stats calculation
+          const allLocations = response.data.reduce((acc, client) => {
+            return acc.concat(client.locations || []);
+          }, []);
+          updateLocationStats(allLocations);
+        } else {
+          const locationData = response.data || [];
+          setLocations(locationData);
+          setPagination(response.pagination || pagination);
+          updateLocationStats(locationData);
+        }
       } else {
         setLocations([]);
+        setGroupedLocations([]);
       }
     } catch (error) {
       console.error("Error loading locations:", error);
       setLocations([]);
+      setGroupedLocations([]);
     } finally {
       setLoading(false);
     }
@@ -109,7 +133,7 @@ const ClientService = ({ currentTheme, preferences, onBack }) => {
   const loadServices = async () => {
     try {
       setServiceLoading(true);
-      const response = await serviceRequestAPI.getAll();
+      const response = await serviceRequestsAPI.getAll();
       if (response.success) {
         const servicesData = response.data || [];
         setServices(servicesData);
@@ -201,7 +225,7 @@ const ClientService = ({ currentTheme, preferences, onBack }) => {
   const handleDeleteLocation = async (locationId) => {
     if (window.confirm("Are you sure you want to delete this location?")) {
       try {
-        const response = await serviceLocationAPI.delete(locationId);
+        const response = await serviceLocationsAPI.delete(locationId);
         if (response.success) {
           alert("Location deleted successfully!");
           await loadLocations();
@@ -216,7 +240,7 @@ const ClientService = ({ currentTheme, preferences, onBack }) => {
   const handleDeleteService = async (serviceId) => {
     if (window.confirm("Are you sure you want to delete this service?")) {
       try {
-        const response = await serviceRequestAPI.delete(serviceId);
+        const response = await serviceRequestsAPI.delete(serviceId);
         if (response.success) {
           alert("Service deleted successfully!");
           await loadServices();
@@ -356,180 +380,289 @@ const ClientService = ({ currentTheme, preferences, onBack }) => {
         </div>
       </div>
 
-      {/* Locations Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Location Details
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Client
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  City
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  SOL Office
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {loading ? (
-                <tr>
-                  <td colSpan="6" className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    </div>
-                  </td>
-                </tr>
-              ) : locations.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan="6"
-                    className="px-6 py-4 text-center text-gray-500"
-                  >
-                    No locations found
-                  </td>
-                </tr>
-              ) : (
-                locations.map((location) => (
-                  <tr key={location.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {location.location_name}
+      {/* View Mode Toggle */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <span className="text-sm font-medium text-gray-700">View:</span>
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode("grouped")}
+              className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                viewMode === "grouped"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              <Grid3X3 className="w-4 h-4 mr-1" />
+              Grouped by Client
+            </button>
+            <button
+              onClick={() => setViewMode("flat")}
+              className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                viewMode === "flat"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              <List className="w-4 h-4 mr-1" />
+              Flat List
+            </button>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            setEditingLocation(null);
+            setShowLocationForm(true);
+          }}
+          className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add Location
+        </button>
+      </div>
+
+      {/* Locations Display */}
+      {viewMode === "grouped" ? (
+        <GroupedLocationsView />
+      ) : (
+        <FlatLocationsTable />
+      )}
+    </div>
+  );
+
+  // Grouped Locations View Component
+  const GroupedLocationsView = () => (
+    <div className="space-y-4">
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+        </div>
+      ) : groupedLocations.length === 0 ? (
+        <div className="text-center py-12">
+          <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            No locations found
+          </h3>
+          <p className="text-gray-500">
+            No service locations match your current filters.
+          </p>
+        </div>
+      ) : (
+        groupedLocations.map((clientGroup) => (
+          <div
+            key={clientGroup.client_id}
+            className="bg-white rounded-lg border border-gray-200 overflow-hidden"
+          >
+            {/* Client Header */}
+            <div
+              className="bg-gray-50 px-6 py-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
+              onClick={() => toggleClientGroup(clientGroup.client_name)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center text-gray-600">
+                    {expandedClient === clientGroup.client_name ? (
+                      <ChevronDown className="w-5 h-5" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {clientGroup.client_name}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Code: {clientGroup.client_code} •{" "}
+                      {clientGroup.stats.total_locations} location
+                      {clientGroup.stats.total_locations !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4">
+                  {/* Client Stats */}
+                  <div className="flex items-center space-x-3 text-sm">
+                    <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                      {clientGroup.stats.active_locations} Active
+                    </span>
+                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                      {clientGroup.stats.assigned_to_sol} Assigned
+                    </span>
+                    <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full">
+                      {clientGroup.stats.cities.length} Cities
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Client Locations - Collapsible */}
+            {expandedClient === clientGroup.client_name && (
+              <div className="px-6 py-4">
+                <div className="grid gap-3">
+                  {clientGroup.locations.map((location) => (
+                    <div
+                      key={location.id}
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-4">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <MapPin className="w-4 h-4 text-gray-500" />
+                              <span className="font-medium text-gray-900">
+                                {location.location_name}
+                              </span>
+                              <span className="text-sm text-gray-500">
+                                ({location.location_code})
+                              </span>
+                            </div>
+                            <div className="mt-1 text-sm text-gray-600">
+                              {location.city} • SOL:{" "}
+                              {location.sol_office_name || "Not Assigned"}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span
+                              className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                location.is_active
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {location.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-500">
-                          Code: {location.location_code}
-                        </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {location.client_name}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {location.city || "-"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {location.sol_office_name || "Not Assigned"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          location.is_active
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {location.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end space-x-2">
+                      <div className="flex items-center space-x-2 ml-4">
                         <button
                           onClick={() => handleEditLocation(location)}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit Location"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteLocation(location.id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete Location"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {pagination.total_pages > 1 && (
-          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200">
-            <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() =>
-                  setCurrentPage((prev) =>
-                    Math.min(pagination.total_pages, prev + 1)
-                  )
-                }
-                disabled={currentPage === pagination.total_pages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-              >
-                Next
-              </button>
-            </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Showing{" "}
-                  <span className="font-medium">
-                    {(currentPage - 1) * pagination.per_page + 1}
-                  </span>{" "}
-                  to{" "}
-                  <span className="font-medium">
-                    {Math.min(
-                      currentPage * pagination.per_page,
-                      pagination.total
-                    )}
-                  </span>{" "}
-                  of <span className="font-medium">{pagination.total}</span>{" "}
-                  results
-                </p>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                  <button
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.max(1, prev - 1))
-                    }
-                    disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() =>
-                      setCurrentPage((prev) =>
-                        Math.min(pagination.total_pages, prev + 1)
-                      )
-                    }
-                    disabled={currentPage === pagination.total_pages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                  >
-                    Next
-                  </button>
-                </nav>
-              </div>
-            </div>
+            )}
           </div>
-        )}
+        ))
+      )}
+    </div>
+  );
+
+  // Flat Locations Table Component
+  const FlatLocationsTable = () => (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Location Details
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Client
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                City
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                SOL Office
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {loading ? (
+              <tr>
+                <td colSpan="6" className="px-6 py-4 text-center">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                </td>
+              </tr>
+            ) : locations.length === 0 ? (
+              <tr>
+                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                  No locations found
+                </td>
+              </tr>
+            ) : (
+              locations.map((location) => (
+                <tr key={location.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {location.location_name}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Code: {location.location_code}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {location.client_name}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {location.city || "-"}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {location.sol_office_name || "Not Assigned"}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        location.is_active
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {location.is_active ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex items-center justify-end space-x-2">
+                      <button
+                        onClick={() => handleEditLocation(location)}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteLocation(location.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

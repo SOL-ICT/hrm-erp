@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiService } from "@/services/api";
 
 const API_BASE = "http://localhost:8000/api";
 
@@ -34,28 +35,29 @@ export const useClients = (initialParams = {}) => {
         page: params.page || 1,
       });
 
-      // FIXED: Use correct backend route
-      const response = await sanctumRequest(
-        `${API_BASE}/admin/clients?${queryParams}`
-      );
+      const data = await apiService.makeRequest(`/clients?${queryParams}`);
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.status === "success") {
-          // Backend returns data directly, not in data.data structure
-          setClients(Array.isArray(data.data) ? data.data : []);
-          // Set basic pagination (backend doesn't return pagination info yet)
-          setPagination({
+      // API service already handles response parsing and errors
+
+      if (data.success) {
+        // Backend returns data in data array with pagination info
+        setClients(Array.isArray(data.data) ? data.data : []);
+        // Set pagination from backend response
+        setPagination(
+          data.pagination || {
             current_page: params.page || 1,
             last_page: 1,
             per_page: params.perPage || 15,
             total: Array.isArray(data.data) ? data.data.length : 0,
-          });
-        } else {
-          setError(data.message || "Failed to fetch clients");
-        }
+          }
+        );
+
+        // Calculate statistics after setting clients
+        setTimeout(() => {
+          fetchStatistics();
+        }, 100);
       } else {
-        setError("Failed to fetch clients");
+        setError(data.message || "Failed to fetch clients");
       }
     } catch (err) {
       setError("Network error occurred");
@@ -66,50 +68,102 @@ export const useClients = (initialParams = {}) => {
   };
 
   const fetchStatistics = async () => {
-    // Only fetch if user is authenticated and has admin role
-    if (!isAuthenticated || !hasRole("admin")) {
+    if (!isAuthenticated) {
+      console.log("Skipping statistics fetch: not authenticated");
       return;
     }
 
     try {
-      // FIXED: Use correct backend route
-      const response = await sanctumRequest(`${API_BASE}/admin/stats`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.status === "success") {
-          setStatistics(data.data.stats || {});
-        }
+      console.log("Fetching statistics from API...");
+      const response = await sanctumRequest(`${API_BASE}/clients/statistics`);
+
+      // Check if response is ok before trying to parse JSON
+      if (!response.ok) {
+        console.log("API response not ok, using fallback");
+        throw new Error("API response not successful");
+      }
+
+      // Parse JSON only once
+      const data = await response.json();
+
+      if (data.success) {
+        console.log("Statistics fetched successfully:", data.data);
+        setStatistics(data.data);
+        return;
+      } else {
+        console.log("API response not successful, using fallback");
+        throw new Error("API response not successful");
       }
     } catch (err) {
       console.error("Error fetching statistics:", err);
+
+      // Fallback: Calculate statistics from the current clients data
+      // Only if we have clients data to work with
+      if (clients && clients.length > 0) {
+        const activeClients = clients.filter(
+          (client) => client.status === "active"
+        ).length;
+        const totalContracts = clients.reduce(
+          (sum, client) => sum + (client.contracts_count || 0),
+          0
+        );
+        const activeContracts = clients.reduce(
+          (sum, client) =>
+            sum +
+            (client.contracts?.filter(
+              (contract) => contract.status === "active"
+            ).length || 0),
+          0
+        );
+
+        const fallbackStats = {
+          totalClients: clients.length,
+          activeClients: activeClients,
+          totalContracts: totalContracts,
+          activeContracts: activeContracts,
+        };
+
+        console.log("Using fallback statistics:", fallbackStats);
+        setStatistics(fallbackStats);
+      } else {
+        // Set default statistics if no client data available
+        console.log("Setting default statistics");
+        setStatistics({
+          totalClients: 0,
+          activeClients: 0,
+          totalContracts: 0,
+          activeContracts: 0,
+        });
+      }
     }
   };
 
   const createClient = async (clientData) => {
-    if (!isAuthenticated || !hasRole("admin")) {
-      throw new Error("Unauthorized");
+    if (!isAuthenticated) {
+      throw new Error("Not authenticated");
     }
 
     setLoading(true);
     try {
-      // FIXED: Use correct backend route
-      const response = await sanctumRequest(`${API_BASE}/admin/clients`, {
+      const response = await sanctumRequest(`${API_BASE}/clients`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(clientData),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.status === "success") {
-          await fetchClients(); // Refresh the list
-          await fetchStatistics(); // Refresh statistics
-          return data;
-        } else {
-          throw new Error(data.message || "Failed to create client");
-        }
+      if (!response.ok) {
+        throw new Error("Failed to create client");
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        // Refresh the clients list
+        fetchClients();
+        return { success: true, data: data.data };
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to create client");
+        throw new Error(data.message || "Failed to create client");
       }
     } catch (err) {
       setError(err.message);
@@ -120,29 +174,31 @@ export const useClients = (initialParams = {}) => {
   };
 
   const updateClient = async (id, clientData) => {
-    if (!isAuthenticated || !hasRole("admin")) {
-      throw new Error("Unauthorized");
+    if (!isAuthenticated) {
+      throw new Error("Not authenticated");
     }
 
     setLoading(true);
     try {
-      // FIXED: Use correct backend route (assuming it exists)
-      const response = await sanctumRequest(`${API_BASE}/admin/clients/${id}`, {
+      const response = await sanctumRequest(`${API_BASE}/clients/${id}`, {
         method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(clientData),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.status === "success") {
-          await fetchClients(); // Refresh the list
-          return data;
-        } else {
-          throw new Error(data.message || "Failed to update client");
-        }
+      if (!response.ok) {
+        throw new Error("Failed to update client");
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        // Refresh the clients list
+        fetchClients();
+        return { success: true, data: data.data };
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to update client");
+        throw new Error(data.message || "Failed to update client");
       }
     } catch (err) {
       setError(err.message);
@@ -153,29 +209,27 @@ export const useClients = (initialParams = {}) => {
   };
 
   const deleteClient = async (id) => {
-    if (!isAuthenticated || !hasRole("admin")) {
-      throw new Error("Unauthorized");
+    if (!isAuthenticated) {
+      throw new Error("Not authenticated");
     }
 
     setLoading(true);
     try {
-      // FIXED: Use correct backend route (assuming it exists)
-      const response = await sanctumRequest(`${API_BASE}/admin/clients/${id}`, {
+      const response = await sanctumRequest(`${API_BASE}/clients/${id}`, {
         method: "DELETE",
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.status === "success") {
-          await fetchClients(); // Refresh the list
-          await fetchStatistics(); // Refresh statistics
-          return data;
-        } else {
-          throw new Error(data.message || "Failed to delete client");
-        }
+      if (!response.ok) {
+        throw new Error("Failed to delete client");
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        // Refresh the clients list
+        fetchClients();
+        return { success: true, message: "Client deleted successfully" };
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to delete client");
+        throw new Error(data.message || "Failed to delete client");
       }
     } catch (err) {
       setError(err.message);
@@ -191,69 +245,117 @@ export const useClients = (initialParams = {}) => {
     }
 
     try {
-      const response = await sanctumRequest(`${API_BASE}/admin/clients/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ status }),
-      });
+      setLoading(true);
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.status === "success") {
-          await fetchClients(); // Refresh the list
-          return data;
-        } else {
-          throw new Error(data.message || "Failed to update client status");
+      const response = await sanctumRequest(
+        `${API_BASE}/clients/${id}/toggle-status`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            status: status === "active" ? "inactive" : "active",
+          }),
         }
-      } else {
+      );
+
+      if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to update client status");
+        throw new Error(errorData.message || "Failed to update status");
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Update client in local state
+        setClients((prev) =>
+          prev.map((client) =>
+            client.id === id
+              ? {
+                  ...client,
+                  status: status === "active" ? "inactive" : "active",
+                  updated_at: new Date().toISOString(),
+                }
+              : client
+          )
+        );
+
+        // Refresh statistics
+        setTimeout(() => fetchStatistics(), 100);
+
+        return {
+          success: true,
+          message: result.message || "Status updated successfully",
+        };
+      } else {
+        throw new Error(result.message || "Failed to update status");
       }
     } catch (err) {
       console.error("Error updating client status:", err);
+      setError(err.message);
       throw err;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const uploadLogo = async (id, logoFile) => {
-    if (!isAuthenticated || !hasRole("admin")) {
-      throw new Error("Unauthorized");
-    }
+  // TODO: Implement logo upload functionality if needed
+  // const uploadLogo = async (id, logoFile) => {
+  //   if (!isAuthenticated || !hasRole("admin")) {
+  //     throw new Error("Unauthorized");
+  //   }
 
-    try {
-      const formData = new FormData();
-      formData.append("logo", logoFile);
+  //   try {
+  //     const formData = new FormData();
+  //     formData.append("logo", logoFile);
 
-      const response = await fetch(`${API_BASE}/admin/clients/${id}/logo`, {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
+  //     const response = await fetch(`${API_BASE}/clients/${id}/logo`, {
+  //       method: "POST",
+  //       credentials: "include",
+  //       body: formData,
+  //     });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.status === "success") {
-          await fetchClients(); // Refresh the list
-          return data;
-        } else {
-          throw new Error(data.message || "Failed to upload logo");
-        }
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to upload logo");
-      }
-    } catch (err) {
-      console.error("Error uploading logo:", err);
-      throw err;
-    }
-  };
+  //     if (response.ok) {
+  //       const data = await response.json();
+  //       if (data.success) {
+  //         await fetchClients(); // Refresh the list
+  //         return data;
+  //       } else {
+  //         throw new Error(data.message || "Failed to upload logo");
+  //       }
+  //     } else {
+  //       const errorData = await response.json();
+  //       throw new Error(errorData.message || "Failed to upload logo");
+  //     }
+  //   } catch (err) {
+  //     console.error("Error uploading logo:", err);
+  //     throw err;
+  //   }
+  // };
 
   // Only fetch initial data if user has admin access
   useEffect(() => {
     if (isAuthenticated && hasRole("admin")) {
-      fetchClients();
-      fetchStatistics();
+      // Add delay to prevent React Strict Mode double execution
+      const timeoutId = setTimeout(() => {
+        fetchClients();
+      }, 150);
+
+      return () => clearTimeout(timeoutId);
     }
   }, [isAuthenticated]);
+
+  // Fetch statistics after clients are loaded (with a slight delay for better reliability)
+  useEffect(() => {
+    if (isAuthenticated && hasRole("admin") && clients.length >= 0) {
+      const timeoutId = setTimeout(() => {
+        fetchStatistics();
+      }, 1000); // 1 second delay to ensure authentication is fully established
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isAuthenticated, clients]);
 
   return {
     clients,
@@ -267,7 +369,7 @@ export const useClients = (initialParams = {}) => {
     updateClient,
     deleteClient,
     toggleStatus,
-    uploadLogo,
+    // uploadLogo removed as per requirements
     refetch: () => {
       if (isAuthenticated && hasRole("admin")) {
         fetchClients();
@@ -293,14 +395,13 @@ export const useUtilityData = () => {
 
     setLoading(true);
     try {
-      // Fetch all utility data in parallel
-      const [industriesRes, categoriesRes, statesRes] = await Promise.all([
-        sanctumRequest(`${API_BASE}/utilities/industry-categories`),
-        sanctumRequest(`${API_BASE}/utilities/client-categories`),
-        sanctumRequest(`${API_BASE}/states-lgas`),
-      ]);
+      // Stagger requests to prevent overwhelming the backend (instead of Promise.all)
+      // This fixes the ERR_CONNECTION_RESET issue in development
 
-      // Process industry categories
+      // Fetch industry categories first
+      const industriesRes = await sanctumRequest(
+        `${API_BASE}/utilities/industry-categories`
+      );
       if (industriesRes.ok) {
         const data = await industriesRes.json();
         if (data.success) {
@@ -308,7 +409,13 @@ export const useUtilityData = () => {
         }
       }
 
-      // Process client categories
+      // Small delay before next request
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Fetch client categories
+      const categoriesRes = await sanctumRequest(
+        `${API_BASE}/utilities/client-categories`
+      );
       if (categoriesRes.ok) {
         const data = await categoriesRes.json();
         if (data.success) {
@@ -316,15 +423,19 @@ export const useUtilityData = () => {
         }
       }
 
-      // Process states/LGAs
+      // Small delay before next request
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Fetch states/LGAs
+      const statesRes = await sanctumRequest(`${API_BASE}/states-lgas`);
       if (statesRes.ok) {
         const data = await statesRes.json();
         if (data.success) {
           setStatesLgas(data.data || []);
         }
       }
-    } catch (error) {
-      console.error("Error fetching utility data:", error);
+    } catch (err) {
+      console.error("Error fetching utility data:", err);
     } finally {
       setLoading(false);
     }
@@ -332,7 +443,12 @@ export const useUtilityData = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      fetchUtilityData();
+      // Add a small delay to prevent React Strict Mode double execution issues
+      const timeoutId = setTimeout(() => {
+        fetchUtilityData();
+      }, 200);
+
+      return () => clearTimeout(timeoutId);
     }
   }, [isAuthenticated]);
 

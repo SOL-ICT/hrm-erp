@@ -3,10 +3,19 @@
 import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
+import { apiService } from "@/services/api";
 import AdminHeader from "./AdminHeader";
 import AdminNavigation from "./AdminNavigation";
 import AdminRouter from "./AdminRouter";
 import ActivitySidebarPanel from "./ActivitySidebarPanel";
+import AuthDebugger from "@/components/debug/AuthDebugger";
+import NavigationPerformanceMonitor from "@/components/NavigationPerformanceMonitor";
+import RouteCacheTest from "@/components/RouteCacheTest";
+
+// Performance notice for developers
+if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+  import("../../performance-notice.js");
+}
 
 const AdminLayout = () => {
   const { user, loading, isAuthenticated, getUserPreferences } = useAuth();
@@ -15,6 +24,7 @@ const AdminLayout = () => {
   const [isActivityPanelOpen, setIsActivityPanelOpen] = useState(false);
   const [activeModule, setActiveModule] = useState("dashboard");
   const [activeSubmodule, setActiveSubmodule] = useState(null);
+  const [activeSubSubmodule, setActiveSubSubmodule] = useState(null);
 
   // SOL Colors
   const MIDNIGHT_BLUE = "#191970";
@@ -28,13 +38,18 @@ const AdminLayout = () => {
     language: "en",
   };
 
-  // Enhanced theme configurations with SOL branding
+  // Theme state management
+  const [currentThemeKey, setCurrentThemeKey] = useState(
+    preferences.theme || "dark"
+  );
+
+  // Enhanced theme configurations with SOL branding (matching login page dark theme)
   const themes = {
     light: {
-      bg: "bg-gradient-to-br from-gray-280 via-gray-280 to-white-50",
+      bg: "bg-gradient-to-br from-gray-50 via-gray-100 to-white",
       cardBg: "bg-white/95",
-      sidebarBg: "bg-white/100",
-      headerBg: "bg-white/95",
+      sidebarBg: "bg-white shadow-xl",
+      headerBg: "bg-white/95 backdrop-blur-lg",
       textPrimary: "text-gray-900",
       textSecondary: "text-gray-600",
       textMuted: "text-gray-500",
@@ -42,10 +57,13 @@ const AdminLayout = () => {
       hover: "hover:bg-gray-50",
     },
     dark: {
-      bg: "bg-gradient-to-br from-blue-950 via-[#001023] to-blue-900",
-      cardBg: "bg-blue-950",
-      sidebarBg: `bg-gradient-to-b from-[${MIDNIGHT_BLUE}] to-[#0f0f3d]`,
-      headerBg: `bg-gradient-to-r from-[${MIDNIGHT_BLUE}] to-[#0f0f3d]`,
+      // Updated to match sidebar blue theme for consistency
+      bg: `bg-gradient-to-br from-[#0f1419] via-[#0a0e1a] to-[#000510]`,
+      cardBg: `bg-gradient-to-br from-[#1a2332]/95 via-[#141b2d]/95 to-[#0f1722]/95 backdrop-blur-sm`,
+      // Deep blue for sidebar (matching login page feel)
+      sidebarBg: `bg-gradient-to-b from-[${MIDNIGHT_BLUE}] via-[#0f0f3d] to-[#001122] shadow-2xl`,
+      // Slightly lighter blue for header
+      headerBg: `bg-gradient-to-r from-[#1e293b] via-[#0f172a] to-[${MIDNIGHT_BLUE}] backdrop-blur-lg`,
       textPrimary: "text-white",
       textSecondary: "text-gray-300",
       textMuted: "text-gray-400",
@@ -65,12 +83,36 @@ const AdminLayout = () => {
     },
   };
 
-  const currentTheme = themes[preferences.theme] || themes.dark;
+  // Function to change theme
+  const handleThemeChange = (newTheme) => {
+    setCurrentThemeKey(newTheme);
+    // Update preferences in AuthContext if available
+    if (typeof updateUserPreferences === "function") {
+      updateUserPreferences({ theme: newTheme });
+    }
+    // Store in localStorage for persistence
+    if (typeof window !== "undefined") {
+      localStorage.setItem("admin_theme", newTheme);
+    }
+  };
+
+  // Load theme from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("admin_theme");
+      if (savedTheme && themes[savedTheme]) {
+        setCurrentThemeKey(savedTheme);
+      }
+    }
+  }, []);
+
+  const currentTheme = themes[currentThemeKey] || themes.dark;
 
   // Handle module changes
-  const handleModuleChange = (moduleId, submoduleId = null) => {
+  const handleModuleChange = (moduleId, submoduleId = null, subSubmoduleId = null) => {
     setActiveModule(moduleId);
     setActiveSubmodule(submoduleId);
+    setActiveSubSubmodule(subSubmoduleId);
   };
 
   // Handle activity panel actions
@@ -129,10 +171,13 @@ const AdminLayout = () => {
       {/* Compact Fixed Header */}
       <AdminHeader
         currentTheme={currentTheme}
+        currentThemeKey={currentThemeKey}
         preferences={preferences}
         user={user}
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        onThemeChange={handleThemeChange}
+        availableThemes={Object.keys(themes)}
       />
 
       <div className="flex">
@@ -192,6 +237,7 @@ const AdminLayout = () => {
               <AdminRouter
                 activeModule={activeModule}
                 activeSubmodule={activeSubmodule}
+                activeSubSubmodule={activeSubSubmodule}
                 currentTheme={currentTheme}
                 preferences={preferences}
               />
@@ -208,6 +254,14 @@ const AdminLayout = () => {
         onToggle={() => setIsActivityPanelOpen(!isActivityPanelOpen)}
         onActionClick={handleActivityAction}
       />
+
+      {/* Debug Components - Remove in production */}
+      <AuthDebugger />
+      <NavigationPerformanceMonitor 
+        currentRoute={activeSubmodule || activeModule} 
+        position="bottom-left" 
+      />
+      <RouteCacheTest currentRoute={activeSubmodule || activeModule} />
     </div>
   );
 };

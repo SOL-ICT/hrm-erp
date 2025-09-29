@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
@@ -91,18 +92,29 @@ class AuthController extends Controller
                     ->update(['preferences' => json_encode($newPreferences)]);
             }
 
-            // Regenerate session for security
-            $request->session()->regenerate();
+            // Determine if this is an API request that needs a token
+            $needsToken = $request->wantsJson() ||
+                $request->header('Accept') === 'application/json' ||
+                $request->has('api_login') ||
+                str_starts_with($request->path(), 'api/') ||
+                $request->is('api/*'); // Additional check for API routes
+
+            // Only regenerate session for web requests, not API requests
+            if (!$needsToken && $request->hasSession()) {
+                $request->session()->regenerate();
+            }
 
             // Get final preferences
             $preferences = $this->getUserPreferences($user);
 
             // ✅ ENHANCED: Determine dashboard type and include staff information
             $staffInfo = null;
-            if ($data['login_type'] === 'candidate') {
+            $loginType = $data['login_type'] ?? 'staff'; // Default to staff if not specified
+
+            if ($loginType === 'candidate') {
                 // Route 1: Candidate login -> candidate dashboard
                 $dashboardType = 'candidate';
-            } elseif ($data['login_type'] === 'staff') {
+            } elseif ($loginType === 'staff') {
                 // Staff login - check if admin access is requested
                 if (isset($data['is_admin']) && $data['is_admin'] === true) {
                     // Admin toggle is ON - verify if user is SOL staff using profile_id
@@ -218,11 +230,40 @@ class AuthController extends Controller
                 ];
             }
 
-            return response()->json([
+            $finalResponse = [
                 'success' => true,
                 'message' => 'Login successful',
                 'user'    => $responseData,
+            ];
+
+            // Generate API token - Force for all logins for now
+            $needsToken = true; // Force token generation
+            Log::info('Token generation needed', ['needs_token' => $needsToken]);
+            
+            if ($needsToken) {
+                try {
+                    // Ensure we have a fresh User model instance with the HasApiTokens trait
+                    /** @var \App\Models\User $userModel */
+                    $userModel = User::find($user->id);
+                    $tokenResult = $userModel->createToken('api-access');
+                    $token = $tokenResult->plainTextToken;
+                    $finalResponse['access_token'] = $token;
+                    $finalResponse['token_type'] = 'Bearer';
+                    Log::info('Token generated successfully', ['token_length' => strlen($token)]);
+                } catch (\Exception $tokenError) {
+                    Log::error('Token generation failed: ' . $tokenError->getMessage());
+                    // Continue without token for now
+                }
+            }
+
+            Log::info('Final login response', [
+                'response_keys' => array_keys($finalResponse),
+                'has_access_token' => isset($finalResponse['access_token']),
+                'access_token_length' => isset($finalResponse['access_token']) ? strlen($finalResponse['access_token']) : 0
             ]);
+
+            return response()->json($finalResponse);
+        } catch (ValidationException $e) {
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -242,103 +283,103 @@ class AuthController extends Controller
         }
     }
 
-    /**
-     * Handle user registration (candidates only).
-     */
-    public function register(Request $request)
-    {
-        try {
-            $data = $request->validate([
-                'first_name' => 'required|string|max:255',
-                'last_name' => 'required|string|max:255',
-                'email' => 'required|email|unique:users,email|unique:candidates,email',
-                'phone' => 'required|string|max:20|unique:candidates,phone',
-                'password' => 'required|string|min:8|confirmed',
-                'date_of_birth' => 'required|date|before:today',
-                'gender' => 'required|in:male,female',
-                'state_lga_id' => 'required|exists:states_lgas,id',
-                // Theme preferences
-                'theme' => 'sometimes|string|in:light,dark,transparent',
-                'language' => 'sometimes|string',
-                'primary_color' => 'sometimes|string',
-            ]);
+    // /**
+    //  * Handle user registration (candidates only).
+    //  */
+    // public function register(Request $request)
+    // {
+    //     try {
+    //         $data = $request->validate([
+    //             'first_name' => 'required|string|max:255',
+    //             'last_name' => 'required|string|max:255',
+    //             'email' => 'required|email|unique:users,email|unique:candidates,email',
+    //             'phone' => 'required|string|max:20|unique:candidates,phone',
+    //             'password' => 'required|string|min:8|confirmed',
+    //             'date_of_birth' => 'required|date|before:today',
+    //             'gender' => 'required|in:male,female',
+    //             'state_lga_id' => 'required|exists:states_lgas,id',
+    //             // Theme preferences
+    //             'theme' => 'sometimes|string|in:light,dark,transparent',
+    //             'language' => 'sometimes|string',
+    //             'primary_color' => 'sometimes|string',
+    //         ]);
 
-            DB::beginTransaction();
+    //         DB::beginTransaction();
 
-            // Create candidate profile first
-            $candidateId = DB::table('candidates')->insertGetId([
-                'first_name' => $data['first_name'],
-                'last_name' => $data['last_name'],
-                'email' => $data['email'],
-                'phone' => $data['phone'],
-                'date_of_birth' => $data['date_of_birth'],
-                'gender' => $data['gender'],
-                'state_lga_id' => $data['state_lga_id'],
-                'registration_status' => 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+    //         // Create candidate profile first
+    //         $candidateId = DB::table('candidates')->insertGetId([
+    //             'first_name' => $data['first_name'],
+    //             'last_name' => $data['last_name'],
+    //             'email' => $data['email'],
+    //             'phone' => $data['phone'],
+    //             'date_of_birth' => $data['date_of_birth'],
+    //             'gender' => $data['gender'],
+    //             'state_lga_id' => $data['state_lga_id'],
+    //             'registration_status' => 'active',
+    //             'created_at' => now(),
+    //             'updated_at' => now(),
+    //         ]);
 
-            // Prepare preferences
-            $preferences = [
-                'theme' => $data['theme'] ?? 'light',
-                'language' => $data['language'] ?? 'en',
-                'primary_color' => $data['primary_color'] ?? '#6366f1',
-            ];
+    //         // Prepare preferences
+    //         $preferences = [
+    //             'theme' => $data['theme'] ?? 'light',
+    //             'language' => $data['language'] ?? 'en',
+    //             'primary_color' => $data['primary_color'] ?? '#6366f1',
+    //         ];
 
-            // ✅ Create user record with candidate profile_id
-            $userId = DB::table('users')->insertGetId([
-                'name' => $data['first_name'] . ' ' . $data['last_name'],
-                'email' => $data['email'],
-                'username' => strtolower($data['first_name'] . '.' . $data['last_name']),
-                'email_verified_at' => now(),
-                'password' => Hash::make($data['password']),
-                'role' => 'candidate',
-                'user_type' => 'candidate',
-                'profile_id' => $candidateId, // ✅ Link to candidate profile
-                'is_active' => true,
-                'preferences' => json_encode($preferences),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+    //         // ✅ Create user record with candidate profile_id
+    //         $userId = DB::table('users')->insertGetId([
+    //             'name' => $data['first_name'] . ' ' . $data['last_name'],
+    //             'email' => $data['email'],
+    //             'username' => strtolower($data['first_name'] . '.' . $data['last_name']),
+    //             'email_verified_at' => now(),
+    //             'password' => Hash::make($data['password']),
+    //             'role' => 'candidate',
+    //             'user_type' => 'candidate',
+    //             'profile_id' => $candidateId, // ✅ Link to candidate profile
+    //             'is_active' => true,
+    //             'preferences' => json_encode($preferences),
+    //             'created_at' => now(),
+    //             'updated_at' => now(),
+    //         ]);
 
-            // Create user model instance for authentication
-            $user = User::find($userId);
-            Auth::login($user);
-            $request->session()->regenerate();
+    //         // Create user model instance for authentication
+    //         $user = User::find($userId);
+    //         Auth::login($user);
+    //         $request->session()->regenerate();
 
-            DB::commit();
+    //         DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Registration successful',
-                'user' => [
-                    'id' => $user->id,
-                    'user_id' => $userId,
-                    'profile_id' => $candidateId, // ✅ Return profile_id
-                    'name' => $data['first_name'] . ' ' . $data['last_name'],
-                    'email' => $data['email'],
-                    'user_type' => 'candidate',
-                    'dashboard_type' => 'candidate',
-                    'preferences' => $preferences,
-                ],
-                'candidate_id' => $candidateId,
-            ], 201);
-        } catch (ValidationException $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Registration failed: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
+    //         return response()->json([
+    //             'success' => true,
+    //             'message' => 'Registration successful',
+    //             'user' => [
+    //                 'id' => $user->id,
+    //                 'user_id' => $userId,
+    //                 'profile_id' => $candidateId, // ✅ Return profile_id
+    //                 'name' => $data['first_name'] . ' ' . $data['last_name'],
+    //                 'email' => $data['email'],
+    //                 'user_type' => 'candidate',
+    //                 'dashboard_type' => 'candidate',
+    //                 'preferences' => $preferences,
+    //             ],
+    //             'candidate_id' => $candidateId,
+    //         ], 201);
+    //     } catch (ValidationException $e) {
+    //         DB::rollBack();
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Validation failed',
+    //             'errors' => $e->errors(),
+    //         ], 422);
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Registration failed: ' . $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
 
     /**
      * Return the currently authenticated user.
@@ -360,7 +401,7 @@ class AuthController extends Controller
             if (in_array($user->user_type, ['staff', 'admin']) && $user->profile_id) {
                 $profileInfo = DB::table('staff')
                     ->where('id', $user->profile_id)
-                    ->select('id', 'employee_code', 'client_id', 'department', 'designation', 'status')
+                    ->select('id', 'employee_code', 'client_id', 'department', 'status')
                     ->first();
             } elseif ($user->user_type === 'candidate' && $user->profile_id) {
                 $profileInfo = DB::table('candidates')
@@ -470,78 +511,76 @@ class AuthController extends Controller
 
 
     /**
-<<<<<<< HEAD
-=======
      * Register a new candidate - FIXED for current database schema
      */
     public function register(Request $request)
-{
-    try {
-        $data = $request->validate([
-            'email'    => 'required|email|unique:candidates,email|unique:users,email',
-            'password' => 'required|string|min:8|confirmed',
-            'first_name' => 'required|string|max:255',
-            'last_name'  => 'required|string|max:255',
-            'phone'      => 'sometimes|string|max:20',
-            'date_of_birth' => 'sometimes|date',
-            // Theme preferences (optional)
-            'theme' => 'sometimes|string|in:light,dark,transparent',
-            'language' => 'sometimes|string',
-            'primary_color' => 'sometimes|string',
-        ]);
+    {
+        try {
+            $data = $request->validate([
+                'email'    => 'required|email|unique:candidates,email|unique:users,email',
+                'password' => 'required|string|min:8|confirmed',
+                'first_name' => 'required|string|max:255',
+                'last_name'  => 'required|string|max:255',
+                'phone'      => 'sometimes|string|max:20',
+                'date_of_birth' => 'sometimes|date',
+                // Theme preferences (optional)
+                'theme' => 'sometimes|string|in:light,dark,transparent',
+                'language' => 'sometimes|string',
+                'primary_color' => 'sometimes|string',
+            ]);
 
-        DB::beginTransaction();
+            DB::beginTransaction();
 
-        // ✅ Create users record first
-        $preferences = [
-            'theme' => $data['theme'] ?? 'light',
-            'language' => $data['language'] ?? 'en',
-            'primary_color' => $data['primary_color'] ?? '#6366f1',
-        ];
+            // ✅ Create users record first
+            $preferences = [
+                'theme' => $data['theme'] ?? 'light',
+                'language' => $data['language'] ?? 'en',
+                'primary_color' => $data['primary_color'] ?? '#6366f1',
+            ];
 
-        // ✅ FIXED: Create users record with correct field mapping
-        $userId = DB::table('users')->insertGetId([
-            'name' => $data['first_name'] . ' ' . $data['last_name'],
-            'email' => $data['email'],
-            'username' => strtolower($data['first_name'] . '.' . $data['last_name']),
-            'email_verified_at' => now(),
-            'password' => Hash::make($data['password']),
-            'role' => 'candidate',
-            'user_type' => 'candidate',
-            'profile_id' => null,
-            'is_active' => true,
-            'preferences' => json_encode($preferences), // ✅ Store as JSON
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-    
-        // ✅Create candidate record using same ID as user
-        DB::table('candidates')->insert([
-            'id' => $userId, // shared PK
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-            'first_name' => $data['first_name'],
-            'last_name' => $data['last_name'],
-            'phone' => $data['phone'] ?? null,
-            'date_of_birth' => $data['date_of_birth'] ?? null,
-            'profile_completed' => false,
-            'status' => 'active',
-            'created_at' => now(),  
-            'updated_at' => now(),
-        ]);
+            // ✅ FIXED: Create users record with correct field mapping
+            $userId = DB::table('users')->insertGetId([
+                'name' => $data['first_name'] . ' ' . $data['last_name'],
+                'email' => $data['email'],
+                'username' => strtolower($data['first_name'] . '.' . $data['last_name']),
+                'email_verified_at' => now(),
+                'password' => Hash::make($data['password']),
+                'role' => 'candidate',
+                'user_type' => 'candidate',
+                'profile_id' => null,
+                'is_active' => true,
+                'preferences' => json_encode($preferences), // ✅ Store as JSON
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
 
-        $candidateId = $userId; // Use the same ID for candidate
+            // ✅Create candidate record using same ID as user
+            DB::table('candidates')->insert([
+                'id' => $userId, // shared PK
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'phone' => $data['phone'] ?? null,
+                'date_of_birth' => $data['date_of_birth'] ?? null,
+                'profile_completed' => false,
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
 
-        // update user's profile_id to point to candidate
-       // DB::table('users')->where('id', $userId)->update(['profile_id' => $candidateId]);
+            $candidateId = $userId; // Use the same ID for candidate
 
-        // ✅Create candidate profile
-        DB::table('candidate_profiles')->insert([
-            'candidate_id' => $candidateId, // Use the same ID as user
-            'nationality' => 'Nigeria',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            // update user's profile_id to point to candidate
+            // DB::table('users')->where('id', $userId)->update(['profile_id' => $candidateId]);
+
+            // ✅Create candidate profile
+            DB::table('candidate_profiles')->insert([
+                'candidate_id' => $candidateId, // Use the same ID as user
+                'nationality' => 'Nigeria',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
             // Create user model instance for authentication
             $user = User::find($userId);
             Auth::login($user);
@@ -580,7 +619,6 @@ class AuthController extends Controller
     }
 
     /**
->>>>>>> 70ef4b6fbc7621c6fed0a6e854f5dc2ce2221d77
      * Get user preferences with defaults.
      */
     private function getUserPreferences($user)

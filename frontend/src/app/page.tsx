@@ -24,7 +24,7 @@ export default function Home() {
           setApiStatus("✗ Error");
           setApiStatusColor("text-red-600");
         }
-      } catch (error) {
+      } catch {
         setApiStatus("✗ Offline");
         setApiStatusColor("text-red-600");
       }

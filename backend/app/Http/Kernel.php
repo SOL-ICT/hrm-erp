@@ -46,7 +46,7 @@ class Kernel extends HttpKernel
             AddQueuedCookiesToResponse::class,
             StartSession::class,
             ShareErrorsFromSession::class,
-            // VerifyCsrfToken::class,
+            VerifyCsrfToken::class, // Re-enabled with our granular logic
             SubstituteBindings::class,
         ],
 

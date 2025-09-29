@@ -1,0 +1,39 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('staff_experience', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('staff_id');
+            $table->string('employer_name');
+            $table->string('designation');
+            $table->date('start_date');
+            $table->date('end_date')->nullable();
+            $table->text('job_description')->nullable();
+            $table->string('reason_for_leaving')->nullable();
+            $table->decimal('last_salary', 12, 2)->nullable();
+            $table->tinyInteger('experience_order')->default(1);
+            $table->timestamps();
+
+            $table->foreign('staff_id')->references('id')->on('staff')->onDelete('cascade');
+            $table->index('staff_id');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('staff_experience');
+    }
+};

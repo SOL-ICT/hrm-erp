@@ -61,9 +61,50 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
   // Load initial data
   useEffect(() => {
     loadOffices();
-    loadStatesAndLGAs();
     loadStatistics();
   }, []);
+
+  // Robust: Load states/LGAs every time modal opens, with error handling
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStates = async () => {
+      if (showForm) {
+        try {
+          console.log("[SOLMaster] Fetching states and LGAs...");
+          const response = await solOfficeAPI.getStatesAndLGAs();
+          const statesData = response.states || [];
+          const mappedStates = statesData.map((state) => ({
+            name: state.state,
+            code: state.code,
+            zone: state.zone || "",
+            lgas: state.lgas || [],
+          }));
+          console.log("[SOLMaster] Mapped states:", mappedStates);
+          if (isMounted) setStates(mappedStates);
+          // Flatten LGAs for easier access
+          const lgasData = [];
+          mappedStates.forEach((state) => {
+            if (Array.isArray(state.lgas)) {
+              state.lgas.forEach((lga) => {
+                lgasData.push({
+                  name: lga.name,
+                  code: lga.code,
+                  state_code: state.code,
+                  isCapital: lga.isCapital,
+                });
+              });
+            }
+          });
+          if (isMounted) setLgas(lgasData);
+        } catch (error) {
+          console.error("[SOLMaster] Error loading states and LGAs:", error);
+          if (isMounted) setStates([]);
+        }
+      }
+    };
+    fetchStates();
+    return () => { isMounted = false; };
+  }, [showForm]);
 
   useEffect(() => {
     const delayedSearch = setTimeout(() => {
@@ -95,36 +136,33 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
 
   const loadStatesAndLGAs = async () => {
     try {
+  console.log("[SOLMaster] Fetching states and LGAs...");
       const response = await solOfficeAPI.getStatesAndLGAs();
-      const statesData = response.data;
-
-      // Extract unique states with their zones
-      const uniqueStates = [];
-      const stateMap = new Map();
-      statesData.forEach((item) => {
-        if (!stateMap.has(item.state_code)) {
-          stateMap.set(item.state_code, {
-            name: item.state_name,
-            code: item.state_code,
-            zone: item.zone, // Map the zone to the state
-          });
-          uniqueStates.push({
-            name: item.state_name,
-            code: item.state_code,
-            zone: item.zone,
+      const statesData = response.data?.states || [];
+      // Map backend state objects to expected frontend format
+      const mappedStates = statesData.map((state) => ({
+        name: state.state, // backend uses 'state', frontend expects 'name'
+        code: state.code,
+        zone: state.zone || "",
+        lgas: state.lgas || [],
+      }));
+  console.log("[SOLMaster] Mapped states:", mappedStates);
+      setStates(mappedStates);
+      // Flatten LGAs for easier access
+      const lgasData = [];
+      mappedStates.forEach((state) => {
+        if (Array.isArray(state.lgas)) {
+          state.lgas.forEach((lga) => {
+            lgasData.push({
+              name: lga.name,
+              code: lga.code,
+              state_code: state.code,
+              isCapital: lga.isCapital,
+            });
           });
         }
       });
-      setStates(uniqueStates);
-
-      // Set LGAs without zone (since zone is state-dependent)
-      const lgasData = statesData.map((item) => ({
-        name: item.lga_name,
-        code:
-          item.lga_code ||
-          `${item.state_code}${Math.random().toString(36).substr(2, 2)}`,
-        state_code: item.state_code,
-      }));
+  console.log("[SOLMaster] Flattened LGAs:", lgasData);
       setLgas(lgasData);
     } catch (error) {
       console.error("Error loading states and LGAs:", error);
@@ -189,7 +227,7 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
         setFormData((prev) => ({
           ...prev,
           state_name: selectedState.name,
-          zone: selectedState.zone || "",
+          zone: selectedState.zone ? selectedState.zone.replace(/_/g, " ").toUpperCase() : "",
         }));
       }
     }
@@ -209,10 +247,18 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
     setFormLoading(true);
 
     try {
+      // Patch: Ensure zone is sent in backend format (lowercase, underscores)
+      const patchedFormData = {
+        ...formData,
+        zone:
+          formData.zone && typeof formData.zone === "string"
+            ? formData.zone.replace(/\s+/g, "_").toLowerCase()
+            : formData.zone,
+      };
       if (editingOffice) {
-        await solOfficeAPI.update(editingOffice.id, formData);
+        await solOfficeAPI.update(editingOffice.id, patchedFormData);
       } else {
-        await solOfficeAPI.create(formData);
+        await solOfficeAPI.create(patchedFormData);
       }
 
       loadOffices();
@@ -624,20 +670,28 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
                 >
                   State *
                 </label>
-                <select
-                  name="state_code"
-                  value={formData.state_code}
-                  onChange={handleInputChange}
-                  required
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentTheme.border}`}
-                >
-                  <option value="">Select state</option>
-                  {states.map((state) => (
-                    <option key={state.code} value={state.code}>
-                      {state.name}
-                    </option>
-                  ))}
-                </select>
+                {/* Debug log for modal rendering */}
+                {console.log("[SOLMaster Modal] States for dropdown:", states)}
+                {states.length === 0 ? (
+                  <div className="py-2 text-center text-gray-500">
+                    Loading states...
+                  </div>
+                ) : (
+                  <select
+                    name="state_code"
+                    value={formData.state_code}
+                    onChange={handleInputChange}
+                    required
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentTheme.border}`}
+                  >
+                    <option value="">Select state</option>
+                    {states.map((state) => (
+                      <option key={state.code} value={state.code}>
+                        {state.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Zone (Auto-filled) */}
@@ -650,7 +704,7 @@ const SOLMaster = ({ currentTheme, preferences, onBack }) => {
                 <input
                   type="text"
                   name="zone"
-                  value={formData.zone?.replace("_", " ").toUpperCase()}
+                  value={formData.zone}
                   readOnly
                   className={`w-full px-3 py-2 border rounded-lg bg-gray-50 ${currentTheme.border}`}
                   placeholder="Auto-filled based on state"

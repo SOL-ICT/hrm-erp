@@ -17,6 +17,9 @@ import {
   Check,
   AlertCircle,
   Filter,
+  Save,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { useClients, useUtilityData } from "@/hooks/useClients";
 
@@ -31,7 +34,6 @@ const ClientMaster = ({ currentTheme, onClose }) => {
     updateClient,
     deleteClient,
     toggleStatus,
-    uploadLogo,
     fetchClients,
   } = useClients();
 
@@ -44,24 +46,18 @@ const ClientMaster = ({ currentTheme, onClose }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedRows, setExpandedRows] = useState(new Set());
 
   const [formData, setFormData] = useState({
-    client_code: "",
-    name: "",
-    alias: "",
-    address: "",
-    state_lga_id: "",
-    contact_person: "",
+    organisation_name: "",
+    cac_registration_number: "",
+    head_office_address: "",
+    phone: "",
     industry_category: "",
     client_category: "",
-    pay_structure: false,
-    client_status: "Client",
-    opening_balance: 0,
-    currency: "Dr",
-    logoFile: null,
-    is_active: true,
-    contract_start_date: "",
-    contract_end_date: "",
+    pay_calculation_basis: "working_days",
+    status: "active",
+    contracts: [],
   });
 
   const [errors, setErrors] = useState({});
@@ -75,13 +71,13 @@ const ClientMaster = ({ currentTheme, onClose }) => {
     if (searchTerm) {
       filtered = filtered.filter(
         (client) =>
-          client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          client.client_code
+          client.organisation_name
             ?.toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
-          client.configuration?.contact_person
+          client.cac_registration_number
             ?.toLowerCase()
-            .includes(searchTerm.toLowerCase())
+            .includes(searchTerm.toLowerCase()) ||
+          client.phone?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -90,16 +86,17 @@ const ClientMaster = ({ currentTheme, onClose }) => {
       filtered = filtered.filter((client) => {
         if (filter === "active") return client.status === "active";
         if (filter === "inactive") return client.status === "inactive";
-        if (filter === "client")
-          return client.configuration?.client_status === "Client";
-        if (filter === "sundry")
-          return client.configuration?.client_status === "Sundry Customer";
         return true;
       });
     }
 
     setFilteredClients(filtered);
   }, [searchTerm, filter, clients]);
+
+  // Initialize data on component mount
+  useEffect(() => {
+    fetchClients();
+  }, []);
 
   // Handle search and filter changes
   const handleSearch = (term) => {
@@ -117,11 +114,8 @@ const ClientMaster = ({ currentTheme, onClose }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.name.trim()) newErrors.name = "Client name is required";
-    if (!formData.client_code.trim())
-      newErrors.client_code = "Client code is required";
-    if (!formData.contact_person.trim())
-      newErrors.contact_person = "Contact person is required";
+    if (!formData.organisation_name.trim())
+      newErrors.organisation_name = "Organisation name is required";
     if (!formData.industry_category)
       newErrors.industry_category = "Industry category is required";
     if (!formData.client_category)
@@ -139,34 +133,17 @@ const ClientMaster = ({ currentTheme, onClose }) => {
     setSubmitLoading(true);
 
     try {
-      // Handle logo upload first if there's a file
-      let logoPath = null;
-      if (formData.logoFile) {
-        const uploadResult = await uploadLogo(formData.logoFile);
-        if (uploadResult.success) {
-          logoPath = uploadResult.data.path;
-        }
-      }
-
       // Prepare client data for API
       const clientData = {
-        client_code: formData.client_code.toUpperCase(),
-        name: formData.name,
-        alias: formData.alias,
-        prefix: formData.client_code.substring(0, 3).toUpperCase(),
-        address: formData.address,
-        state_lga_id: formData.state_lga_id || null,
-        contact_person: formData.contact_person,
+        organisation_name: formData.organisation_name,
+        cac_registration_number: formData.cac_registration_number,
+        head_office_address: formData.head_office_address,
+        phone: formData.phone,
         industry_category: formData.industry_category,
         client_category: formData.client_category,
-        pay_structure: formData.pay_structure,
-        client_status: formData.client_status,
-        opening_balance: parseFloat(formData.opening_balance) || 0,
-        currency: formData.currency,
-        is_active: formData.is_active,
-        contract_start_date: formData.contract_start_date || null,
-        contract_end_date: formData.contract_end_date || null,
-        logo_path: logoPath,
+        pay_calculation_basis: formData.pay_calculation_basis,
+        status: formData.status,
+        contracts: formData.contracts,
       };
 
       if (isEditMode) {
@@ -191,47 +168,63 @@ const ClientMaster = ({ currentTheme, onClose }) => {
 
   const resetForm = () => {
     setFormData({
-      client_code: "",
-      name: "",
-      alias: "",
-      address: "",
-      state_lga_id: "",
-      contact_person: "",
+      organisation_name: "",
+      cac_registration_number: "",
+      head_office_address: "",
+      phone: "",
       industry_category: "",
       client_category: "",
-      pay_structure: false,
-      client_status: "Client",
-      opening_balance: 0,
-      currency: "Dr",
-      logoFile: null,
-      is_active: true,
-      contract_start_date: "",
-      contract_end_date: "",
+      pay_calculation_basis: "working_days",
+      status: "active",
+      contracts: [],
     });
     setErrors({});
     setIsEditMode(false);
     setSelectedClient(null);
   };
 
+  // Helper function to format date for HTML date input
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return "";
+    // Extract just the date part (YYYY-MM-DD) from datetime string
+    return dateString.split("T")[0];
+  };
+
+  // Helper function to format date for display (user-friendly format)
+  const formatDateForDisplay = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      // Extract just the date part and format it nicely
+      const date = new Date(dateString.split("T")[0]);
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch (error) {
+      // Fallback to just the date part if parsing fails
+      return dateString.split("T")[0];
+    }
+  };
+
   const handleEdit = (client) => {
-    const config = client.configuration || {};
+    // Format contract dates for HTML date inputs
+    const formattedContracts = (client.contracts || []).map((contract) => ({
+      ...contract,
+      contract_start_date: formatDateForInput(contract.contract_start_date),
+      contract_end_date: formatDateForInput(contract.contract_end_date),
+    }));
+
     setFormData({
-      client_code: client.client_code || "",
-      name: client.name || "",
-      alias: config.alias || "",
-      address: client.address || "",
-      state_lga_id: client.state_lga_id || "",
-      contact_person: config.contact_person || "",
-      industry_category: config.industry_category || "",
-      client_category: config.client_category || "",
-      pay_structure: config.pay_structure || false,
-      client_status: config.client_status || "Client",
-      opening_balance: config.opening_balance || 0,
-      currency: config.currency || "Dr",
-      logoFile: null,
-      is_active: client.status === "active",
-      contract_start_date: client.contract_start_date || "",
-      contract_end_date: client.contract_end_date || "",
+      organisation_name: client.organisation_name || "",
+      cac_registration_number: client.cac_registration_number || "",
+      head_office_address: client.head_office_address || "",
+      phone: client.phone || "",
+      industry_category: client.industry_category || "",
+      client_category: client.client_category || "",
+      pay_calculation_basis: client.pay_calculation_basis || "working_days",
+      status: client.status || "active",
+      contracts: formattedContracts,
     });
     setSelectedClient(client);
     setIsEditMode(true);
@@ -254,893 +247,1113 @@ const ClientMaster = ({ currentTheme, onClose }) => {
       const newStatus = currentStatus === "active" ? "inactive" : "active";
       await toggleStatus(clientId, newStatus);
     } catch (error) {
-      console.error("Error toggling status:", error);
-      alert("Failed to toggle status: " + error.message);
+      console.error("Error toggling client status:", error);
+      alert("Failed to update client status: " + error.message);
     }
   };
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Validate file size (2MB max)
-      if (file.size > 2 * 1024 * 1024) {
-        alert("File size must be less than 2MB");
-        return;
-      }
-
-      // Validate file type
-      const allowedTypes = [
-        "image/jpeg",
-        "image/png",
-        "image/jpg",
-        "image/gif",
-        "image/svg+xml",
-      ];
-      if (!allowedTypes.includes(file.type)) {
-        alert("Please upload a valid image file (JPEG, PNG, JPG, GIF, SVG)");
-        return;
-      }
-
-      setFormData((prev) => ({ ...prev, logoFile: file }));
-    }
-  };
-
-  const getClientDisplayData = (client) => {
-    const config = client.configuration || {};
-    return {
-      ...client,
-      contactPerson: config.contact_person || "N/A",
-      industryCategory: config.industry_category || "N/A",
-      clientCategory: config.client_category || "N/A",
-      payStructure: config.pay_structure || false,
-      clientStatus: config.client_status || "Client",
-      openingBalance: config.opening_balance || 0,
-      currency: config.currency || "Dr",
-      isActive: client.status === "active",
+  const addContract = () => {
+    const newContract = {
+      id: null, // New contract
+      service_type: "",
+      contract_start_date: "",
+      contract_end_date: "",
+      status: "active",
+      notes: "",
     };
+    setFormData((prev) => ({
+      ...prev,
+      contracts: [...prev.contracts, newContract],
+    }));
   };
 
-  // Render directly as Client Master (no dashboard)
-  return (
-    <div className={`min-h-screen ${currentTheme.bg} p-6`}>
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 rounded-xl bg-blue-600 text-white">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className={`text-3xl font-bold ${currentTheme.textPrimary}`}>
-                Client Master
-              </h1>
-              <p className={`${currentTheme.textSecondary} mt-1`}>
-                Manage client information and profiles
-              </p>
+  const removeContract = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      contracts: prev.contracts.filter((_, i) => i !== index),
+    }));
+  };
+
+  const updateContract = (index, field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      contracts: prev.contracts.map((contract, i) =>
+        i === index ? { ...contract, [field]: value } : contract
+      ),
+    }));
+  };
+
+  const toggleRowExpansion = (clientId) => {
+    setExpandedRows((prev) => {
+      const newExpandedRows = new Set(prev);
+      if (newExpandedRows.has(clientId)) {
+        newExpandedRows.delete(clientId);
+      } else {
+        newExpandedRows.add(clientId);
+      }
+      return newExpandedRows;
+    });
+  };
+
+  // Main render - show form modal if open
+  if (isAddModalOpen) {
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+          {/* Modal Header */}
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 text-white">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold">
+                {isEditMode ? "Edit Client" : "Add New Client"}
+              </h2>
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className={`p-2 rounded-lg ${currentTheme.hover} ${currentTheme.textSecondary} hover:text-red-500 transition-colors`}
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
           </div>
 
+          {/* Modal Body */}
+          <form onSubmit={handleSubmit} className="p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left Column */}
+              <div className="space-y-6">
+                {/* Basic Information */}
+                <div
+                  className={`p-4 rounded-xl border ${currentTheme.border} bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-900/20`}
+                >
+                  <h3
+                    className={`text-lg font-semibold ${currentTheme.textPrimary} mb-4 flex items-center`}
+                  >
+                    <Building2 className="w-5 h-5 mr-2 text-blue-600" />
+                    Basic Information
+                  </h3>
+
+                  {/* Organisation Name - FIRST POSITION */}
+                  <div className="mb-4">
+                    <label
+                      className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                    >
+                      Name of Organisation *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.organisation_name}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          organisation_name: e.target.value,
+                        }))
+                      }
+                      className={`w-full px-4 py-3 rounded-lg border ${
+                        errors.organisation_name
+                          ? "border-red-500"
+                          : currentTheme.border
+                      } ${currentTheme.cardBg} ${
+                        currentTheme.textPrimary
+                      } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      placeholder="Enter organisation name"
+                    />
+                    {errors.organisation_name && (
+                      <p className="text-red-500 text-sm mt-1 flex items-center">
+                        <AlertCircle className="w-4 h-4 mr-1" />
+                        {errors.organisation_name}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label
+                        className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                      >
+                        CAC Registration Number
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.cac_registration_number || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            cac_registration_number: e.target.value,
+                          }))
+                        }
+                        className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        placeholder="CAC Registration Number"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                      >
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={formData.phone || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            phone: e.target.value,
+                          }))
+                        }
+                        className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        placeholder="Phone number"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label
+                      className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                    >
+                      Head Office Address
+                    </label>
+                    <textarea
+                      value={formData.head_office_address}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          head_office_address: e.target.value,
+                        }))
+                      }
+                      rows={3}
+                      className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`}
+                      placeholder="Head office address"
+                    />
+                  </div>
+                </div>
+
+                {/* Contact & Category */}
+                <div
+                  className={`p-4 rounded-xl border ${currentTheme.border} bg-gradient-to-r from-green-50/50 to-transparent dark:from-green-900/20`}
+                >
+                  <h3
+                    className={`text-lg font-semibold ${currentTheme.textPrimary} mb-4 flex items-center`}
+                  >
+                    <Phone className="w-5 h-5 mr-2 text-green-600" />
+                    Classification
+                  </h3>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label
+                        className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                      >
+                        Industry Category *
+                      </label>
+                      <select
+                        value={formData.industry_category}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            industry_category: e.target.value,
+                          }))
+                        }
+                        className={`w-full px-4 py-3 rounded-lg border ${
+                          errors.industry_category
+                            ? "border-red-500"
+                            : currentTheme.border
+                        } ${currentTheme.cardBg} ${
+                          currentTheme.textPrimary
+                        } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      >
+                        <option value="">Select Industry</option>
+                        {industryCategories.map((category) => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.industry_category && (
+                        <p className="text-red-500 text-sm mt-1 flex items-center">
+                          <AlertCircle className="w-4 h-4 mr-1" />
+                          {errors.industry_category}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label
+                        className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                      >
+                        Business Entity Type *
+                      </label>
+                      <select
+                        value={formData.client_category}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            client_category: e.target.value,
+                          }))
+                        }
+                        className={`w-full px-4 py-3 rounded-lg border ${
+                          errors.client_category
+                            ? "border-red-500"
+                            : currentTheme.border
+                        } ${currentTheme.cardBg} ${
+                          currentTheme.textPrimary
+                        } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      >
+                        <option value="">Select Business Entity Type</option>
+                        {clientCategories.map((category) => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.client_category && (
+                        <p className="text-red-500 text-sm mt-1 flex items-center">
+                          <AlertCircle className="w-4 h-4 mr-1" />
+                          {errors.client_category}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Pay Calculation Basis */}
+                    <div>
+                      <label
+                        className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                      >
+                        Pay Calculation Basis *
+                      </label>
+                      <select
+                        value={formData.pay_calculation_basis}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            pay_calculation_basis: e.target.value,
+                          }))
+                        }
+                        className={`w-full px-4 py-3 rounded-lg border ${
+                          errors.pay_calculation_basis
+                            ? "border-red-500"
+                            : currentTheme.border
+                        } ${currentTheme.cardBg} ${
+                          currentTheme.textPrimary
+                        } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      >
+                        <option value="working_days">
+                          Working Days (Monday-Friday)
+                        </option>
+                        <option value="calendar_days">
+                          Calendar Days (Full Month)
+                        </option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Basis for payroll calculations and invoicing
+                      </p>
+                      {errors.pay_calculation_basis && (
+                        <p className="text-red-500 text-sm mt-1 flex items-center">
+                          <AlertCircle className="w-4 h-4 mr-1" />
+                          {errors.pay_calculation_basis}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column - Contract Management */}
+              <div className="space-y-6">
+                {/* Contract Management */}
+                <div
+                  className={`p-4 rounded-xl border ${currentTheme.border} bg-gradient-to-r from-purple-50/50 to-transparent dark:from-purple-900/20`}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h3
+                      className={`text-lg font-semibold ${currentTheme.textPrimary} flex items-center`}
+                    >
+                      <DollarSign className="w-5 h-5 mr-2 text-purple-600" />
+                      Client Contracts
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={addContract}
+                      className="flex items-center space-x-2 bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Add Contract</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                    {formData.contracts.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <DollarSign className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                        <p>No contracts added yet</p>
+                        <p className="text-sm">
+                          Click "Add Contract" to get started
+                        </p>
+                      </div>
+                    ) : (
+                      formData.contracts.map((contract, index) => (
+                        <div
+                          key={index}
+                          className={`p-4 border ${currentTheme.border} rounded-lg bg-white dark:bg-gray-800 space-y-3`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <h4
+                              className={`font-medium ${currentTheme.textPrimary}`}
+                            >
+                              Contract {index + 1}
+                            </h4>
+                            <button
+                              type="button"
+                              onClick={() => removeContract(index)}
+                              className="text-red-600 hover:bg-red-50 p-1 rounded transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label
+                                className={`block text-xs font-medium ${currentTheme.textPrimary} mb-1`}
+                              >
+                                Service Type
+                              </label>
+                              <select
+                                value={contract.service_type}
+                                onChange={(e) =>
+                                  updateContract(
+                                    index,
+                                    "service_type",
+                                    e.target.value
+                                  )
+                                }
+                                className={`w-full px-3 py-2 rounded border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} text-sm focus:outline-none focus:ring-1 focus:ring-purple-500`}
+                              >
+                                <option value="">Select Service Type</option>
+                                <option value="Recruitment Service">
+                                  Recruitment Service
+                                </option>
+                                <option value="Temporary Staff Service">
+                                  Temporary Staff Service
+                                </option>
+                                <option value="Managed Staff Service">
+                                  Managed Staff Service
+                                </option>
+                                <option value="Payroll Services">
+                                  Payroll Services
+                                </option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label
+                                className={`block text-xs font-medium ${currentTheme.textPrimary} mb-1`}
+                              >
+                                Status
+                              </label>
+                              <select
+                                value={contract.status}
+                                onChange={(e) =>
+                                  updateContract(
+                                    index,
+                                    "status",
+                                    e.target.value
+                                  )
+                                }
+                                className={`w-full px-3 py-2 rounded border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} text-sm focus:outline-none focus:ring-1 focus:ring-purple-500`}
+                              >
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="expired">Expired</option>
+                                <option value="terminated">Terminated</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label
+                                className={`block text-xs font-medium ${currentTheme.textPrimary} mb-1`}
+                              >
+                                Start Date
+                              </label>
+                              <input
+                                type="date"
+                                value={contract.contract_start_date}
+                                onChange={(e) =>
+                                  updateContract(
+                                    index,
+                                    "contract_start_date",
+                                    e.target.value
+                                  )
+                                }
+                                className={`w-full px-3 py-2 rounded border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} text-sm focus:outline-none focus:ring-1 focus:ring-purple-500`}
+                              />
+                            </div>
+
+                            <div>
+                              <label
+                                className={`block text-xs font-medium ${currentTheme.textPrimary} mb-1`}
+                              >
+                                End Date
+                              </label>
+                              <input
+                                type="date"
+                                value={contract.contract_end_date}
+                                onChange={(e) =>
+                                  updateContract(
+                                    index,
+                                    "contract_end_date",
+                                    e.target.value
+                                  )
+                                }
+                                className={`w-full px-3 py-2 rounded border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} text-sm focus:outline-none focus:ring-1 focus:ring-purple-500`}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label
+                              className={`block text-xs font-medium ${currentTheme.textPrimary} mb-1`}
+                            >
+                              Notes
+                            </label>
+                            <textarea
+                              value={contract.notes || ""}
+                              onChange={(e) =>
+                                updateContract(index, "notes", e.target.value)
+                              }
+                              rows={2}
+                              className={`w-full px-3 py-2 rounded border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 resize-none`}
+                              placeholder="Contract notes..."
+                            />
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Status Toggle */}
+                <div
+                  className={`p-4 rounded-xl border ${currentTheme.border} bg-gradient-to-r from-gray-50/50 to-transparent dark:from-gray-900/20`}
+                >
+                  <h3
+                    className={`text-lg font-semibold ${currentTheme.textPrimary} mb-4`}
+                  >
+                    Status
+                  </h3>
+
+                  <div className="flex items-center space-x-3">
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.status === "active"}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            status: e.target.checked ? "active" : "inactive",
+                          }))
+                        }
+                        className="sr-only"
+                      />
+                      <div
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          formData.status === "active"
+                            ? "bg-green-500"
+                            : "bg-gray-300"
+                        }`}
+                      >
+                        <div
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            formData.status === "active"
+                              ? "translate-x-6"
+                              : "translate-x-1"
+                          }`}
+                        />
+                      </div>
+                      <span
+                        className={`ml-3 text-sm font-medium ${currentTheme.textPrimary}`}
+                      >
+                        {formData.status === "active" ? "Active" : "Inactive"}
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div className="mt-8 flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  resetForm();
+                }}
+                className="px-6 py-3 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitLoading}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+                {submitLoading && (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                )}
+                <Save className="w-4 h-4" />
+                <span>{isEditMode ? "Update Client" : "Save Client"}</span>
+              </button>
+            </div>
+
+            {errors.submit && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-600 text-sm">{errors.submit}</p>
+              </div>
+            )}
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Main component render
+  return (
+    <div className={`p-6 ${currentTheme.cardBg} min-h-screen`}>
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className={`text-3xl font-bold ${currentTheme.textPrimary}`}>
+              Client Master
+            </h1>
+            <p className={`text-sm ${currentTheme.textSecondary} mt-1`}>
+              Manage client information and configurations
+            </p>
+          </div>
           <button
-            onClick={onClose}
-            className={`p-2 rounded-lg ${currentTheme.hover} ${currentTheme.textSecondary} hover:text-red-500 transition-colors`}
+            onClick={() => {
+              resetForm();
+              setIsAddModalOpen(true);
+            }}
+            className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <Plus className="w-5 h-5" />
+            <span>Add Client</span>
           </button>
         </div>
       </div>
 
-      {/* Controls */}
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div
+          className={`p-6 rounded-xl border ${currentTheme.border} ${currentTheme.cardBg}`}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className={`text-sm ${currentTheme.textSecondary}`}>
+                Total Clients
+              </p>
+              <p className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
+                {statistics.totalClients || 0}
+              </p>
+            </div>
+            <Building2 className="w-10 h-10 text-blue-500" />
+          </div>
+        </div>
+
+        <div
+          className={`p-6 rounded-xl border ${currentTheme.border} ${currentTheme.cardBg}`}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className={`text-sm ${currentTheme.textSecondary}`}>
+                Active Clients
+              </p>
+              <p className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
+                {statistics.activeClients || 0}
+              </p>
+            </div>
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+              <Check className="w-6 h-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div
+          className={`p-6 rounded-xl border ${currentTheme.border} ${currentTheme.cardBg}`}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className={`text-sm ${currentTheme.textSecondary}`}>
+                Active Contracts
+              </p>
+              <p className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
+                {statistics.activeContracts || 0}
+              </p>
+            </div>
+            <DollarSign className="w-10 h-10 text-purple-500" />
+          </div>
+        </div>
+
+        <div
+          className={`p-6 rounded-xl border ${currentTheme.border} ${currentTheme.cardBg}`}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className={`text-sm ${currentTheme.textSecondary}`}>
+                Total Contracts
+              </p>
+              <p className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
+                {statistics.totalContracts || 0}
+              </p>
+            </div>
+            <Globe className="w-10 h-10 text-orange-500" />
+          </div>
+        </div>
+      </div>
+
+      {/* Search and Filter */}
       <div
-        className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 mb-6 backdrop-blur-md shadow-lg`}
+        className={`p-6 rounded-xl border ${currentTheme.border} ${currentTheme.cardBg} mb-6`}
       >
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-          {/* Search */}
-          <div className="relative flex-1 max-w-md">
-            <Search
-              className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${currentTheme.textMuted} w-4 h-4`}
-            />
-            <input
-              type="text"
-              placeholder="Search clients..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full pl-10 pr-4 py-2 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-            />
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search clients..."
+                value={searchTerm}
+                onChange={(e) => handleSearch(e.target.value)}
+                className={`w-full pl-10 pr-4 py-2 border ${currentTheme.border} rounded-lg ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              />
+            </div>
           </div>
 
-          {/* Filter & Add Button */}
           <div className="flex items-center space-x-4">
             <select
               value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className={`px-4 py-2 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              onChange={(e) => handleFilterChange(e.target.value)}
+              className={`px-4 py-2 border ${currentTheme.border} rounded-lg ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
             >
               <option value="all">All Clients</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
-              <option value="client">Clients</option>
-              <option value="sundry">Sundry Customers</option>
             </select>
-
-            <button
-              onClick={() => {
-                resetForm();
-                setIsAddModalOpen(true);
-              }}
-              className="flex items-center space-x-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Client</span>
-            </button>
           </div>
         </div>
       </div>
 
-      {/* Client Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredClients.map((client) => (
-          <div
-            key={client.id}
-            className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-6 backdrop-blur-md shadow-lg hover:shadow-xl transition-all duration-200 group`}
-          >
-            {/* Client Header */}
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg">
-                  {client.name.charAt(0)}
-                </div>
-                <div>
-                  <h3
-                    className={`font-semibold ${currentTheme.textPrimary} text-lg`}
-                  >
-                    {client.name}
-                  </h3>
-                  <p className={`text-sm ${currentTheme.textSecondary}`}>
-                    {client.clientCode}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={() => handleEdit(client)}
-                  className="p-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 transition-colors"
+      {/* Clients Table */}
+      <div
+        className={`rounded-xl border ${currentTheme.border} ${currentTheme.cardBg} overflow-hidden`}
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className={`bg-gray-50 dark:bg-gray-800`}>
+              <tr>
+                <th
+                  className={`px-6 py-4 text-left text-xs font-medium ${currentTheme.textSecondary} uppercase tracking-wider w-12`}
+                ></th>
+                <th
+                  className={`px-6 py-4 text-left text-xs font-medium ${currentTheme.textSecondary} uppercase tracking-wider`}
                 >
-                  <Edit3 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDelete(client.id)}
-                  className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 transition-colors"
+                  Organisation
+                </th>
+                <th
+                  className={`px-6 py-4 text-left text-xs font-medium ${currentTheme.textSecondary} uppercase tracking-wider`}
                 >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Client Info */}
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <MapPin className={`w-4 h-4 ${currentTheme.textMuted}`} />
-                <span
-                  className={`text-sm ${currentTheme.textSecondary} truncate`}
+                  Contact
+                </th>
+                <th
+                  className={`px-6 py-4 text-left text-xs font-medium ${currentTheme.textSecondary} uppercase tracking-wider`}
                 >
-                  {client.address || "No address provided"}
-                </span>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Building2 className={`w-4 h-4 ${currentTheme.textMuted}`} />
-                <span className={`text-sm ${currentTheme.textSecondary}`}>
-                  {client.industryCategory}
-                </span>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Phone className={`w-4 h-4 ${currentTheme.textMuted}`} />
-                <span className={`text-sm ${currentTheme.textSecondary}`}>
-                  {client.contactPerson}
-                </span>
-              </div>
-
-              {getClientDisplayData(client).openingBalance !== 0 && (
-                <div className="flex items-center space-x-2">
-                  <DollarSign className={`w-4 h-4 ${currentTheme.textMuted}`} />
-                  <span
-                    className={`text-sm font-medium ${
-                      getClientDisplayData(client).currency === "Dr"
-                        ? "text-red-600"
-                        : "text-green-600"
-                    }`}
-                  >
-                    ₦
-                    {getClientDisplayData(
-                      client
-                    ).openingBalance.toLocaleString()}{" "}
-                    ({getClientDisplayData(client).currency})
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Status Badges */}
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex space-x-2">
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    client.status === "Client"
-                      ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-                      : "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
-                  }`}
+                  Category
+                </th>
+                <th
+                  className={`px-6 py-4 text-left text-xs font-medium ${currentTheme.textSecondary} uppercase tracking-wider`}
                 >
-                  {client.status}
-                </span>
-
-                {client.payStructure && (
-                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                    Pay Structure
-                  </span>
-                )}
-              </div>
-
-              <div
-                className={`w-3 h-3 rounded-full ${
-                  client.isActive ? "bg-green-500" : "bg-red-500"
-                }`}
-                title={client.isActive ? "Active" : "Inactive"}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Add/Edit Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div
-            className={`${currentTheme.cardBg} rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto`}
-          >
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-inherit rounded-t-2xl border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-              <div className="flex items-center justify-between">
-                <h2
-                  className={`text-2xl font-bold ${currentTheme.textPrimary}`}
+                  Contracts
+                </th>
+                <th
+                  className={`px-6 py-4 text-left text-xs font-medium ${currentTheme.textSecondary} uppercase tracking-wider`}
                 >
-                  {isEditMode ? "Edit Client" : "Add New Client"}
-                </h2>
-                <button
-                  onClick={() => setIsAddModalOpen(false)}
-                  className={`p-2 rounded-lg ${currentTheme.hover} ${currentTheme.textSecondary} hover:text-red-500 transition-colors`}
+                  Status
+                </th>
+                <th
+                  className={`px-6 py-4 text-left text-xs font-medium ${currentTheme.textSecondary} uppercase tracking-wider`}
                 >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <form onSubmit={handleSubmit} className="p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left Column */}
-                <div className="space-y-6">
-                  {/* Basic Information */}
-                  <div
-                    className={`p-4 rounded-xl border ${currentTheme.border} bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-900/20`}
-                  >
-                    <h3
-                      className={`text-lg font-semibold ${currentTheme.textPrimary} mb-4 flex items-center`}
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className={`divide-y ${currentTheme.border}`}>
+              {loading ? (
+                <tr>
+                  <td colSpan="7" className="px-6 py-12 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                    <p className={`mt-2 text-sm ${currentTheme.textSecondary}`}>
+                      Loading clients...
+                    </p>
+                  </td>
+                </tr>
+              ) : filteredClients.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="px-6 py-12 text-center">
+                    <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p
+                      className={`text-lg font-medium ${currentTheme.textPrimary}`}
                     >
-                      <Building2 className="w-5 h-5 mr-2 text-blue-600" />
-                      Basic Information
-                    </h3>
+                      No clients found
+                    </p>
+                    <p className={`text-sm ${currentTheme.textSecondary}`}>
+                      {searchTerm || filter !== "all"
+                        ? "Try adjusting your search or filter criteria"
+                        : "Get started by adding your first client"}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                filteredClients.map((client) => {
+                  const isExpanded = expandedRows.has(client.id);
+                  const hasContracts =
+                    client.contracts && client.contracts.length > 0;
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label
-                          className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
-                        >
-                          Client Code *
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.clientCode}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              clientCode: e.target.value.toUpperCase(),
-                            }))
-                          }
-                          className={`w-full px-4 py-3 rounded-lg border ${
-                            errors.clientCode
-                              ? "border-red-500"
-                              : currentTheme.border
-                          } ${currentTheme.cardBg} ${
-                            currentTheme.textPrimary
-                          } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                          placeholder="e.g., ACC001"
-                        />
-                        {errors.clientCode && (
-                          <p className="text-red-500 text-sm mt-1 flex items-center">
-                            <AlertCircle className="w-4 h-4 mr-1" />
-                            {errors.clientCode}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label
-                          className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
-                        >
-                          PF Number
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.pfNo}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              pfNo: e.target.value,
-                            }))
-                          }
-                          className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                          placeholder="PF Number"
-                        />
-                      </div>
-
-                      <div>
-                        <label
-                          className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
-                        >
-                          Registration Number
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.regNo}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              regNo: e.target.value,
-                            }))
-                          }
-                          className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                          placeholder="Registration Number"
-                        />
-                      </div>
-
-                      <div>
-                        <label
-                          className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
-                        >
-                          FIRS Number
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.firsNo}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              firsNo: e.target.value,
-                            }))
-                          }
-                          className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                          placeholder="FIRS Number"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <label
-                        className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                  return (
+                    <React.Fragment key={client.id}>
+                      {/* Main Client Row */}
+                      <tr
+                        className={`hover:bg-gray-50 dark:hover:bg-gray-800/50`}
                       >
-                        Client/Customer Name *
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            name: e.target.value,
-                          }))
-                        }
-                        className={`w-full px-4 py-3 rounded-lg border ${
-                          errors.name ? "border-red-500" : currentTheme.border
-                        } ${currentTheme.cardBg} ${
-                          currentTheme.textPrimary
-                        } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                        placeholder="Enter client name"
-                      />
-                      {errors.name && (
-                        <p className="text-red-500 text-sm mt-1 flex items-center">
-                          <AlertCircle className="w-4 h-4 mr-1" />
-                          {errors.name}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="mt-4">
-                      <label
-                        className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
-                      >
-                        Alias
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.alias}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            alias: e.target.value,
-                          }))
-                        }
-                        className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                        placeholder="Client alias or short name"
-                      />
-                    </div>
-
-                    <div className="mt-4">
-                      <label
-                        className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
-                      >
-                        Address
-                      </label>
-                      <textarea
-                        value={formData.address}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            address: e.target.value,
-                          }))
-                        }
-                        rows={3}
-                        className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`}
-                        placeholder="Client address"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Contact & Category */}
-                  <div
-                    className={`p-4 rounded-xl border ${currentTheme.border} bg-gradient-to-r from-green-50/50 to-transparent dark:from-green-900/20`}
-                  >
-                    <h3
-                      className={`text-lg font-semibold ${currentTheme.textPrimary} mb-4 flex items-center`}
-                    >
-                      <Phone className="w-5 h-5 mr-2 text-green-600" />
-                      Contact & Classification
-                    </h3>
-
-                    <div className="space-y-4">
-                      <div>
-                        <label
-                          className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
-                        >
-                          Contact Person *
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.contactPerson}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              contactPerson: e.target.value,
-                            }))
-                          }
-                          className={`w-full px-4 py-3 rounded-lg border ${
-                            errors.contactPerson
-                              ? "border-red-500"
-                              : currentTheme.border
-                          } ${currentTheme.cardBg} ${
-                            currentTheme.textPrimary
-                          } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                          placeholder="Primary contact person"
-                        />
-                        {errors.contactPerson && (
-                          <p className="text-red-500 text-sm mt-1 flex items-center">
-                            <AlertCircle className="w-4 h-4 mr-1" />
-                            {errors.contactPerson}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label
-                          className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
-                        >
-                          Industry/Sector *
-                        </label>
-                        <select
-                          value={formData.industry_category}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              industry_category: e.target.value,
-                            }))
-                          }
-                          className={`w-full px-4 py-3 rounded-lg border ${
-                            errors.industry_category
-                              ? "border-red-500"
-                              : currentTheme.border
-                          } ${currentTheme.cardBg} ${
-                            currentTheme.textPrimary
-                          } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                        >
-                          <option value="">Select Industry</option>
-                          {industryCategories.map((industry) => (
-                            <option key={industry} value={industry}>
-                              {industry}
-                            </option>
-                          ))}
-                        </select>
-
-                        {errors.industryCategory && (
-                          <p className="text-red-500 text-sm mt-1 flex items-center">
-                            <AlertCircle className="w-4 h-4 mr-1" />
-                            {errors.industryCategory}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label
-                          className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
-                        >
-                          Client Category *
-                        </label>
-                        <select
-                          value={formData.client_category}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              client_category: e.target.value,
-                            }))
-                          }
-                          className={`w-full px-4 py-3 rounded-lg border ${
-                            errors.client_category
-                              ? "border-red-500"
-                              : currentTheme.border
-                          } ${currentTheme.cardBg} ${
-                            currentTheme.textPrimary
-                          } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                        >
-                          <option value="">Select Category</option>
-                          {clientCategories.map((category) => (
-                            <option key={category} value={category}>
-                              {category}
-                            </option>
-                          ))}
-                        </select>
-                        {errors.clientCategory && (
-                          <p className="text-red-500 text-sm mt-1 flex items-center">
-                            <AlertCircle className="w-4 h-4 mr-1" />
-                            {errors.clientCategory}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Column */}
-                <div className="space-y-6">
-                  {/* Settings & Status */}
-                  <div
-                    className={`p-4 rounded-xl border ${currentTheme.border} bg-gradient-to-r from-purple-50/50 to-transparent dark:from-purple-900/20`}
-                  >
-                    <h3
-                      className={`text-lg font-semibold ${currentTheme.textPrimary} mb-4 flex items-center`}
-                    >
-                      <DollarSign className="w-5 h-5 mr-2 text-purple-600" />
-                      Settings & Status
-                    </h3>
-
-                    <div className="space-y-4">
-                      {/* Pay Structure Toggle */}
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-white/50 dark:bg-gray-800/50">
-                        <div>
-                          <label
-                            className={`text-sm font-medium ${currentTheme.textPrimary}`}
-                          >
-                            Pay Structure
-                          </label>
-                          <p
-                            className={`text-xs ${currentTheme.textSecondary}`}
-                          >
-                            Enable structured payroll
-                          </p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={formData.payStructure}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                payStructure: e.target.checked,
-                              }))
+                        {/* Expand Button */}
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => toggleRowExpansion(client.id)}
+                            className={`p-1 rounded transition-colors ${
+                              hasContracts
+                                ? "text-blue-600 hover:bg-blue-50"
+                                : "text-gray-300 cursor-not-allowed"
+                            }`}
+                            disabled={!hasContracts}
+                            title={
+                              hasContracts ? "View contracts" : "No contracts"
                             }
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                        </label>
-                      </div>
-
-                      {/* Status Selection */}
-                      <div>
-                        <label
-                          className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
-                        >
-                          Status
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                          <label
-                            className={`flex items-center p-3 rounded-lg border ${
-                              formData.status === "Client"
-                                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
-                                : currentTheme.border
-                            } cursor-pointer transition-colors`}
                           >
-                            <input
-                              type="radio"
-                              name="status"
-                              value="Client"
-                              checked={formData.status === "Client"}
-                              onChange={(e) =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  status: e.target.value,
-                                }))
-                              }
-                              className="sr-only"
-                            />
-                            <div
-                              className={`w-4 h-4 rounded-full border-2 mr-3 ${
-                                formData.status === "Client"
-                                  ? "border-blue-500 bg-blue-500"
-                                  : "border-gray-300"
-                              } flex items-center justify-center`}
-                            >
-                              {formData.status === "Client" && (
-                                <div className="w-2 h-2 rounded-full bg-white"></div>
-                              )}
+                            {hasContracts ? (
+                              isExpanded ? (
+                                <ChevronUp className="w-4 h-4" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4" />
+                              )
+                            ) : (
+                              <div className="w-4 h-4" />
+                            )}
+                          </button>
+                        </td>
+
+                        {/* Organisation */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 w-10 h-10">
+                              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <Building2 className="w-5 h-5 text-blue-600" />
+                              </div>
                             </div>
-                            <span
-                              className={`text-sm font-medium ${currentTheme.textPrimary}`}
-                            >
-                              Client
-                            </span>
-                          </label>
-
-                          <label
-                            className={`flex items-center p-3 rounded-lg border ${
-                              formData.status === "Sundry Customer"
-                                ? "border-purple-500 bg-purple-50 dark:bg-purple-900/30"
-                                : currentTheme.border
-                            } cursor-pointer transition-colors`}
-                          >
-                            <input
-                              type="radio"
-                              name="status"
-                              value="Sundry Customer"
-                              checked={formData.status === "Sundry Customer"}
-                              onChange={(e) =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  status: e.target.value,
-                                }))
-                              }
-                              className="sr-only"
-                            />
-                            <div
-                              className={`w-4 h-4 rounded-full border-2 mr-3 ${
-                                formData.status === "Sundry Customer"
-                                  ? "border-purple-500 bg-purple-500"
-                                  : "border-gray-300"
-                              } flex items-center justify-center`}
-                            >
-                              {formData.status === "Sundry Customer" && (
-                                <div className="w-2 h-2 rounded-full bg-white"></div>
-                              )}
+                            <div className="ml-4">
+                              <div
+                                className={`text-sm font-medium ${currentTheme.textPrimary}`}
+                              >
+                                {client.organisation_name}
+                              </div>
+                              <div
+                                className={`text-sm ${currentTheme.textSecondary}`}
+                              >
+                                {client.cac_registration_number ||
+                                  "No CAC Number"}
+                              </div>
                             </div>
-                            <span
-                              className={`text-sm font-medium ${currentTheme.textPrimary}`}
-                            >
-                              Sundry Customer
-                            </span>
-                          </label>
-                        </div>
-                      </div>
-
-                      {/* Opening Balance */}
-                      <div>
-                        <label
-                          className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
-                        >
-                          Opening Balance
-                        </label>
-                        <div className="flex space-x-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={formData.openingBalance}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                openingBalance: parseFloat(e.target.value) || 0,
-                              }))
-                            }
-                            className={`flex-1 px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                            placeholder="0.00"
-                          />
-                          <select
-                            value={formData.currency}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                currency: e.target.value,
-                              }))
-                            }
-                            className={`px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                          >
-                            <option value="Dr">Dr</option>
-                            <option value="Cr">Cr</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Logo Upload */}
-                  <div
-                    className={`p-4 rounded-xl border ${currentTheme.border} bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-900/20`}
-                  >
-                    <h3
-                      className={`text-lg font-semibold ${currentTheme.textPrimary} mb-4 flex items-center`}
-                    >
-                      <Upload className="w-5 h-5 mr-2 text-orange-600" />
-                      Client Logo
-                    </h3>
-
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-center w-full">
-                        <label
-                          className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed ${currentTheme.border} rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
-                        >
-                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <Upload
-                              className={`w-8 h-8 mb-2 ${currentTheme.textMuted}`}
-                            />
-                            <p
-                              className={`mb-2 text-sm ${currentTheme.textSecondary}`}
-                            >
-                              <span className="font-semibold">
-                                Click to upload
-                              </span>{" "}
-                              or drag and drop
-                            </p>
-                            <p className={`text-xs ${currentTheme.textMuted}`}>
-                              PNG, JPG or SVG (MAX. 2MB)
-                            </p>
                           </div>
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept="image/*"
-                            onChange={handleFileUpload}
-                          />
-                        </label>
-                      </div>
+                        </td>
 
-                      {formData.logoFile && (
-                        <div className="flex items-center space-x-2 p-2 bg-green-50 dark:bg-green-900/30 rounded-lg">
-                          <Check className="w-4 h-4 text-green-600" />
-                          <span className="text-sm text-green-800 dark:text-green-300">
-                            {formData.logoFile.name}
+                        {/* Contact */}
+                        <td className="px-6 py-4">
+                          <div
+                            className={`text-sm ${currentTheme.textPrimary}`}
+                          >
+                            {client.phone || "No phone"}
+                          </div>
+                          <div
+                            className={`text-sm ${currentTheme.textSecondary}`}
+                          >
+                            {client.head_office_address || "No address"}
+                          </div>
+                        </td>
+
+                        {/* Category */}
+                        <td className="px-6 py-4">
+                          <div
+                            className={`text-sm ${currentTheme.textPrimary}`}
+                          >
+                            {client.industry_category || "N/A"}
+                          </div>
+                          <div
+                            className={`text-sm ${currentTheme.textSecondary}`}
+                          >
+                            {client.client_category || "N/A"}
+                          </div>
+                        </td>
+
+                        {/* Contracts Count */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center space-x-2">
+                            <span
+                              className={`text-sm font-medium ${currentTheme.textPrimary}`}
+                            >
+                              {hasContracts ? client.contracts.length : 0}
+                            </span>
+                            <span
+                              className={`text-xs ${currentTheme.textSecondary}`}
+                            >
+                              {hasContracts ? "contracts" : "no contracts"}
+                            </span>
+                            {hasContracts && (
+                              <div className="flex space-x-1">
+                                {client.contracts.map((contract, index) => (
+                                  <span
+                                    key={index}
+                                    className={`inline-block w-2 h-2 rounded-full ${
+                                      contract.status === "active"
+                                        ? "bg-green-500"
+                                        : "bg-gray-400"
+                                    }`}
+                                    title={`${
+                                      contract.service_type || "Service"
+                                    } - ${contract.status || "unknown"}`}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              client.status === "active"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {client.status === "active" ? "Active" : "Inactive"}
                           </span>
-                        </div>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handleEdit(client)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Edit Client"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleStatusToggle(client.id, client.status)
+                              }
+                              className={`p-2 rounded-lg transition-colors ${
+                                client.status === "active"
+                                  ? "text-red-600 hover:bg-red-50"
+                                  : "text-green-600 hover:bg-green-50"
+                              }`}
+                              title={
+                                client.status === "active"
+                                  ? "Deactivate"
+                                  : "Activate"
+                              }
+                            >
+                              {client.status === "active" ? (
+                                <X className="w-4 h-4" />
+                              ) : (
+                                <Check className="w-4 h-4" />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleDelete(client.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete Client"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Expanded Contracts Row */}
+                      {isExpanded && hasContracts && (
+                        <tr className={`bg-gray-50 dark:bg-gray-800/30`}>
+                          <td></td>
+                          <td colSpan="6" className="px-6 py-4">
+                            <div className="space-y-3">
+                              <h4
+                                className={`text-sm font-medium ${currentTheme.textPrimary} mb-3`}
+                              >
+                                Contracts ({client.contracts.length})
+                              </h4>
+                              <div className="grid gap-3">
+                                {client.contracts.map((contract, index) => (
+                                  <div
+                                    key={index}
+                                    className={`border ${currentTheme.border} rounded-lg p-4 bg-white dark:bg-gray-900`}
+                                  >
+                                    <div className="grid md:grid-cols-4 gap-4">
+                                      <div>
+                                        <label
+                                          className={`text-xs font-medium ${currentTheme.textSecondary}`}
+                                        >
+                                          Service Type
+                                        </label>
+                                        <p
+                                          className={`text-sm ${currentTheme.textPrimary} mt-1`}
+                                        >
+                                          {contract.service_type || "N/A"}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <label
+                                          className={`text-xs font-medium ${currentTheme.textSecondary}`}
+                                        >
+                                          Start Date
+                                        </label>
+                                        <p
+                                          className={`text-sm ${currentTheme.textPrimary} mt-1`}
+                                        >
+                                          {formatDateForDisplay(
+                                            contract.contract_start_date
+                                          )}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <label
+                                          className={`text-xs font-medium ${currentTheme.textSecondary}`}
+                                        >
+                                          End Date
+                                        </label>
+                                        <p
+                                          className={`text-sm ${currentTheme.textPrimary} mt-1`}
+                                        >
+                                          {formatDateForDisplay(
+                                            contract.contract_end_date
+                                          )}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <label
+                                          className={`text-xs font-medium ${currentTheme.textSecondary}`}
+                                        >
+                                          Status
+                                        </label>
+                                        <p className="mt-1">
+                                          <span
+                                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                              contract.status === "active"
+                                                ? "bg-green-100 text-green-800"
+                                                : contract.status === "inactive"
+                                                ? "bg-gray-100 text-gray-800"
+                                                : contract.status === "expired"
+                                                ? "bg-red-100 text-red-800"
+                                                : "bg-yellow-100 text-yellow-800"
+                                            }`}
+                                          >
+                                            {(contract.status || "unknown")
+                                              .charAt(0)
+                                              .toUpperCase() +
+                                              (
+                                                contract.status || "unknown"
+                                              ).slice(1)}
+                                          </span>
+                                        </p>
+                                      </div>
+                                    </div>
+                                    {contract.notes && (
+                                      <div className="mt-3">
+                                        <label
+                                          className={`text-xs font-medium ${currentTheme.textSecondary}`}
+                                        >
+                                          Notes
+                                        </label>
+                                        <p
+                                          className={`text-sm ${currentTheme.textPrimary} mt-1`}
+                                        >
+                                          {contract.notes}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Active Status */}
-                  <div
-                    className={`p-4 rounded-xl border ${currentTheme.border} bg-gradient-to-r from-red-50/50 to-transparent dark:from-red-900/20`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3
-                          className={`text-lg font-semibold ${currentTheme.textPrimary} flex items-center`}
-                        >
-                          <AlertCircle className="w-5 h-5 mr-2 text-red-600" />
-                          Active Status
-                        </h3>
-                        <p
-                          className={`text-sm ${currentTheme.textSecondary} mt-1`}
-                        >
-                          Deactivate to suspend client operations
-                        </p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.isActive}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              isActive: e.target.checked,
-                            }))
-                          }
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 dark:peer-focus:ring-red-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600"></div>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="flex items-center justify-end space-x-4 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className={`px-6 py-3 rounded-lg ${currentTheme.hover} ${currentTheme.textSecondary} font-medium transition-colors`}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex items-center space-x-2 px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Saving...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4" />
-                      <span>{isEditMode ? "Update Client" : "Add Client"}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
 
-      {/* Empty State */}
-      {filteredClients.length === 0 && (
-        <div
-          className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl p-12 text-center backdrop-blur-md shadow-lg`}
-        >
-          <Building2
-            className={`w-16 h-16 ${currentTheme.textMuted} mx-auto mb-4`}
-          />
-          <h3
-            className={`text-xl font-semibold ${currentTheme.textPrimary} mb-2`}
+        {/* Pagination */}
+        {pagination.total_pages > 1 && (
+          <div
+            className={`px-6 py-4 border-t ${currentTheme.border} flex items-center justify-between`}
           >
-            {searchTerm || filter !== "all"
-              ? "No clients found"
-              : "No clients yet"}
-          </h3>
-          <p className={`${currentTheme.textSecondary} mb-6`}>
-            {searchTerm || filter !== "all"
-              ? "Try adjusting your search or filter criteria"
-              : "Get started by adding your first client"}
-          </p>
-          {!searchTerm && filter === "all" && (
-            <button
-              onClick={() => {
-                resetForm();
-                setIsAddModalOpen(true);
-              }}
-              className="flex items-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl mx-auto"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add First Client</span>
-            </button>
-          )}
+            <div className={`text-sm ${currentTheme.textSecondary}`}>
+              Showing {(currentPage - 1) * pagination.per_page + 1} to{" "}
+              {Math.min(currentPage * pagination.per_page, pagination.total)} of{" "}
+              {pagination.total} results
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 rounded border ${currentTheme.border} ${
+                  currentPage === 1
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-gray-50 dark:hover:bg-gray-800"
+                }`}
+              >
+                Previous
+              </button>
+              <span className={`px-3 py-1 text-sm ${currentTheme.textPrimary}`}>
+                Page {currentPage} of {pagination.total_pages}
+              </span>
+              <button
+                onClick={() =>
+                  setCurrentPage((prev) =>
+                    Math.min(prev + 1, pagination.total_pages)
+                  )
+                }
+                disabled={currentPage === pagination.total_pages}
+                className={`px-3 py-1 rounded border ${currentTheme.border} ${
+                  currentPage === pagination.total_pages
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-gray-50 dark:hover:bg-gray-800"
+                }`}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg">
+          <p className="text-sm">{error}</p>
         </div>
       )}
     </div>

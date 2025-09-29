@@ -5,23 +5,20 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\CandidateController;
+use App\Http\Controllers\Candidate\CandidateController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\AdminController;
-use App\Http\Controllers\ClientController;
-use App\Http\Controllers\ServiceLocationController;
-use App\Http\Controllers\Admin\ServiceRequestController;
-use App\Http\Controllers\ClientContractController;
-use App\Http\Controllers\SystemPreferenceController;
-use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\UtilityController;
-use App\Http\Controllers\Admin\SOLOfficeController;
+use App\Http\Controllers\OfferLetterTemplateController;
+use App\Http\Controllers\PerformanceController;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes - Custom Middleware Stack Without CSRF
+| API Routes - Modular Entry Point
 |--------------------------------------------------------------------------
+| This file includes all module route files
+| Each module is in its own file for better organization
 */
 
 // Health check (public)
@@ -34,784 +31,304 @@ Route::get('/health', function () {
     ]);
 });
 
-// // ✅ TEMPORARY FIX: Add explicit route before others
-// Route::get('/admin/sol-offices', [SOLOfficeController::class, 'index'])->middleware(['web', 'auth:sanctum']);
-// Route::get('/admin/sol-offices/data/statistics', [SOLOfficeController::class, 'getStatistics'])->middleware(['web', 'auth:sanctum']);
-
 // Public endpoints
 Route::get('/states-lgas', [CandidateController::class, 'getStatesLgas']);
-
+Route::get('/utilities/states-lgas', [CandidateController::class, 'getStatesLgas']);
 Route::get('/utilities/industry-categories', [UtilityController::class, 'getIndustryCategories']);
 Route::get('/utilities/client-categories', [UtilityController::class, 'getClientCategories']);
 
+// Performance testing endpoints (development)
+Route::get('/performance/diagnostics', [PerformanceController::class, 'diagnostics']);
+Route::post('/performance/test-endpoint', [PerformanceController::class, 'testEndpoint']);
 
 // Auth routes (public)
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/register', [AuthController::class, 'register']);
 
-/*
-|--------------------------------------------------------------------------
-| Authenticated API Routes (Main Application)
-|--------------------------------------------------------------------------
-*/
+// Protected routes group
 
-// Custom middleware stack that excludes CSRF but includes session
-Route::middleware([
-    'web',
-    'auth:sanctum',
-    // Explicitly exclude CSRF by not including it
-])->group(function () {
-
-    // Auth routes
-    Route::put('/user/preferences', [AuthController::class, 'updatePreferences']);
-    Route::get('/user', [AuthController::class, 'user']);
-    Route::post('/logout', [AuthController::class, 'logout']);
-
-    // Dashboard routes
-    Route::get('/dashboard/candidate', [DashboardController::class, 'candidateDashboard']);
-
-    /*
-    |--------------------------------------------------------------------------
-    | FIXED: Utility Routes - Moved to correct location
-    |--------------------------------------------------------------------------
-    */
-
-    // // Utility data endpoints for dropdown populations
-    // Route::get('/utilities/industry-categories', function () {
-    //     try {
-    //         $categories = DB::table('job_categories')
-    //             ->select('name', 'slug', 'description')
-    //             ->where('is_active', 1)
-    //             ->orderBy('name')
-    //             ->get()
-    //             ->pluck('name')
-    //             ->toArray();
-
-    //         return response()->json([
-    //             'success' => true,
-    //             'data' => $categories,
-    //             'message' => 'Industry categories retrieved successfully'
-    //         ]);
-    //     } catch (\Exception $e) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Failed to fetch industry categories',
-    //             'error' => config('app.debug') ? $e->getMessage() : 'Server error'
-    //         ], 500);
-    //     }
-    // });
-
-    // Route::get('/utilities/client-categories', function () {
-    //     try {
-    //         $categories = DB::table('service_requests')
-    //             ->select('category')
-    //             ->where('is_active', 1)
-    //             ->whereNotNull('category')
-    //             ->distinct()
-    //             ->orderBy('category')
-    //             ->get()
-    //             ->pluck('category')
-    //             ->toArray();
-
-    //         return response()->json([
-    //             'success' => true,
-    //             'data' => $categories,
-    //             'message' => 'Client categories retrieved successfully'
-    //         ]);
-    //     } catch (\Exception $e) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Failed to fetch client categories',
-    //             'error' => config('app.debug') ? $e->getMessage() : 'Server error'
-    //         ], 500);
-    //     }
-    // });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Candidate Management Routes (Existing)
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('candidates')->group(function () {
-        // Profile routes
-        Route::get('/{id}/profile', [CandidateController::class, 'getProfile'])->where('id', '[0-9]+');
-        Route::put('/{id}/profile', [CandidateController::class, 'updateProfile'])->where('id', '[0-9]+');
-
-        // Education routes
-        Route::get('/{id}/education', [CandidateController::class, 'getEducation'])->where('id', '[0-9]+');
-        Route::post('/{id}/education', [CandidateController::class, 'storeEducation'])->where('id', '[0-9]+');
-        Route::put('/education/{id}', [CandidateController::class, 'updateEducation'])->where('id', '[0-9]+');
-        Route::delete('/education/{id}', [CandidateController::class, 'deleteEducation'])->where('id', '[0-9]+');
-
-        // Experience routes
-        Route::get('/{id}/experience', [CandidateController::class, 'getExperience'])->where('id', '[0-9]+');
-        Route::post('/{id}/experience', [CandidateController::class, 'storeExperience'])->where('id', '[0-9]+');
-        Route::put('/experience/{id}', [CandidateController::class, 'updateExperience'])->where('id', '[0-9]+');
-        Route::delete('/experience/{id}', [CandidateController::class, 'deleteExperience'])->where('id', '[0-9]+');
-
-        // Emergency contacts routes
-        Route::get('/{id}/emergency-contacts', [CandidateController::class, 'getEmergencyContacts'])->where('id', '[0-9]+');
-        Route::post('/{id}/emergency-contacts', [CandidateController::class, 'storeEmergencyContact'])->where('id', '[0-9]+');
-        Route::put('/emergency-contacts/{id}', [CandidateController::class, 'updateEmergencyContact'])->where('id', '[0-9]+');
-        Route::delete('/emergency-contacts/{id}', [CandidateController::class, 'deleteEmergencyContact'])->where('id', '[0-9]+');
-
-        // Dashboard stats
-        Route::get('/{id}/dashboard-stats', [CandidateController::class, 'getDashboardStats'])->where('id', '[0-9]+');
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Admin Management Routes (Existing)
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('admin')->group(function () {
-        // Dashboard & Statistics
-        Route::get('/stats', [AdminController::class, 'getStats']);
-
-        // Client Management (Legacy - keeping for backward compatibility)
-        Route::get('/clients', [AdminController::class, 'getClients']);
-        Route::post('/clients', [AdminController::class, 'createClient']);
-        Route::get('/clients/{id}/dashboard', [AdminController::class, 'getClientDashboard'])->where('id', '[0-9]+');
-
-        // Job Management
-        Route::get('/jobs', [AdminController::class, 'getJobs']);
-        Route::post('/jobs', [AdminController::class, 'createJob']);
-        Route::get('/job-categories', [AdminController::class, 'getJobCategories']);
-
-        // Application Management
-        Route::get('/applications', [AdminController::class, 'getApplications']);
-        Route::put('/applications/{id}/status', [AdminController::class, 'updateApplicationStatus'])->where('id', '[0-9]+');
-        Route::post('/applications/{id}/interview', [AdminController::class, 'scheduleInterview'])->where('id', '[0-9]+');
-
-        // Staff Management
-        Route::get('/staff', [AdminController::class, 'getStaff']);
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Client Management Routes (New Modern System)
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('clients')->group(function () {
-        Route::get('/', [ClientController::class, 'index'])->name('clients.index');
-        Route::post('/', [ClientController::class, 'store'])->name('clients.store');
-        Route::get('/statistics', [ClientController::class, 'statistics'])->name('clients.statistics');
-        Route::get('/{id}', [ClientController::class, 'show'])->name('clients.show');
-        Route::put('/{id}', [ClientController::class, 'update'])->name('clients.update');
-        Route::delete('/{id}', [ClientController::class, 'destroy'])->name('clients.destroy');
-        Route::patch('/{id}/toggle-status', [ClientController::class, 'toggleStatus'])->name('clients.toggle-status');
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Service Location Master Routes (Location + Region/Zone)
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('service-locations')->group(function () {
-        Route::get('/', [ServiceLocationController::class, 'index'])->name('service-locations.index');
-        Route::post('/', [ServiceLocationController::class, 'store'])->name('service-locations.store');
-        Route::get('/{id}', [ServiceLocationController::class, 'show'])->name('service-locations.show');
-        Route::put('/{id}', [ServiceLocationController::class, 'update'])->name('service-locations.update');
-        Route::delete('/{id}', [ServiceLocationController::class, 'destroy'])->name('service-locations.destroy');
-        Route::get('/by-client/{clientId}', [ServiceLocationController::class, 'getByClient'])->name('service-locations.by-client');
-        Route::get('/regions/list', [ServiceLocationController::class, 'getRegions'])->name('service-locations.regions');
-        Route::get('/zones/list', [ServiceLocationController::class, 'getZones'])->name('service-locations.zones');
-        Route::post('/test-auto-assignment', [ServiceLocationController::class, 'testAutoAssignment'])->name('service-locations.test-auto-assignment');
-        Route::get('/bulk-template', [ServiceLocationController::class, 'downloadTemplate'])->name('service-locations.bulk-template');
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Service Request Master Routes
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('service-requests')->group(function () {
-        // Basic CRUD operations (updated for new structure)
-        Route::get('/', [ServiceRequestController::class, 'index'])->name('service-requests.index');
-        Route::post('/', [ServiceRequestController::class, 'store'])->name('service-requests.store');
-        Route::get('/{id}', [ServiceRequestController::class, 'show'])->name('service-requests.show');
-        Route::put('/{id}', [ServiceRequestController::class, 'update'])->name('service-requests.update');
-        Route::delete('/{id}', [ServiceRequestController::class, 'destroy'])->name('service-requests.destroy');
-
-        // New client-based endpoints
-        Route::get('/by-client/grouped', [ServiceRequestController::class, 'getByClient'])->name('service-requests.by-client');
-        Route::get('/service-types/list', [ServiceRequestController::class, 'getServiceTypes'])->name('service-requests.service-types');
-        Route::post('/generate-code', [ServiceRequestController::class, 'generateServiceCode'])->name('service-requests.generate-code');
-        Route::get('/dashboard/statistics', [ServiceRequestController::class, 'getDashboardStats'])->name('service-requests.dashboard-stats');
-
-        // Bulk operations
-        Route::post('/bulk-update', [ServiceRequestController::class, 'bulkUpdate'])->name('service-requests.bulk-update');
-    });
-
-    /*
-|--------------------------------------------------------------------------
-| Client Contract Routes
-|--------------------------------------------------------------------------
-*/
-    Route::prefix('client-contracts')->group(function () {
-        // Basic CRUD operations
-        Route::get('/', [ClientContractController::class, 'index'])->name('client-contracts.index');
-        Route::post('/', [ClientContractController::class, 'store'])->name('client-contracts.store');
-        Route::get('/particulars', [ClientContractController::class, 'getContractParticulars'])->name('client-contracts.particulars');
-        Route::get('/expiring-soon', [ClientContractController::class, 'getExpiringSoon'])->name('client-contracts.expiring-soon');
-        Route::get('/{id}', [ClientContractController::class, 'show'])->name('client-contracts.show');
-        Route::put('/{id}', [ClientContractController::class, 'update'])->name('client-contracts.update');
-        Route::delete('/{id}', [ClientContractController::class, 'destroy'])->name('client-contracts.destroy');
-
-        // Additional routes
-        Route::get('/by-client/{clientId}', [ClientContractController::class, 'getByClient'])->name('client-contracts.by-client');
-        Route::patch('/{id}/toggle-status', [ClientContractController::class, 'toggleStatus'])->name('client-contracts.toggle-status');
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | System Preferences Routes
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('system-preferences')->group(function () {
-        Route::get('/', [SystemPreferenceController::class, 'index'])->name('system-preferences.index');
-        Route::post('/', [SystemPreferenceController::class, 'store'])->name('system-preferences.store');
-        Route::get('/{key}', [SystemPreferenceController::class, 'show'])->name('system-preferences.show');
-        Route::put('/{key}', [SystemPreferenceController::class, 'update'])->name('system-preferences.update');
-        Route::delete('/{key}', [SystemPreferenceController::class, 'destroy'])->name('system-preferences.destroy');
-        Route::get('/by-category/{category}', [SystemPreferenceController::class, 'getByCategory'])->name('system-preferences.by-category');
-        Route::post('/bulk-update', [SystemPreferenceController::class, 'bulkUpdate'])->name('system-preferences.bulk-update');
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Audit Log Routes
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('audit-logs')->group(function () {
-        Route::get('/', [AuditLogController::class, 'index'])->name('audit-logs.index');
-        Route::get('/{id}', [AuditLogController::class, 'show'])->name('audit-logs.show');
-        Route::get('/by-user/{userId}', [AuditLogController::class, 'getByUser'])->name('audit-logs.by-user');
-        Route::get('/by-module/{module}', [AuditLogController::class, 'getByModule'])->name('audit-logs.by-module');
-        Route::get('/by-table/{table}', [AuditLogController::class, 'getByTable'])->name('audit-logs.by-table');
-        Route::get('/export/csv', [AuditLogController::class, 'exportCsv'])->name('audit-logs.export-csv');
-        Route::get('/export/pdf', [AuditLogController::class, 'exportPdf'])->name('audit-logs.export-pdf');
-        Route::delete('/cleanup/{days}', [AuditLogController::class, 'cleanup'])->name('audit-logs.cleanup');
-    });
-
-
-    // SOL Office lookup (for service location assignment)
-    Route::prefix('sol-offices')->group(function () {
-        Route::get('/lookup/auto-assign', function (Request $request) {
-            $stateCode = $request->get('state_code');
-            $lgaCode = $request->get('lga_code');
-
-            // Use DB instead of model
-            $office = DB::table('sol_offices')
-                ->where('is_active', true)
-                ->where('state_code', $stateCode)
-                ->first();
-
-            return response()->json([
-                'success' => true,
-                'data' => $office
-            ]);
-        })->name('sol-offices.auto-assign');
-
-        Route::get('/coverage-map', function () {
-            $coverageMap = DB::table('sol_offices')
-                ->where('is_active', true)
-                ->select('id', 'office_name', 'office_code', 'state_name', 'control_type', 'controlled_areas')
-                ->get();
-
-            return response()->json([
-                'success' => true,
-                'data' => $coverageMap
-            ]);
-        })->name('sol-offices.coverage-map');
-
-        Route::get('/validate-coverage', function () {
-            $validation = [
-                'conflicts' => [],
-                'gaps' => [],
-                'summary' => [
-                    'total_offices' => DB::table('sol_offices')->where('is_active', true)->count(),
-                    'lga_control' => DB::table('sol_offices')->where('control_type', 'lga')->where('is_active', true)->count(),
-                    'state_control' => DB::table('sol_offices')->where('control_type', 'state')->where('is_active', true)->count(),
-                ]
-            ];
-
-            return response()->json([
-                'success' => true,
-                'data' => $validation
-            ]);
-        })->name('sol-offices.validate-coverage');
-
-        Route::get('/active', function () {
-            $offices = DB::table('sol_offices')
-                ->where('is_active', true)
-                ->select('id', 'office_name', 'office_code', 'state_name', 'control_type', 'zone_name')
-                ->orderBy('state_name')
-                ->orderBy('office_name')
-                ->get();
-
-            return response()->json([
-                'success' => true,
-                'data' => $offices
-            ]);
-        })->name('sol-offices.active');
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Utility Routes
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('utilities')->group(function () {
-        // States and LGAs
-        Route::get('/states-lgas', function () {
-            return response()->json([
-                'success' => true,
-                'data' => DB::table('states_lgas')
-                    ->select('id', 'state_name', 'lga_name', 'state_code', 'zone')
-                    ->where('is_active', true)
-                    ->orderBy('state_name')
-                    ->orderBy('lga_name')
-                    ->get()
-            ]);
-        })->name('utilities.states-lgas');
-
-        Route::get('/city-lookup', function (Request $request) {
-            $city = $request->get('city');
-
-            if (!$city) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'City parameter required'
-                ], 400);
-            }
-
-            $matches = DB::table('states_lgas')
-                ->where('lga_name', 'LIKE', "%{$city}%")
-                ->orWhere('state_name', 'LIKE', "%{$city}%")
-                ->select('lga_code', 'lga_name', 'state_code', 'state_name', 'zone')
-                ->limit(10)
-                ->get();
-
-            return response()->json([
-                'success' => true,
-                'data' => $matches
-            ]);
-        })->name('utilities.city-lookup');
-
-        // Industry categories
-        Route::get('/industry-categories', function () {
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'Banking & Finance',
-                    'Oil & Gas',
-                    'Telecommunications',
-                    'Manufacturing',
-                    'Healthcare',
-                    'Education',
-                    'Government',
-                    'Technology',
-                    'Real Estate',
-                    'Retail & Commerce',
-                    'Insurance',
-                    'Agriculture',
-                    'Transportation',
-                    'Media & Entertainment',
-                    'Professional Services'
-                ]
-            ]);
-        })->name('utilities.industry-categories');
-
-        // Client categories
-        Route::get('/client-categories', function () {
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'Corporate',
-                    'SME',
-                    'Individual',
-                    'Government',
-                    'NGO',
-                    'Multinational',
-                    'Startup',
-                    'Public Sector',
-                    'Private Sector'
-                ]
-            ]);
-        })->name('utilities.client-categories');
-
-        // Service categories for requests
-        Route::get('/service-categories', function () {
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'Finance',
-                    'Administration',
-                    'Security',
-                    'Maintenance',
-                    'Technology',
-                    'Human Resources',
-                    'Operations',
-                    'Customer Service',
-                    'Legal',
-                    'Marketing',
-                    'Procurement',
-                    'Quality Assurance'
-                ]
-            ]);
-        })->name('utilities.service-categories');
-
-        // Nigerian zones for SOL regions
-        Route::get('/nigeria-zones', function () {
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'North Central',
-                    'North East',
-                    'North West',
-                    'South East',
-                    'South South',
-                    'South West'
-                ]
-            ]);
-        })->name('utilities.nigeria-zones');
-
-        // File upload utility
-        Route::post('/upload-file', function (Request $request) {
-            try {
-                $request->validate([
-                    'file' => 'required|file|max:10240', // 10MB max
-                    'type' => 'required|in:logo,document,contract',
-                    'client_id' => 'sometimes|exists:clients,id'
-                ]);
-
-                $file = $request->file('file');
-                $type = $request->input('type');
-                $clientId = $request->input('client_id');
-
-                $path = match ($type) {
-                    'logo' => 'clients/logos',
-                    'document' => 'clients/documents',
-                    'contract' => 'contracts/attachments',
-                    default => 'general'
-                };
-
-                $fileName = time() . '_' . ($clientId ?? 'general') . '_' . $file->getClientOriginalName();
-                $storedPath = $file->storeAs($path, $fileName, 'public');
-
-                return response()->json([
-                    'success' => true,
-                    'data' => [
-                        'path' => $storedPath,
-                        'url' => Storage::url($storedPath),
-                        'original_name' => $file->getClientOriginalName(),
-                        'size' => $file->getSize(),
-                        'mime_type' => $file->getMimeType()
-                    ],
-                    'message' => 'File uploaded successfully'
-                ]);
-            } catch (\Exception $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'File upload failed',
-                    'error' => $e->getMessage()
-                ], 500);
-            }
-        })->name('utilities.upload-file');
-    });
-});
-
-/*
-|--------------------------------------------------------------------------
-| Admin-Only Routes (Super Admin/Global Admin Access)
-|--------------------------------------------------------------------------
-*/
-
-Route::middleware(['auth:sanctum', 'role:super-admin,admin'])->group(function () {
-
-    // Advanced client management (Global admin only)
-    Route::prefix('admin/clients')->group(function () {
-        Route::post('/bulk-import', [ClientController::class, 'bulkImport'])->name('admin.clients.bulk-import');
-        Route::post('/bulk-export', [ClientController::class, 'bulkExport'])->name('admin.clients.bulk-export');
-        Route::post('/bulk-update-status', [ClientController::class, 'bulkUpdateStatus'])->name('admin.clients.bulk-update-status');
-        Route::delete('/bulk-delete', [ClientController::class, 'bulkDelete'])->name('admin.clients.bulk-delete');
-        Route::get('/audit-trail/{clientId}', [ClientController::class, 'getAuditTrail'])->name('admin.clients.audit-trail');
-    });
-
-    // Service location management (Global admin only)
-    Route::prefix('admin/service-locations')->group(function () {
-        Route::post('/bulk-import', [ServiceLocationController::class, 'bulkImport'])->name('admin.service-locations.bulk-import');
-        Route::post('/test-auto-assignment', [ServiceLocationController::class, 'testAutoAssignment'])->name('admin.service-locations.test-auto-assignment');
-        Route::get('/bulk-template', [ServiceLocationController::class, 'downloadTemplate'])->name('admin.service-locations.bulk-template');
-        Route::get('/hierarchy/{clientId}', [ServiceLocationController::class, 'getHierarchy'])->name('admin.service-locations.hierarchy');
-        Route::post('/sync-regions-zones', [ServiceLocationController::class, 'syncRegionsZones'])->name('admin.service-locations.sync-regions-zones');
-    });
-
-    // Service request management (Global admin only)
-    Route::prefix('admin/service-requests')->group(function () {
-        Route::post('/bulk-update', [ServiceRequestController::class, 'bulkUpdate'])->name('admin.service-requests.bulk-update');
-        Route::get('/usage-statistics', [ServiceRequestController::class, 'getUsageStatistics'])->name('admin.service-requests.usage-statistics');
-    });
-
-    // System maintenance routes
-    Route::prefix('admin/maintenance')->group(function () {
-        Route::post('/optimize-database', function () {
-            try {
-                // Optimize database tables
-                $tables = ['clients', 'service_locations', 'service_requests', 'client_contracts', 'audit_logs'];
-
-                foreach ($tables as $table) {
-                    DB::statement("OPTIMIZE TABLE {$table}");
-                }
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Database optimization completed',
-                    'optimized_tables' => $tables
-                ]);
-            } catch (\Exception $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Database optimization failed',
-                    'error' => $e->getMessage()
-                ], 500);
-            }
-        })->name('admin.maintenance.optimize-database');
-
-        Route::post('/clear-audit-logs', function (Request $request) {
-            try {
-                $days = $request->input('older_than_days', 365);
-
-                $deletedCount = DB::table('audit_logs')
-                    ->where('created_at', '<', now()->subDays($days))
-                    ->delete();
-
-                return response()->json([
-                    'success' => true,
-                    'message' => "Cleared audit logs older than {$days} days",
-                    'deleted_records' => $deletedCount
-                ]);
-            } catch (\Exception $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to clear audit logs',
-                    'error' => $e->getMessage()
-                ], 500);
-            }
-        })->name('admin.maintenance.clear-audit-logs');
-
-        Route::get('/system-statistics', function () {
-            try {
-                $stats = [
-                    'database_size' => DB::select("SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'DB_Size_MB' FROM information_schema.tables WHERE table_schema = DATABASE()")[0]->DB_Size_MB ?? 0,
-                    'total_records' => [
-                        'clients' => DB::table('clients')->count(),
-                        'service_locations' => DB::table('service_locations')->count(),
-                        'service_requests' => DB::table('service_requests')->count(),
-                        'client_contracts' => DB::table('client_contracts')->count(),
-                        'audit_logs' => DB::table('audit_logs')->count(),
-                        'users' => DB::table('users')->count(),
-                    ],
-                    'recent_activity' => [
-                        'last_client_created' => DB::table('clients')->orderBy('created_at', 'desc')->value('created_at'),
-                        'last_contract_updated' => DB::table('client_contracts')->orderBy('updated_at', 'desc')->value('updated_at'),
-                        'last_audit_log' => DB::table('audit_logs')->orderBy('created_at', 'desc')->value('created_at'),
-                    ],
-                    'active_sessions' => DB::table('sessions')->where('last_activity', '>', now()->subMinutes(15)->timestamp)->count(),
-                ];
-
-                return response()->json([
-                    'success' => true,
-                    'data' => $stats,
-                    'generated_at' => now()->toISOString()
-                ]);
-            } catch (\Exception $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to retrieve system statistics',
-                    'error' => $e->getMessage()
-                ], 500);
-            }
-        })->name('admin.maintenance.system-statistics');
-    });
-});
-
-// SOL Office management (Global admin only) - PROPER GROUPED VERSION
-Route::prefix('admin/sol-offices')->group(function () {
-    // ✅ IMPORTANT: Specific routes MUST come FIRST (before parameterized routes)
-    Route::get('/data/states-lgas', [SOLOfficeController::class, 'getStatesAndLGAs'])->name('admin.sol-offices.states-lgas');
-    Route::get('/data/statistics', [SOLOfficeController::class, 'getStatistics'])->name('admin.sol-offices.statistics');
-    Route::patch('/bulk/status', [SOLOfficeController::class, 'bulkUpdateStatus'])->name('admin.sol-offices.bulk-status');
-
-    // ✅ General routes (no parameters)
-    Route::get('/', [SOLOfficeController::class, 'index'])->name('admin.sol-offices.index');
-    Route::post('/', [SOLOfficeController::class, 'store'])->name('admin.sol-offices.store');
-
-    // ✅ Parameterized routes MUST come LAST + add constraints
-    Route::get('/{id}', [SOLOfficeController::class, 'show'])
-        ->name('admin.sol-offices.show')
-        ->where('id', '[0-9]+'); // ✅ Only numeric IDs
-
-    Route::put('/{id}', [SOLOfficeController::class, 'update'])
-        ->name('admin.sol-offices.update')
-        ->where('id', '[0-9]+');
-
-    Route::delete('/{id}', [SOLOfficeController::class, 'destroy'])
-        ->name('admin.sol-offices.destroy')
-        ->where('id', '[0-9]+');
-});
-
-/*
-|--------------------------------------------------------------------------
-| Custom Middleware Routes
-|--------------------------------------------------------------------------
-*/
-
-// Routes that require specific permissions (if you implement permission system)
-Route::middleware(['auth:sanctum', 'permission:manage_clients'])->group(function () {
-    Route::post('/clients/{id}/archive', [ClientController::class, 'archive'])->name('clients.archive');
-    Route::post('/clients/{id}/restore', [ClientController::class, 'restore'])->name('clients.restore');
-});
-
-Route::middleware(['auth:sanctum', 'permission:manage_contracts'])->group(function () {
-    Route::post('/client-contracts/{id}/renew', [ClientContractController::class, 'renew'])->name('client-contracts.renew');
-    Route::post('/client-contracts/{id}/terminate', [ClientContractController::class, 'terminate'])->name('client-contracts.terminate');
-});
-
-/*
-|--------------------------------------------------------------------------
-| Public API Routes (Rate Limited)
-|--------------------------------------------------------------------------
-*/
-
-Route::middleware(['throttle:60,1'])->group(function () {
-    // Public client information (limited data)
-    Route::get('/public/clients/{slug}', function ($slug) {
-        try {
-            $client = DB::table('clients')
-                ->select('name', 'slug', 'status')
-                ->where('slug', $slug)
-                ->where('status', 'active')
-                ->first();
-
-            if (!$client) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Client not found'
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data' => $client
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Service unavailable'
-            ], 503);
-        }
-    })->name('public.clients.show');
-});
-
-/*
-|--------------------------------------------------------------------------
-| Health Check & System Status Routes
-|--------------------------------------------------------------------------
-*/
-
-Route::get('/health/client-management', function () {
+// TEMPORARY: Check service_locations table structure
+Route::get('/test-table-structure/{table}', function ($table) {
     try {
-        // Test database connection
-        $clientCount = DB::table('clients')->count();
-
+        $columns = DB::select("DESCRIBE `{$table}`");
         return response()->json([
             'success' => true,
-            'service' => 'Client Management API',
-            'status' => 'healthy',
-            'timestamp' => now()->toISOString(),
-            'data' => [
-                'total_clients' => $clientCount,
-                'database_connection' => 'ok'
-            ]
+            'table' => $table,
+            'columns' => $columns,
+            'message' => 'Table structure retrieved successfully'
         ]);
     } catch (\Exception $e) {
         return response()->json([
             'success' => false,
-            'service' => 'Client Management API',
-            'status' => 'unhealthy',
-            'timestamp' => now()->toISOString(),
-            'error' => 'Database connection failed'
+            'message' => 'Error retrieving table structure: ' . $e->getMessage(),
+            'error' => $e->getMessage()
         ], 500);
     }
-})->name('health.client-management');
-/*
-|--------------------------------------------------------------------------
-| API Documentation Route
-|--------------------------------------------------------------------------
-*/
+});
 
-Route::get('/docs/client-management', function () {
+// TEMPORARY: Test service locations endpoint (REMOVE IN PRODUCTION)
+Route::get('/test-service-locations/{clientId}', function ($clientId) {
+    try {
+        $serviceLocations = DB::table('service_locations')
+            ->leftJoin('sol_offices', 'service_locations.sol_office_id', '=', 'sol_offices.id')
+            ->where('service_locations.client_id', $clientId)
+            ->where('service_locations.is_active', 1)
+            ->select([
+                'service_locations.id',
+                'service_locations.location_name',
+                'service_locations.city',
+                'service_locations.lga',
+                'service_locations.sol_zone',
+                'service_locations.sol_office_id',
+                'service_locations.full_address',
+                'sol_offices.office_name',
+                'sol_offices.office_code'
+            ])
+            ->orderBy('service_locations.location_name')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $serviceLocations,
+            'message' => 'Service locations retrieved successfully (TEST ENDPOINT)'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error retrieving service locations: ' . $e->getMessage(),
+            'error' => $e->getMessage()
+        ], 500);
+    }
+});
+
+// TEMPORARY: Test database connection and table existence
+Route::get('/test-db-structure', function () {
+    try {
+        $tables = DB::select('SHOW TABLES');
+        $dbInfo = [
+            'database_connected' => true,
+            'tables' => collect($tables)->map(function ($table) {
+                $tableName = array_values((array)$table)[0];
+                return $tableName;
+            }),
+            'client_count' => DB::table('clients')->count(),
+        ];
+
+        // Check specific tables for recruitment requests
+        $requiredTables = ['clients', 'service_requests', 'job_structures', 'service_locations', 'recruitment_requests'];
+        foreach ($requiredTables as $table) {
+            try {
+                $count = DB::table($table)->count();
+                $dbInfo['table_counts'][$table] = $count;
+            } catch (\Exception $e) {
+                $dbInfo['table_errors'][$table] = $e->getMessage();
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Database structure check completed',
+            'data' => $dbInfo
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Database connection failed',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+});
+
+// TEMPORARY: Public client contracts for testing (REMOVE IN PRODUCTION)
+Route::get('/test-client-contracts', function () {
+    try {
+        $contracts = DB::table('view_client_contracts_with_details')
+            ->orderBy('created_at', 'desc')
+            ->paginate(15);
+
+        return response()->json([
+            'success' => true,
+            'data' => $contracts,
+            'message' => 'Client contracts retrieved successfully (TEST ENDPOINT)'
+        ]);
+    } catch (Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ], 500);
+    }
+});
+
+// TEMPORARY: Test database connection and table existence
+Route::get('/test-db-structure', function () {
+    try {
+        $tables = DB::select('SHOW TABLES');
+        $dbInfo = [
+            'database_connected' => true,
+            'tables' => collect($tables)->map(function ($table) {
+                $tableName = array_values((array)$table)[0];
+                return $tableName;
+            }),
+            'client_count' => DB::table('clients')->count(),
+        ];
+
+        // Check specific tables for recruitment requests
+        $requiredTables = ['clients', 'service_requests', 'job_structures', 'service_locations', 'recruitment_requests'];
+        foreach ($requiredTables as $table) {
+            try {
+                $count = DB::table($table)->count();
+                $dbInfo['table_counts'][$table] = $count;
+            } catch (\Exception $e) {
+                $dbInfo['table_errors'][$table] = $e->getMessage();
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Database structure check completed',
+            'data' => $dbInfo
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Database connection failed',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+});
+
+// TEMPORARY: Public client contracts for testing (REMOVE IN PRODUCTION)
+Route::get('/test-client-contracts', function () {
+    try {
+        $contracts = DB::table('view_client_contracts_with_details')
+            ->orderBy('created_at', 'desc')
+            ->paginate(15);
+
+        return response()->json([
+            'success' => true,
+            'data' => $contracts,
+            'message' => 'Client contracts retrieved successfully (TEST ENDPOINT)'
+        ]);
+    } catch (Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ], 500);
+    }
+});
+
+// TEMPORARY: Simple client test endpoint (REMOVE IN PRODUCTION)
+Route::get('/test-simple', function () {
     return response()->json([
-        'api_name' => 'SOL Nigeria HRM - Client Management API',
-        'version' => '1.0.0',
-        'documentation' => 'https://docs.solnigeria.com/api/client-management',
-        'endpoints' => [
-            'clients' => [
-                'GET /api/clients' => 'List all clients with pagination and filtering',
-                'POST /api/clients' => 'Create a new client',
-                'GET /api/clients/{id}' => 'Get specific client details',
-                'PUT /api/clients/{id}' => 'Update client information',
-                'DELETE /api/clients/{id}' => 'Delete a client',
-                'PATCH /api/clients/{id}/toggle-status' => 'Toggle client active status',
-                'GET /api/clients/statistics' => 'Get client statistics'
-            ],
-            'service_locations' => [
-                'GET /api/service-locations' => 'List all service locations',
-                'POST /api/service-locations' => 'Create a new service location',
-                'GET /api/service-locations/by-client/{clientId}' => 'Get locations for specific client'
-            ],
-            'service_requests' => [
-                'GET /api/service-requests' => 'List all service requests',
-                'POST /api/service-requests' => 'Create a new service request type',
-                'GET /api/service-requests/by-category/{category}' => 'Get requests by category'
-            ],
-            'utilities' => [
-                'GET /api/utilities/states-lgas' => 'Get Nigerian states and LGAs',
-                'GET /api/utilities/industry-categories' => 'Get industry categories',
-                'GET /api/utilities/client-categories' => 'Get client categories',
-                'POST /api/utilities/upload-file' => 'Upload files (logos, documents)'
-            ]
-        ],
-        'authentication' => 'Bearer Token (Laravel Sanctum)',
-        'rate_limits' => [
-            'authenticated' => '1000 requests per hour',
-            'public' => '60 requests per minute'
-        ],
-        'support' => 'api-support@solnigeria.com'
+        'success' => true,
+        'message' => 'Simple test endpoint working',
+        'data' => ['test' => 'value']
     ]);
-})->name('docs.client-management');
-/*
-|--------------------------------------------------------------------------
-| Legacy API Support (for backward compatibility)
-|--------------------------------------------------------------------------
-*/
-Route::prefix('v1')->middleware(['web', 'auth:sanctum'])->group(function () {
-    // Legacy client endpoints
-    Route::get('/clients', [ClientController::class, 'index'])->name('v1.clients.index');
-    Route::get('/clients/{id}', [ClientController::class, 'show'])->name('v1.clients.show');
+});
+
+// TEMPORARY: Simple database query test (REMOVE IN PRODUCTION)
+Route::get('/test-db-clients', function () {
+    try {
+        $clients = DB::select('SELECT * FROM clients ORDER BY created_at DESC');
+
+        return response()->json([
+            'success' => true,
+            'count' => count($clients),
+            'data' => $clients,
+            'message' => 'Direct database query for all clients'
+        ]);
+    } catch (Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ], 500);
+    }
 });
 
 /*
 |--------------------------------------------------------------------------
-| Webhook Routes for External Integrations
+| Authenticated Routes - Load All Modules
 |--------------------------------------------------------------------------
 */
 
+Route::middleware(['auth:sanctum'])->group(function () {
+
+    // Core routes
+    Route::put('/user/preferences', [AuthController::class, 'updatePreferences']);
+    Route::get('/user', [AuthController::class, 'user']);
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/dashboard/candidate', [DashboardController::class, 'candidateDashboard']);
+
+    // Cache management routes (Admin only)
+    Route::prefix('cache')->group(function () {
+        Route::post('/clear', [App\Http\Controllers\DashboardCacheController::class, 'clearAllCaches']);
+        Route::post('/warmup', [App\Http\Controllers\DashboardCacheController::class, 'warmupCaches']);
+        Route::get('/dashboard-stats', [App\Http\Controllers\DashboardCacheController::class, 'getDashboardStats']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Include All Module Route Files
+    |--------------------------------------------------------------------------
+    */
+
+    // Client Contract Management Module
+    require __DIR__ . '/modules/client-contract-management/client-master.php';
+    require __DIR__ . '/modules/client-contract-management/service-locations.php';
+    require __DIR__ . '/modules/client-contract-management/client-contracts.php';
+    require __DIR__ . '/modules/client-contract-management/salary-structure.php';
+
+
+    // Recruitment Management Module
+    require __DIR__ . '/modules/recruitment-management/recruitment-requests.php';
+    require __DIR__ . '/modules/recruitment-management/applicant-profiles.php';
+    require __DIR__ . '/modules/recruitment-management/current-vacancies.php';
+    require __DIR__ . '/modules/recruitment-management/test-management.php';
+    require __DIR__ . '/modules/recruitment-management/candidate-tests.php';
+    require __DIR__ . '/modules/recruitment-management/interview-management.php';
+    require __DIR__ . '/modules/recruitment-management/client-interviews.php';
+    require __DIR__ . '/modules/recruitment-management/client-interview-feedback.php';
+    require __DIR__ . '/modules/recruitment-management/applicants-profile.php';
+    require __DIR__ . '/modules/recruitment-management/boarding.php';
+
+    // Administration Module
+    require __DIR__ . '/modules/administration/sol-master.php';
+    require __DIR__ . '/modules/administration/stats.php';
+    require __DIR__ . '/modules/administration/system-preferences.php';
+    require __DIR__ . '/modules/administration/audit-logs.php';
+    require __DIR__ . '/modules/administration/utilities.php';
+
+    // Candidate Staff Management Module
+    require __DIR__ . '/modules/candidate-staff-management/candidates.php';
+    require __DIR__ . '/modules/candidate-staff-management/candidate-education.php';
+    require __DIR__ . '/modules/candidate-staff-management/admin-management.php';
+    require __DIR__ . '/modules/candidate-staff-management/candidate-tests.php';
+    require __DIR__ . '/modules/candidate-staff-management/candidate-interviews.php';
+    require __DIR__ . '/modules/candidate-staff-management/candidate-invitations.php';
+    require __DIR__ . '/modules/candidate-staff-management/job-applications.php';
+
+    // HR & Payroll Management Module
+    require __DIR__ . '/modules/hr-payroll-management/employee-record.php';
+
+    // Invoicing Module - HR & Payroll Management Extension
+    require __DIR__ . '/modules/invoicing/invoicing-routes.php';
+});
+
+/*
+|--------------------------------------------------------------------------
+| Legacy & Webhook Routes
+|--------------------------------------------------------------------------
+*/
+
+// Legacy API Support
+Route::prefix('v1')->middleware(['web', 'auth:sanctum'])->group(function () {
+    Route::get('/clients', [\App\Http\Controllers\ClientController::class, 'index'])->name('v1.clients.index');
+    Route::get('/clients/{id}', [\App\Http\Controllers\ClientController::class, 'show'])->name('v1.clients.show');
+});
+
+// Webhooks
 Route::prefix('webhooks')->group(function () {
     Route::post('/client-updated/{clientId}', function ($clientId) {
-        // Handle external client update notifications
         try {
             $client = DB::table('clients')->where('id', $clientId)->first();
 
@@ -819,7 +336,6 @@ Route::prefix('webhooks')->group(function () {
                 return response()->json(['error' => 'Client not found'], 404);
             }
 
-            // Log the webhook event
             Log::info('Client webhook triggered', [
                 'client_id' => $clientId,
                 'client_name' => $client->name,
@@ -837,14 +353,76 @@ Route::prefix('webhooks')->group(function () {
     })->name('webhooks.client-updated');
 });
 
+// API Documentation
+Route::get('/client-management/docs', function () {
+    return response()->json([
+        'title' => 'SOL Nigeria HRM - Client Management API',
+        'version' => '2.0',
+        'description' => 'Comprehensive API for managing clients, locations, and services',
+        'base_url' => env('APP_URL') . '/api'
+    ]);
+})->name('docs.client-management');
+
 /*
 |--------------------------------------------------------------------------
-| Additional Routes for CSRF-Free API Access
+| Offer Letter Template Routes
 |--------------------------------------------------------------------------
 */
 
-// ✅ FIXED: Additional routes that need web middleware for session handling
-Route::middleware(['web', 'auth:sanctum'])->group(function () {
-    // Only routes that specifically need session/CSRF should be here
-    // Most API operations should use the auth:sanctum only group above
+// Protected offer letter template routes
+Route::middleware(['auth:sanctum'])->prefix('offer-letter-templates')->group(function () {
+    // Get template for specific grade
+    Route::get('/grade', [OfferLetterTemplateController::class, 'getForGrade']);
+
+    // CRUD operations
+    Route::post('/', [OfferLetterTemplateController::class, 'store']);
+    Route::put('/{template}', [OfferLetterTemplateController::class, 'update']);
+    Route::delete('/{template}', [OfferLetterTemplateController::class, 'destroy']);
+
+    // Utilities
+    Route::get('/salary-components', [OfferLetterTemplateController::class, 'getSalaryComponents']);
+    Route::post('/preview', [OfferLetterTemplateController::class, 'generatePreview']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Phase 4.1: Service Integration Monitoring Routes
+|--------------------------------------------------------------------------
+*/
+
+use App\Http\Controllers\Api\ServiceIntegrationController;
+
+// Service health monitoring (protected)
+Route::middleware(['auth:sanctum'])->prefix('services')->group(function () {
+    // Comprehensive health check
+    Route::get('/health', [ServiceIntegrationController::class, 'healthCheck']);
+
+    // Performance metrics
+    Route::get('/performance', [ServiceIntegrationController::class, 'performanceMetrics']);
+
+    // Integration status summary
+    Route::get('/integration-status', [ServiceIntegrationController::class, 'integrationStatus']);
+
+    // Test specific service integration
+    Route::post('/test-integration', [ServiceIntegrationController::class, 'testServiceIntegration']);
+});
+
+// Public health check (simplified)
+Route::get('/health/services', function () {
+    try {
+        $monitor = app(\App\Services\ServiceIntegrationMonitor::class);
+        $health = $monitor->performHealthCheck();
+
+        return response()->json([
+            'status' => $health['overall_status'],
+            'timestamp' => $health['timestamp'],
+            'services_count' => count($health['services']),
+            'message' => 'Phase 4.1 Service Integration Status'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Service monitoring unavailable'
+        ], 503);
+    }
 });

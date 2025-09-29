@@ -30,16 +30,23 @@ class UtilityController extends Controller
     public function getClientCategories()
     {
         try {
-            $categories = DB::table('service_requests')
-                ->where('is_active', 1)
-                ->whereNotNull('category')
-                ->distinct()
-                ->orderBy('category')
-                ->pluck('category');
+            // Standard business entity types for client categories
+            $categories = [
+                'Corporate',
+                'SME',
+                'Government',
+                'NGO',
+                'International',
+                'Startup',
+                'Enterprise',
+                'Public Sector',
+                'Private Sector',
+                'Multinational'
+            ];
 
             return response()->json([
                 'success' => true,
-                'data' => $categories->toArray()
+                'data' => $categories
             ]);
         } catch (\Exception $e) {
             return response()->json([

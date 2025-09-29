@@ -1,688 +1,250 @@
+// Core API Configuration and Base Service
 class APIService {
   constructor() {
     this.baseURL =
-      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
-    this.defaultHeaders = {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-    };
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+    this.authToken = null;
+
+    // Try to get token from localStorage on initialization
+    if (typeof window !== "undefined") {
+      this.authToken = localStorage.getItem("auth_token");
+    }
+  }
+
+  setAuthToken(token) {
+    this.authToken = token;
+    if (typeof window !== "undefined") {
+      if (token) {
+        localStorage.setItem("auth_token", token);
+      } else {
+        localStorage.removeItem("auth_token");
+      }
+    }
+  }
+
+  getAuthToken() {
+    return this.authToken;
   }
 
   async makeRequest(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
 
+    // For authenticated requests, ensure CSRF cookie is available
+    if (!options.skipCsrf && typeof window !== "undefined") {
+      try {
+        await fetch(`${this.baseURL.replace('/api', '')}/sanctum/csrf-cookie`, {
+          credentials: "include",
+        });
+        console.log("✅ CSRF cookie ensured for:", endpoint);
+      } catch (csrfError) {
+        console.warn("⚠️ CSRF cookie fetch failed:", csrfError);
+      }
+    }
+
+    const headers = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-Requested-With": "XMLHttpRequest", // Required for Laravel Sanctum
+      ...options.headers,
+    };
+
+    // Add Authorization header if token is available
+    if (this.authToken) {
+      headers.Authorization = `Bearer ${this.authToken}`;
+    }
+
+    // Handle params for GET requests
+    if (
+      options.params &&
+      options.method !== "POST" &&
+      options.method !== "PUT"
+    ) {
+      const urlParams = new URLSearchParams(options.params);
+      const finalUrl = `${url}?${urlParams}`;
+      delete options.params;
+
+      const config = {
+        method: options.method || "GET",
+        headers,
+        credentials: "include", // Include cookies for session-based auth
+        signal: options.signal, // Support for AbortController
+        ...options,
+      };
+
+      try {
+        const response = await fetch(finalUrl, config);
+        const contentType = response.headers.get("content-type");
+        let data;
+
+        if (contentType && contentType.includes("application/json")) {
+          data = await response.json();
+        } else {
+          data = await response.text();
+        }
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            // Only redirect to login if we're not already on login page
+            // and if this isn't from an aborted request
+            const currentPath =
+              typeof window !== "undefined" ? window.location.pathname : "";
+            if (currentPath !== "/login" && !error?.name?.includes("Abort")) {
+              console.warn("Authentication expired, redirecting to login");
+              this.setAuthToken(null);
+              if (typeof window !== "undefined") {
+                // Use setTimeout to prevent immediate redirect during component cleanup
+                setTimeout(() => {
+                  window.location.href = "/login";
+                }, 100);
+              }
+            }
+          }
+
+          // For 404s, return the response data so individual APIs can handle them
+          if (response.status === 404 && data && data.message) {
+            return data;
+          }
+
+          throw new Error(
+            data.message || `HTTP error! status: ${response.status}`
+          );
+        }
+
+        return data;
+      } catch (error) {
+        console.error("API Request failed:", error);
+        throw error;
+      }
+    }
+
     const config = {
-      credentials: "include",
-      headers: {
-        ...this.defaultHeaders,
-        ...options.headers,
-      },
+      method: options.method || "GET",
+      headers,
+      credentials: "include", // Include cookies for session-based auth
+      body: options.body,
+      signal: options.signal, // Support for AbortController
       ...options,
     };
 
-    const response = await fetch(url, config);
-    const data = await response.json();
+    // Debug logging
+    console.log("API Request:", {
+      url,
+      method: config.method,
+      hasToken: !!this.authToken,
+      hasCSRF: !!headers["X-XSRF-TOKEN"],
+      headers,
+    });
 
-    if (!response.ok) {
-      throw new Error(data.message || `HTTP error! status: ${response.status}`);
+    try {
+      const response = await fetch(url, config);
+
+      const contentType = response.headers.get("content-type");
+      let data;
+
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        data = await response.text();
+      }
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Only redirect to login if we're not already on login page
+          // and if this isn't from an aborted request
+          const currentPath =
+            typeof window !== "undefined" ? window.location.pathname : "";
+          if (currentPath !== "/login" && !error?.name?.includes("Abort")) {
+            console.warn("Authentication expired, redirecting to login");
+            this.setAuthToken(null);
+            if (typeof window !== "undefined") {
+              // Use setTimeout to prevent immediate redirect during component cleanup
+              setTimeout(() => {
+                window.location.href = "/login";
+              }, 100);
+            }
+          }
+        }
+
+        // For validation errors, include the validation details
+        if (response.status === 422 && data.errors) {
+          const validationErrors = Object.entries(data.errors)
+            .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
+            .join('; ');
+          throw new Error(
+            `${data.message || 'Validation failed'}: ${validationErrors}`
+          );
+        }
+
+        throw new Error(
+          data.message || `HTTP error! status: ${response.status}`
+        );
+      }
+
+      return data;
+    } catch (error) {
+      console.error("API Request failed:", error);
+      throw error;
     }
-
-    return data;
   }
 
+  // Authentication methods
   async register(userData) {
-    return this.makeRequest("/register", {
-      method: "POST",
-      body: JSON.stringify(userData),
-    });
-  }
-
-  async login(credentials) {
-    return this.makeRequest("/login", {
-      method: "POST",
-      body: JSON.stringify(credentials),
-    });
+    try {
+      const response = await this.makeRequest("/register", {
+        method: "POST",
+        body: JSON.stringify(userData),
+      });
+      return response;
+    } catch (error) {
+      console.error("Registration failed:", error);
+      throw error;
+    }
   }
 }
 
-// Create API service instance
-const apiService = new APIService();
+// Create singleton instance
+export const apiService = new APIService();
 
-// SOL Office API functions
-export const solOfficeAPI = {
-  // Get all SOL offices with filters
-  getAll: async (params = {}) => {
-    try {
-      const queryString = new URLSearchParams(params).toString();
-      const endpoint = `/admin/sol-offices${
-        queryString ? `?${queryString}` : ""
-      }`;
-      return await apiService.makeRequest(endpoint);
-    } catch (error) {
-      console.error("Error fetching SOL offices:", error);
-      throw error;
-    }
-  },
+// Import all modular APIs
+import clientMasterAPI from "./modules/client-contract-management/clientMasterAPI";
+import serviceLocationsAPI from "./modules/client-contract-management/serviceLocationsAPI";
+import serviceRequestsAPI from "./modules/client-contract-management/serviceRequestsAPI"; // Stub for removed functionality
+import clientContractsAPI from "./modules/client-contract-management/clientContractsAPI";
+import { salaryStructureAPI } from "./modules/client-contract-management/salary-structure";
+import solOfficeAPI from "./modules/administration/solOfficeAPI";
 
-  // Get single SOL office
-  getById: async (id) => {
-    try {
-      return await apiService.makeRequest(`/admin/sol-offices/${id}`);
-    } catch (error) {
-      console.error("Error fetching SOL office:", error);
-      throw error;
-    }
-  },
+// RECRUITMENT MANAGEMENT IMPORT
+import recruitmentRequestAPI from "./modules/recruitment-management/recruitmentRequestAPI";
+import clientInterviewAPI from "./modules/recruitment-management/clientInterviewAPI";
 
-  // Create new SOL office
-  create: async (data) => {
-    try {
-      return await apiService.makeRequest("/admin/sol-offices", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
-    } catch (error) {
-      console.error("Error creating SOL office:", error);
-      throw error;
-    }
-  },
+// OFFER LETTER MANAGEMENT IMPORT
+import { offerLetterAPI } from "./modules/client-contract-management/offer-letter";
 
-  // Update SOL office
-  update: async (id, data) => {
-    try {
-      return await apiService.makeRequest(`/admin/sol-offices/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      });
-    } catch (error) {
-      console.error("Error updating SOL office:", error);
-      throw error;
-    }
-  },
+// Clean, organized exports (no legacy naming confusion)
+export {
+  // Client Contract Management APIs
+  clientMasterAPI,
+  serviceLocationsAPI,
+  serviceRequestsAPI, // Stub for removed functionality
+  clientContractsAPI,
+  salaryStructureAPI,
 
-  // Delete SOL office
-  delete: async (id) => {
-    try {
-      return await apiService.makeRequest(`/admin/sol-offices/${id}`, {
-        method: "DELETE",
-      });
-    } catch (error) {
-      console.error("Error deleting SOL office:", error);
-      throw error;
-    }
-  },
+  // Administration APIs
+  solOfficeAPI,
 
-  // Get states and LGAs for forms
-  getStatesAndLGAs: async () => {
-    try {
-      return await apiService.makeRequest("/utilities/states-lgas");
-    } catch (error) {
-      console.error("Error fetching states and LGAs:", error);
-      throw error;
-    }
-  },
+  // Recruitment Management APIs
+  recruitmentRequestAPI,
+  clientInterviewAPI,
 
-  // Get statistics
-  getStatistics: async () => {
-    try {
-      return await apiService.makeRequest("/admin/sol-offices/data/statistics");
-    } catch (error) {
-      console.error("Error fetching statistics:", error);
-      throw error;
-    }
-  },
-
-  // Bulk update status
-  bulkUpdateStatus: async (officeIds, isActive) => {
-    try {
-      return await apiService.makeRequest("/admin/sol-offices/bulk/status", {
-        method: "PATCH",
-        body: JSON.stringify({
-          office_ids: officeIds,
-          is_active: isActive,
-        }),
-      });
-    } catch (error) {
-      console.error("Error bulk updating offices:", error);
-      throw error;
-    }
-  },
-
-  // Auto-assign office based on location
-  autoAssignOffice: async (stateCode, lgaCode = null) => {
-    try {
-      const params = { state_code: stateCode };
-      if (lgaCode) params.lga_code = lgaCode;
-
-      const queryString = new URLSearchParams(params).toString();
-      return await apiService.makeRequest(
-        `/sol-offices/lookup/auto-assign?${queryString}`
-      );
-    } catch (error) {
-      console.error("Error auto-assigning office:", error);
-      throw error;
-    }
-  },
-
-  // Get active offices for dropdowns
-  getActiveOffices: async () => {
-    try {
-      return await apiService.makeRequest("/sol-offices/active");
-    } catch (error) {
-      console.error("Error fetching active offices:", error);
-      throw error;
-    }
-  },
+  // Offer Letter Management APIs
+  offerLetterAPI,
 };
 
-// ✅ ADD THESE CLIENT CONTRACT API FUNCTIONS TO YOUR api.js FILE
-// Place this after your existing solOfficeAPI object
+// Legacy aliases for backward compatibility (clean version)
+export const clientAPI = clientMasterAPI;
+export const serviceLocationAPI = serviceLocationsAPI; // Simple alias
+export const serviceRequestAPI = serviceRequestsAPI; // Stub for removed functionality
+export const solMasterAPI = solOfficeAPI;
 
-// Client Contract API functions
-export const clientContractAPI = {
-  // Get all client contracts with pagination and filtering
-  getAll: async (params = {}) => {
-    try {
-      const queryString = new URLSearchParams(params).toString();
-      const endpoint = `/client-contracts${
-        queryString ? `?${queryString}` : ""
-      }`;
-      return await apiService.makeRequest(endpoint);
-    } catch (error) {
-      console.error("Error fetching client contracts:", error);
-      throw error;
-    }
-  },
-
-  // Get single client contract
-  getById: async (id) => {
-    try {
-      return await apiService.makeRequest(`/client-contracts/${id}`);
-    } catch (error) {
-      console.error("Error fetching client contract:", error);
-      throw error;
-    }
-  },
-
-  // Create new client contract
-  create: async (data) => {
-    try {
-      // Handle file uploads with FormData
-      if (data.attachment_1 || data.attachment_2 || data.attachment_3) {
-        const formData = new FormData();
-
-        // Add all form fields
-        Object.keys(data).forEach((key) => {
-          if (key.startsWith("attachment_") && data[key] instanceof File) {
-            formData.append(key, data[key]);
-          } else if (
-            key === "selected_particulars" &&
-            Array.isArray(data[key])
-          ) {
-            data[key].forEach((particular, index) => {
-              formData.append(`selected_particulars[${index}]`, particular);
-            });
-          } else if (data[key] !== null && data[key] !== undefined) {
-            formData.append(key, data[key]);
-          }
-        });
-
-        return await apiService.makeRequest("/client-contracts", {
-          method: "POST",
-          headers: {
-            // Remove Content-Type to let browser set it with boundary for FormData
-          },
-          body: formData,
-        });
-      } else {
-        // No files, use JSON
-        return await apiService.makeRequest("/client-contracts", {
-          method: "POST",
-          body: JSON.stringify(data),
-        });
-      }
-    } catch (error) {
-      console.error("Error creating client contract:", error);
-      throw error;
-    }
-  },
-
-  // Update client contract
-  update: async (id, data) => {
-    try {
-      // Handle file uploads with FormData
-      if (data.attachment_1 || data.attachment_2 || data.attachment_3) {
-        const formData = new FormData();
-        formData.append("_method", "PUT"); // Laravel method spoofing
-
-        // Add all form fields
-        Object.keys(data).forEach((key) => {
-          if (key.startsWith("attachment_") && data[key] instanceof File) {
-            formData.append(key, data[key]);
-          } else if (
-            key === "selected_particulars" &&
-            Array.isArray(data[key])
-          ) {
-            data[key].forEach((particular, index) => {
-              formData.append(`selected_particulars[${index}]`, particular);
-            });
-          } else if (data[key] !== null && data[key] !== undefined) {
-            formData.append(key, data[key]);
-          }
-        });
-
-        return await apiService.makeRequest(`/client-contracts/${id}`, {
-          method: "POST", // Using POST with _method=PUT for file uploads
-          headers: {
-            // Remove Content-Type to let browser set it with boundary for FormData
-          },
-          body: formData,
-        });
-      } else {
-        // No files, use JSON
-        return await apiService.makeRequest(`/client-contracts/${id}`, {
-          method: "PUT",
-          body: JSON.stringify(data),
-        });
-      }
-    } catch (error) {
-      console.error("Error updating client contract:", error);
-      throw error;
-    }
-  },
-
-  // Delete client contract
-  delete: async (id) => {
-    try {
-      return await apiService.makeRequest(`/client-contracts/${id}`, {
-        method: "DELETE",
-      });
-    } catch (error) {
-      console.error("Error deleting client contract:", error);
-      throw error;
-    }
-  },
-
-  // Get contracts by client
-  getByClient: async (clientId) => {
-    try {
-      return await apiService.makeRequest(
-        `/client-contracts/by-client/${clientId}`
-      );
-    } catch (error) {
-      console.error("Error fetching client contracts:", error);
-      throw error;
-    }
-  },
-
-  // Get contract particulars master data
-  getContractParticulars: async () => {
-    try {
-      return await apiService.makeRequest("/client-contracts/particulars");
-    } catch (error) {
-      console.error("Error fetching contract particulars:", error);
-      throw error;
-    }
-  },
-
-  // Toggle contract status
-  toggleStatus: async (id) => {
-    try {
-      return await apiService.makeRequest(
-        `/client-contracts/${id}/toggle-status`,
-        {
-          method: "PATCH",
-        }
-      );
-    } catch (error) {
-      console.error("Error toggling contract status:", error);
-      throw error;
-    }
-  },
-
-  // Get expiring contracts
-  getExpiringSoon: async () => {
-    try {
-      return await apiService.makeRequest("/client-contracts/expiring-soon");
-    } catch (error) {
-      console.error("Error fetching expiring contracts:", error);
-      throw error;
-    }
-  },
-
-  // Download contract attachment
-  downloadAttachment: async (contractId, attachmentNumber) => {
-    try {
-      const response = await fetch(
-        `${apiService.baseURL}/client-contracts/${contractId}/attachment/${attachmentNumber}`,
-        {
-          method: "GET",
-          headers: {
-            ...apiService.getHeaders(),
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      // Handle file download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `contract_attachment_${attachmentNumber}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-
-      return { success: true, message: "Attachment downloaded successfully" };
-    } catch (error) {
-      console.error("Error downloading attachment:", error);
-      throw error;
-    }
-  },
-
-  // Get contract statistics
-  getStatistics: async () => {
-    try {
-      return await apiService.makeRequest("/client-contracts/statistics");
-    } catch (error) {
-      console.error("Error fetching contract statistics:", error);
-      throw error;
-    }
-  },
-};
-
-// Service Location API functions
-export const serviceLocationAPI = {
-  // Get all service locations with filters
-  getAll: async (params = {}) => {
-    try {
-      const queryString = new URLSearchParams(params).toString();
-      const endpoint = `/service-locations${
-        queryString ? `?${queryString}` : ""
-      }`;
-      return await apiService.makeRequest(endpoint);
-    } catch (error) {
-      console.error("Error fetching service locations:", error);
-      throw error;
-    }
-  },
-
-  // Get single service location
-  getById: async (id) => {
-    try {
-      return await apiService.makeRequest(`/service-locations/${id}`);
-    } catch (error) {
-      console.error("Error fetching service location:", error);
-      throw error;
-    }
-  },
-
-  // Create new service location
-  create: async (data) => {
-    try {
-      return await apiService.makeRequest("/service-locations", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
-    } catch (error) {
-      console.error("Error creating service location:", error);
-      throw error;
-    }
-  },
-
-  // Update service location
-  update: async (id, data) => {
-    try {
-      return await apiService.makeRequest(`/service-locations/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      });
-    } catch (error) {
-      console.error("Error updating service location:", error);
-      throw error;
-    }
-  },
-
-  // Delete service location
-  delete: async (id) => {
-    try {
-      return await apiService.makeRequest(`/service-locations/${id}`, {
-        method: "DELETE",
-      });
-    } catch (error) {
-      console.error("Error deleting service location:", error);
-      throw error;
-    }
-  },
-
-  // Get locations by client
-  getByClient: async (clientId) => {
-    try {
-      return await apiService.makeRequest(
-        `/service-locations/by-client/${clientId}`
-      );
-    } catch (error) {
-      console.error("Error fetching client locations:", error);
-      throw error;
-    }
-  },
-
-  // Bulk import locations
-  bulkImport: async (clientId, file) => {
-    try {
-      const formData = new FormData();
-      formData.append("client_id", clientId);
-      formData.append("file", file);
-
-      return await apiService.makeRequest(
-        "/admin/service-locations/bulk-import",
-        {
-          method: "POST",
-          headers: {
-            // Remove Content-Type to let browser set it with boundary for FormData
-          },
-          body: formData,
-        }
-      );
-    } catch (error) {
-      console.error("Error bulk importing locations:", error);
-      throw error;
-    }
-  },
-
-  // Generate location code
-  generateCode: async (clientCode, city) => {
-    try {
-      const params = { client_code: clientCode, city: city };
-      const queryString = new URLSearchParams(params).toString();
-      return await apiService.makeRequest(
-        `/service-locations/generate-code?${queryString}`
-      );
-    } catch (error) {
-      console.error("Error generating location code:", error);
-      throw error;
-    }
-  },
-};
-
-// Client API functions
-export const clientAPI = {
-  // Get all clients
-  getAll: async (params = {}) => {
-    try {
-      const queryString = new URLSearchParams(params).toString();
-      const endpoint = `/clients${queryString ? `?${queryString}` : ""}`;
-      return await apiService.makeRequest(endpoint);
-    } catch (error) {
-      console.error("Error fetching clients:", error);
-      throw error;
-    }
-  },
-
-  // Get active clients for dropdowns
-  getActive: async () => {
-    try {
-      return await apiService.makeRequest("/clients"); // ← Just get all clients, no filters
-    } catch (error) {
-      console.error("Error fetching active clients:", error);
-      throw error;
-    }
-  },
-};
-
-// Service Request API (Updated for client-based structure)
-export const serviceRequestAPI = {
-  // Get all service requests with filtering
-  getAll: async (params = {}) => {
-    try {
-      const queryString = new URLSearchParams();
-
-      Object.keys(params).forEach((key) => {
-        if (
-          params[key] !== null &&
-          params[key] !== undefined &&
-          params[key] !== ""
-        ) {
-          queryString.append(key, params[key]);
-        }
-      });
-
-      const endpoint = `/service-requests${
-        queryString.toString() ? `?${queryString}` : ""
-      }`;
-      return await apiService.makeRequest(endpoint);
-    } catch (error) {
-      console.error("Error fetching service requests:", error);
-      throw error;
-    }
-  },
-
-  // Get single service request
-  getById: async (id) => {
-    try {
-      return await apiService.makeRequest(`/service-requests/${id}`);
-    } catch (error) {
-      console.error("Error fetching service request:", error);
-      throw error;
-    }
-  },
-
-  // Create new service request
-  create: async (data) => {
-    try {
-      return await apiService.makeRequest("/service-requests", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
-    } catch (error) {
-      console.error("Error creating service request:", error);
-      throw error;
-    }
-  },
-
-  // Update service request
-  update: async (id, data) => {
-    try {
-      return await apiService.makeRequest(`/service-requests/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      });
-    } catch (error) {
-      console.error("Error updating service request:", error);
-      throw error;
-    }
-  },
-
-  // Delete service request
-  delete: async (id) => {
-    try {
-      return await apiService.makeRequest(`/service-requests/${id}`, {
-        method: "DELETE",
-      });
-    } catch (error) {
-      console.error("Error deleting service request:", error);
-      throw error;
-    }
-  },
-
-  // Get services grouped by client
-  getByClient: async () => {
-    try {
-      return await apiService.makeRequest(
-        "/service-requests/by-client/grouped"
-      );
-    } catch (error) {
-      console.error("Error fetching services by client:", error);
-      throw error;
-    }
-  },
-
-  // Get service types (optionally filtered by client)
-  getServiceTypes: async (clientId = null) => {
-    try {
-      const endpoint = clientId
-        ? `/service-requests/service-types/list?client_id=${clientId}`
-        : "/service-requests/service-types/list";
-      return await apiService.makeRequest(endpoint);
-    } catch (error) {
-      console.error("Error fetching service types:", error);
-      throw error;
-    }
-  },
-
-  // Generate service code
-  generateServiceCode: async (data) => {
-    try {
-      return await apiService.makeRequest("/service-requests/generate-code", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
-    } catch (error) {
-      console.error("Error generating service code:", error);
-      throw error;
-    }
-  },
-
-  // Get dashboard statistics
-  getDashboardStats: async () => {
-    try {
-      return await apiService.makeRequest(
-        "/service-requests/dashboard/statistics"
-      );
-    } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
-      throw error;
-    }
-  },
-
-  // Bulk operations
-  bulkUpdate: async (data) => {
-    try {
-      return await apiService.makeRequest("/service-requests/bulk-update", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
-    } catch (error) {
-      console.error("Error performing bulk update:", error);
-      throw error;
-    }
-  },
-
-  // Legacy method (for backward compatibility)
-  getUsageStatistics: async () => {
-    try {
-      return await apiService.makeRequest("/service-requests/usage-statistics");
-    } catch (error) {
-      console.error("Error fetching usage statistics:", error);
-      throw error;
-    }
-  },
-};
-
-export default new APIService();
+// Default export
+export default apiService;

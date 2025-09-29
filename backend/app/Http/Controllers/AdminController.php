@@ -61,17 +61,17 @@ class AdminController extends Controller
                 'staff_on_probation' => DB::table('staff')->where('appointment_status', 'probation')->count(),
 
                 // Job statistics
-                'total_jobs' => DB::table('job_opportunities')->count(),
-                'active_jobs' => DB::table('job_opportunities')->where('status', 'active')->count(),
-                'jobs_closing_soon' => DB::table('job_opportunities')
-                    ->where('application_deadline', '<=', now()->addDays(7))
+                'total_jobs' => DB::table('recruitment_requests')->count(),
+                'active_jobs' => DB::table('recruitment_requests')->where('status', 'active')->count(),
+                'jobs_closing_soon' => DB::table('recruitment_requests')
+                    ->where('recruitment_period_end', '<=', now()->addDays(7))
                     ->where('status', 'active')
                     ->count(),
 
                 // Application statistics
-                'total_applications' => DB::table('job_applications')->count(),
-                'pending_applications' => DB::table('job_applications')->where('status', 'pending')->count(),
-                'applications_today' => DB::table('job_applications')
+                'total_applications' => DB::table('candidate_job_applications')->count(),
+                'pending_applications' => DB::table('candidate_job_applications')->where('application_status', 'applied')->count(),
+                'applications_today' => DB::table('candidate_job_applications')
                     ->whereDate('applied_at', today())
                     ->count(),
 
@@ -81,66 +81,47 @@ class AdminController extends Controller
                     ->whereNotNull('account_verified_at')
                     ->count(),
 
-                // Interview statistics
-                'interviews_scheduled' => DB::table('job_interviews')
-                    ->where('status', 'scheduled')
-                    ->count(),
-                'interviews_today' => DB::table('job_interviews')
+                // Interview statistics - Using interview_invitations table
+                'interviews_scheduled' => DB::table('interview_invitations')->count(),
+                'interviews_completed' => DB::table('interview_invitations')->where('status', 'completed')->count(),
+                'interviews_today' => DB::table('interview_invitations')
                     ->whereDate('interview_date', today())
                     ->count(),
 
                 // Monthly metrics
-                'hired_this_month' => DB::table('job_applications')
-                    ->where('status', 'hired')
+                'hired_this_month' => DB::table('candidate_job_applications')
+                    ->where('application_status', 'accepted')
                     ->whereMonth('updated_at', now()->month)
                     ->whereYear('updated_at', now()->year)
                     ->count(),
-                'applications_this_month' => DB::table('job_applications')
+                'applications_this_month' => DB::table('candidate_job_applications')
                     ->whereMonth('applied_at', now()->month)
                     ->whereYear('applied_at', now()->year)
                     ->count(),
             ];
 
             // Recent applications
-            $recent_applications = DB::table('job_applications')
-                ->join('candidates', 'job_applications.candidate_id', '=', 'candidates.id')
-                ->join('job_opportunities', 'job_applications.job_opportunity_id', '=', 'job_opportunities.id')
-                ->join('clients', 'job_opportunities.client_id', '=', 'clients.id')
+            $recent_applications = DB::table('candidate_job_applications')
+                ->join('candidates', 'candidate_job_applications.candidate_id', '=', 'candidates.id')
+                ->join('recruitment_requests', 'candidate_job_applications.recruitment_request_id', '=', 'recruitment_requests.id')
+                ->join('clients', 'recruitment_requests.client_id', '=', 'clients.id')
+                ->join('job_structures', 'recruitment_requests.job_structure_id', '=', 'job_structures.id')
                 ->select(
-                    'job_applications.id',
-                    'job_applications.status',
-                    'job_applications.applied_at',
+                    'candidate_job_applications.id',
+                    'candidate_job_applications.application_status as status',
+                    'candidate_job_applications.applied_at',
                     'candidates.first_name',
                     'candidates.last_name',
                     'candidates.email',
-                    'job_opportunities.title as job_title',
+                    'job_structures.title as job_title',
                     'clients.name as client_name'
                 )
-                ->orderBy('job_applications.applied_at', 'desc')
+                ->orderBy('candidate_job_applications.applied_at', 'desc')
                 ->limit(10)
                 ->get();
 
-            // Upcoming interviews
-            $upcoming_interviews = DB::table('job_interviews')
-                ->join('job_applications', 'job_interviews.job_application_id', '=', 'job_applications.id')
-                ->join('candidates', 'job_applications.candidate_id', '=', 'candidates.id')
-                ->join('job_opportunities', 'job_applications.job_opportunity_id', '=', 'job_opportunities.id')
-                ->leftJoin('staff', 'job_interviews.interviewer_id', '=', 'staff.id')
-                ->select(
-                    'job_interviews.id',
-                    'job_interviews.interview_date',
-                    'job_interviews.interview_type',
-                    'job_interviews.location',
-                    'job_interviews.status',
-                    'candidates.first_name',
-                    'candidates.last_name',
-                    'job_opportunities.title as job_title',
-                    DB::raw('CONCAT(staff.first_name, " ", staff.last_name) as interviewer_name')
-                )
-                ->where('job_interviews.interview_date', '>', now())
-                ->orderBy('job_interviews.interview_date', 'asc')
-                ->limit(10)
-                ->get();
+            // Upcoming interviews - TODO: Update when interview system is migrated to new application system
+            $upcoming_interviews = collect(); // Empty collection since interview system needs migration
 
             return response()->json([
                 'status' => 'success',
@@ -169,13 +150,13 @@ class AdminController extends Controller
 
         try {
             $clients = DB::table('clients')
-                ->leftJoin('states_lgas', 'clients.state_lga_id', '=', 'states_lgas.id')
+                //    ->leftJoin('service_locations', 'clients.id', '=', 'service_locations.client_id')
                 ->select(
                     'clients.*',
-                    'states_lgas.state_name',
-                    'states_lgas.lga_name',
+                    //             'service_locations.state',
+                    // 'service_locations.city',
                     DB::raw('(SELECT COUNT(*) FROM staff WHERE staff.client_id = clients.id AND staff.status = "active") as active_staff_count'),
-                    DB::raw('(SELECT COUNT(*) FROM job_opportunities WHERE job_opportunities.client_id = clients.id AND job_opportunities.status = "active") as active_jobs_count')
+                    DB::raw('(SELECT COUNT(*) FROM recruitment_requests WHERE recruitment_requests.client_id = clients.id AND recruitment_requests.status = "active") as active_jobs_count')
                 )
                 ->orderBy('clients.name')
                 ->get();
@@ -200,41 +181,61 @@ class AdminController extends Controller
         if (!$this->checkAdminAccess()) {
             return response()->json(['error' => 'Unauthorized access'], 403);
         }
-
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255|unique:clients',
             'client_code' => 'required|string|max:20|unique:clients',
             'prefix' => 'required|string|max:10|unique:clients',
             'address' => 'nullable|string',
-            'state_lga_id' => 'nullable|exists:states_lgas,id',
-            'contract_start_date' => 'nullable|date',
-            'contract_end_date' => 'nullable|date|after:contract_start_date',
+            'contact_person' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'reg_no' => 'nullable|string|max:50',
+            'industry_category' => 'required|string|max:100',
+            'client_category' => 'required|string|max:100',
+            'client_status' => 'required|in:Client,Sundry Customer',
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'status' => 'in:active,inactive,suspended',
         ]);
-
         if ($validator->fails()) {
             return response()->json([
                 'status' => 'error',
                 'errors' => $validator->errors()
             ], 422);
         }
-
         try {
             $validated = $validator->validated();
-            $validated['slug'] = Str::slug($validated['name']);
-            $validated['created_at'] = now();
-            $validated['updated_at'] = now();
-
-            $clientId = DB::table('clients')->insertGetId($validated);
-
-            // Create default staff types for the client
+            $logoPath = null;
+            if ($request->hasFile('logo')) {
+                $logo = $request->file('logo');
+                $logoName = time() . '_' . $validated['client_code'] . '.' . $logo->getClientOriginalExtension();
+                $logoPath = $logo->storeAs('clients/logos', $logoName, 'public');
+            }
+            $configuration = [
+                'contact_person' => $validated['contact_person'],
+                'email' => $validated['email'],
+                'industry_category' => $validated['industry_category'],
+                'client_category' => $validated['client_category'],
+                'client_status' => $validated['client_status'],
+                'reg_no' => $validated['reg_no'],
+                'logo_path' => $logoPath,
+            ];
+            $clientId = DB::table('clients')->insertGetId([
+                'client_code' => strtoupper($validated['client_code']),
+                'name' => $validated['name'],
+                'slug' => Str::slug($validated['name']),
+                'prefix' => strtoupper($validated['prefix']),
+                'address' => $validated['address'],
+                'configuration' => json_encode($configuration),
+                'status' => $validated['status'] ?? 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            // Create default staff types
             $staffTypes = [
                 ['type_code' => 'MGR', 'title' => 'Manager', 'description' => 'Management positions'],
                 ['type_code' => 'SUP', 'title' => 'Supervisor', 'description' => 'Supervisory positions'],
                 ['type_code' => 'STF', 'title' => 'Staff', 'description' => 'General staff positions'],
                 ['type_code' => 'INT', 'title' => 'Intern', 'description' => 'Internship positions'],
             ];
-
             foreach ($staffTypes as $type) {
                 DB::table('client_staff_types')->insert([
                     'client_id' => $clientId,
@@ -246,9 +247,8 @@ class AdminController extends Controller
                     'updated_at' => now()
                 ]);
             }
-
             $client = DB::table('clients')->find($clientId);
-
+            $client->configuration = json_decode($client->configuration, true);
             return response()->json([
                 'status' => 'success',
                 'message' => 'Client created successfully',
@@ -272,24 +272,25 @@ class AdminController extends Controller
         }
 
         try {
-            $jobs = DB::table('job_opportunities')
-                ->join('clients', 'job_opportunities.client_id', '=', 'clients.id')
-                ->leftJoin('job_categories', 'job_opportunities.job_category_id', '=', 'job_categories.id')
-                ->leftJoin('states_lgas', 'job_opportunities.state_lga_id', '=', 'states_lgas.id')
-                ->leftJoin('staff', 'job_opportunities.created_by', '=', 'staff.id')
+            $jobs = DB::table('recruitment_requests')
+                ->join('clients', 'recruitment_requests.client_id', '=', 'clients.id')
+                ->join('job_structures', 'recruitment_requests.job_structure_id', '=', 'job_structures.id')
+                ->join('service_locations', 'recruitment_requests.service_location_id', '=', 'service_locations.id')
+                ->leftJoin('users', 'recruitment_requests.created_by', '=', 'users.id')
                 ->select(
-                    'job_opportunities.*',
+                    'recruitment_requests.*',
                     'clients.name as client_name',
                     'clients.client_code',
-                    'job_categories.name as category_name',
-                    'states_lgas.state_name',
-                    'states_lgas.lga_name',
-                    DB::raw('CONCAT(staff.first_name, " ", staff.last_name) as created_by_name'),
-                    DB::raw('(SELECT COUNT(*) FROM job_applications WHERE job_applications.job_opportunity_id = job_opportunities.id) as applications_count'),
-                    DB::raw('(SELECT COUNT(*) FROM job_applications WHERE job_applications.job_opportunity_id = job_opportunities.id AND job_applications.status = "pending") as pending_applications'),
-                    DB::raw('(SELECT COUNT(*) FROM job_applications WHERE job_applications.job_opportunity_id = job_opportunities.id AND job_applications.status = "hired") as hired_count')
+                    'job_structures.title as job_title',
+                    'job_structures.job_category',
+                    'service_locations.state',
+                    'service_locations.lga',
+                    DB::raw('CONCAT(users.first_name, " ", users.last_name) as created_by_name'),
+                    DB::raw('(SELECT COUNT(*) FROM candidate_job_applications WHERE candidate_job_applications.recruitment_request_id = recruitment_requests.id) as applications_count'),
+                    DB::raw('(SELECT COUNT(*) FROM candidate_job_applications WHERE candidate_job_applications.recruitment_request_id = recruitment_requests.id AND candidate_job_applications.application_status = "applied") as pending_applications'),
+                    DB::raw('(SELECT COUNT(*) FROM candidate_job_applications WHERE candidate_job_applications.recruitment_request_id = recruitment_requests.id AND candidate_job_applications.application_status = "accepted") as hired_count')
                 )
-                ->orderBy('job_opportunities.created_at', 'desc')
+                ->orderBy('recruitment_requests.created_at', 'desc')
                 ->get();
 
             return response()->json([
@@ -397,8 +398,8 @@ class AdminController extends Controller
         try {
             $applications = DB::table('job_applications')
                 ->join('candidates', 'job_applications.candidate_id', '=', 'candidates.id')
-                ->join('job_opportunities', 'job_applications.job_opportunity_id', '=', 'job_opportunities.id')
-                ->join('clients', 'job_opportunities.client_id', '=', 'clients.id')
+                ->join('recruitment_requests', 'job_applications.recruitment_request_id', '=', 'recruitment_requests.id')
+                ->join('clients', 'recruitment_requests.client_id', '=', 'clients.id')
                 ->leftJoin('staff as reviewer', 'job_applications.reviewed_by', '=', 'reviewer.id')
                 ->select(
                     'job_applications.*',
@@ -406,8 +407,8 @@ class AdminController extends Controller
                     'candidates.last_name',
                     'candidates.email as candidate_email',
                     'candidates.phone as candidate_phone',
-                    'job_opportunities.title as job_title',
-                    'job_opportunities.job_code',
+                    'recruitment_requests.description as job_title',
+                    'recruitment_requests.ticket_id as job_code',
                     'clients.name as client_name',
                     DB::raw('CONCAT(reviewer.first_name, " ", reviewer.last_name) as reviewed_by_name'),
                     DB::raw('(SELECT COUNT(*) FROM job_interviews WHERE job_interviews.job_application_id = job_applications.id) as interviews_count')
@@ -474,12 +475,12 @@ class AdminController extends Controller
 
             $updatedApplication = DB::table('job_applications')
                 ->join('candidates', 'job_applications.candidate_id', '=', 'candidates.id')
-                ->join('job_opportunities', 'job_applications.job_opportunity_id', '=', 'job_opportunities.id')
+                ->join('recruitment_requests', 'job_applications.recruitment_request_id', '=', 'recruitment_requests.id')
                 ->select(
                     'job_applications.*',
                     'candidates.first_name',
                     'candidates.last_name',
-                    'job_opportunities.title as job_title'
+                    'recruitment_requests.description as job_title'
                 )
                 ->where('job_applications.id', $applicationId)
                 ->first();
@@ -641,15 +642,15 @@ class AdminController extends Controller
             $stats = [
                 'total_staff' => DB::table('staff')->where('client_id', $clientId)->count(),
                 'active_staff' => DB::table('staff')->where('client_id', $clientId)->where('status', 'active')->count(),
-                'total_jobs' => DB::table('job_opportunities')->where('client_id', $clientId)->count(),
-                'active_jobs' => DB::table('job_opportunities')->where('client_id', $clientId)->where('status', 'active')->count(),
+                'total_jobs' => DB::table('recruitment_requests')->where('client_id', $clientId)->count(),
+                'active_jobs' => DB::table('recruitment_requests')->where('client_id', $clientId)->where('status', 'active')->count(),
                 'total_applications' => DB::table('job_applications')
-                    ->join('job_opportunities', 'job_applications.job_opportunity_id', '=', 'job_opportunities.id')
-                    ->where('job_opportunities.client_id', $clientId)
+                    ->join('recruitment_requests', 'job_applications.recruitment_request_id', '=', 'recruitment_requests.id')
+                    ->where('recruitment_requests.client_id', $clientId)
                     ->count(),
                 'pending_applications' => DB::table('job_applications')
-                    ->join('job_opportunities', 'job_applications.job_opportunity_id', '=', 'job_opportunities.id')
-                    ->where('job_opportunities.client_id', $clientId)
+                    ->join('recruitment_requests', 'job_applications.recruitment_request_id', '=', 'recruitment_requests.id')
+                    ->where('recruitment_requests.client_id', $clientId)
                     ->where('job_applications.status', 'pending')
                     ->count(),
             ];

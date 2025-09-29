@@ -119,3 +119,46 @@ DB::table('candidate_profiles')->insert([
     'updated_at' => now()
 ]);
 exit
+App\Models\EmolumentComponent::count()
+App\Models\EmolumentComponent::take(5)->get()
+$controller = new App\Http\Controllers\SalaryStructureController();
+$response = $controller->getEmolumentComponents();
+$response->getData();
+json_decode($response->getContent(), true);
+$controller = new App\Http\Controllers\SalaryStructureController();
+$response = $controller->getEmolumentComponents();
+$count = App\Models\EmolumentComponent::count();
+echo "Total emolument components: " . $count . "\n";
+$activeCount = App\Models\EmolumentComponent::where('is_active', 1)->count();
+echo "Active emolument components: " . $activeCount . "\n";
+$components = App\Models\EmolumentComponent::where('is_active', 1)->take(3)->get();
+echo "Response structure check:\n";
+echo "Success: " . ($data['success'] ? 'true' : 'false') . "\n";
+echo "Has data.all: " . (isset($data['data']['all']) ? 'true' : 'false') . "\n";
+if(isset($data['data']['all'])) {
+    echo "Count in data.all: " . count($data['data']['all']) . "\n";
+}
+$components = App\Models\EmolumentComponent::where('is_active', 1)->take(3)->get();
+echo "Response structure check:\n";
+echo "Success: " . ($data['success'] ? 'true' : 'false') . "\n";
+echo "Has data.all: " . (isset($data['data']['all']) ? 'true' : 'false') . "\n";
+$controller = new App\Http\Controllers\SalaryStructureController();
+$response = $controller->getEmolumentComponents();
+$count = App\Models\EmolumentComponent::count();
+echo "Total emolument components: " . $count . "\n";
+$activeCount = App\Models\EmolumentComponent::where('is_active', 1)->count();
+echo "Active emolument components: " . $activeCount . "\n";
+$components = App\Models\EmolumentComponent::where('is_active', 1)->take(3)->get();
+echo "Response structure check:\n";
+echo "Success: " . ($data['success'] ? 'true' : 'false') . "\n";
+echo "Has data.all: " . (isset($data['data']['all']) ? 'true' : 'false') . "\n";
+if(isset($data['data']['all'])) {
+    echo "Count in data.all: " . count($data['data']['all']) . "\n";
+}
+$data = json_decode($response->getContent(), true);
+ESCRIBE recruitment_requests;
+SELECT COLUMN_NAME 
+FROM INFORMATION_SCHEMA.COLUMNS 
+WHERE TABLE_NAME = 'recruitment_requests' 
+AND TABLE_SCHEMA = 'hrm_database'
+AND COLUMN_NAME LIKE '%service%';

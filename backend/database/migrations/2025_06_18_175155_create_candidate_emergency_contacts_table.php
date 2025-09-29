@@ -19,7 +19,13 @@ return new class extends Migration
             $table->string('email')->nullable();
             $table->text('address')->nullable();
             $table->boolean('is_primary')->default(false);
+            $table->string('emergency_state_of_residence', 100)->nullable();
+            $table->string('emergency_local_government_residence', 100)->nullable();
+            $table->string('emergency_address')->nullable();
+            $table->string('emergency_address_line_2')->nullable();
             $table->timestamps();
+
+            $table->index('candidate_id');
         });
     }
 

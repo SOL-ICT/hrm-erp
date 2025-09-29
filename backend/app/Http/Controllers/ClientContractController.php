@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
+use App\Http\Requests\ClientContractIndexRequest;
 use Exception;
 
 class ClientContractController extends Controller
@@ -14,20 +16,23 @@ class ClientContractController extends Controller
     /**
      * Get all client contracts with pagination and filtering
      */
-    public function index(Request $request)
+    public function index(ClientContractIndexRequest $request)
     {
         try {
-            $perPage = $request->get('per_page', 15);
-            $search = $request->get('search');
-            $clientId = $request->get('client_id');
-            $status = $request->get('status', 'all');
-            $sortBy = $request->get('sort_by', 'created_at');
-            $sortOrder = $request->get('sort_order', 'desc');
+            // Get validated and clean parameters
+            $params = $request->getCleanParams();
+
+            Log::info('=== CLIENT CONTRACTS REQUEST ===', [
+                'user_authenticated' => Auth::check(),
+                'user_id' => Auth::id(),
+                'clean_params' => $params
+            ]);
 
             $query = DB::table('view_client_contracts_with_details');
 
             // Apply search filter
-            if ($search) {
+            if (!empty($params['search'])) {
+                $search = $params['search'];
                 $query->where(function ($q) use ($search) {
                     $q->where('contract_code', 'LIKE', "%{$search}%")
                         ->orWhere('contract_type', 'LIKE', "%{$search}%")
@@ -36,34 +41,38 @@ class ClientContractController extends Controller
             }
 
             // Apply client filter
-            if ($clientId) {
-                $query->where('client_id', $clientId);
+            if (!empty($params['client_id'])) {
+                $query->where('client_id', $params['client_id']);
             }
 
-            // Apply status filter
-            if ($status !== 'all') {
-                if ($status === 'expiring') {
-                    $query->where('contract_status', 'Expiring Soon');
-                } elseif ($status === 'expired') {
-                    $query->where('contract_status', 'Expired');
-                } else {
-                    $query->where('status', $status);
+            // Apply status filter with proper validation
+            if (!empty($params['status']) && $params['status'] !== 'all') {
+                switch ($params['status']) {
+                    case 'expiring':
+                        $query->where('contract_status', 'Expiring Soon');
+                        break;
+                    case 'expired':
+                        $query->where('contract_status', 'Expired');
+                        break;
+                    case 'active':
+                    case 'inactive':
+                        $query->where('status', $params['status']);
+                        break;
                 }
             }
 
             // Apply sorting
-            $query->orderBy($sortBy, $sortOrder);
+            $query->orderBy($params['sort_by'], $params['sort_order']);
 
             // Paginate results
-            $contracts = $query->paginate($perPage);
+            $contracts = $query->paginate($params['per_page']);
 
-            // Process selected_particulars for each contract
-            $contracts->getCollection()->transform(function ($contract) {
-                if ($contract->selected_particulars) {
-                    $contract->selected_particulars = json_decode($contract->selected_particulars, true);
-                }
-                return $contract;
-            });
+            Log::info('=== CLIENT CONTRACTS RESPONSE ===', [
+                'contracts_count' => $contracts->count(),
+                'total' => $contracts->total(),
+                'current_page' => $contracts->currentPage(),
+                'per_page' => $contracts->perPage()
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -71,6 +80,11 @@ class ClientContractController extends Controller
                 'message' => 'Client contracts retrieved successfully'
             ]);
         } catch (Exception $e) {
+            Log::error('Error retrieving client contracts', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error retrieving client contracts: ' . $e->getMessage()
@@ -88,11 +102,6 @@ class ClientContractController extends Controller
             'contract_type' => 'required|string|max:100',
             'contract_start_date' => 'required|date',
             'contract_end_date' => 'required|date|after:contract_start_date',
-            'selected_particulars' => 'nullable|array',
-            'selected_particulars.*' => 'string|exists:contract_particulars_master,code',
-            'attachment_1' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
-            'attachment_2' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
-            'attachment_3' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
             'notes' => 'nullable|string|max:1000'
         ]);
 
@@ -116,17 +125,6 @@ class ClientContractController extends Controller
             // Generate contract code
             $contractCode = $this->generateContractCode($client->client_code);
 
-            // Handle file uploads
-            $attachments = [];
-            for ($i = 1; $i <= 3; $i++) {
-                if ($request->hasFile("attachment_$i")) {
-                    $file = $request->file("attachment_$i");
-                    $filename = time() . "_$i." . $file->getClientOriginalExtension();
-                    $path = $file->storeAs('contracts/' . $contractCode, $filename, 'public');
-                    $attachments["attachment_$i"] = $path;
-                }
-            }
-
             // Create contract
             $contractId = DB::table('client_contracts')->insertGetId([
                 'contract_code' => $contractCode,
@@ -134,9 +132,6 @@ class ClientContractController extends Controller
                 'contract_type' => $request->contract_type,
                 'contract_start_date' => $request->contract_start_date,
                 'contract_end_date' => $request->contract_end_date,
-                'attachment_1' => $attachments['attachment_1'] ?? null,
-                'attachment_2' => $attachments['attachment_2'] ?? null,
-                'attachment_3' => $attachments['attachment_3'] ?? null,
                 'selected_particulars' => json_encode($request->selected_particulars ?? []),
                 'status' => 'active',
                 'notes' => $request->notes,
@@ -205,11 +200,6 @@ class ClientContractController extends Controller
             'contract_type' => 'required|string|max:100',
             'contract_start_date' => 'required|date',
             'contract_end_date' => 'required|date|after:contract_start_date',
-            'selected_particulars' => 'nullable|array',
-            'selected_particulars.*' => 'string|exists:contract_particulars_master,code',
-            'attachment_1' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
-            'attachment_2' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
-            'attachment_3' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
             'notes' => 'nullable|string|max:1000',
             'status' => 'nullable|in:active,inactive,expired,terminated'
         ]);
@@ -234,26 +224,6 @@ class ClientContractController extends Controller
 
             DB::beginTransaction();
 
-            // Handle file uploads
-            $attachments = [
-                'attachment_1' => $existingContract->attachment_1,
-                'attachment_2' => $existingContract->attachment_2,
-                'attachment_3' => $existingContract->attachment_3,
-            ];
-
-            for ($i = 1; $i <= 3; $i++) {
-                if ($request->hasFile("attachment_$i")) {
-                    // Delete old file if exists
-                    if ($attachments["attachment_$i"]) {
-                        Storage::disk('public')->delete($attachments["attachment_$i"]);
-                    }
-
-                    $file = $request->file("attachment_$i");
-                    $filename = time() . "_$i." . $file->getClientOriginalExtension();
-                    $path = $file->storeAs('contracts/' . $existingContract->contract_code, $filename, 'public');
-                    $attachments["attachment_$i"] = $path;
-                }
-            }
 
             // Update contract
             DB::table('client_contracts')
@@ -263,9 +233,6 @@ class ClientContractController extends Controller
                     'contract_type' => $request->contract_type,
                     'contract_start_date' => $request->contract_start_date,
                     'contract_end_date' => $request->contract_end_date,
-                    'attachment_1' => $attachments['attachment_1'],
-                    'attachment_2' => $attachments['attachment_2'],
-                    'attachment_3' => $attachments['attachment_3'],
                     'selected_particulars' => json_encode($request->selected_particulars ?? []),
                     'status' => $request->status ?? $existingContract->status,
                     'notes' => $request->notes,
@@ -305,14 +272,6 @@ class ClientContractController extends Controller
             }
 
             DB::beginTransaction();
-
-            // Delete attachments
-            $attachments = [$contract->attachment_1, $contract->attachment_2, $contract->attachment_3];
-            foreach ($attachments as $attachment) {
-                if ($attachment) {
-                    Storage::disk('public')->delete($attachment);
-                }
-            }
 
             // Delete contract
             DB::table('client_contracts')->where('id', $id)->delete();

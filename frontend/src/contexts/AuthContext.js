@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useState, useEffect, useContext } from "react";
 import { useRouter } from "next/navigation";
 
 const AuthContext = createContext({});
@@ -9,12 +9,102 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const router = useRouter();
+
+  // Request deduplication to prevent multiple simultaneous identical requests
+  const requestCache = new Map();
+  const pendingRequests = new Map();
+
+  // Enhanced Sanctum request with better security and deduplication
+  const sanctumRequest = async (url, options = {}) => {
+    // Handle relative URLs by prepending the backend base URL
+    const fullUrl = url.startsWith('/') ? `http://localhost:8000${url}` : url;
+    
+    // Create a unique key for this request to prevent duplicates
+    const requestKey = `${options.method || 'GET'}:${fullUrl}:${JSON.stringify(options.body || {})}`;
+    
+    // If the same request is already pending, return the existing promise
+    if (pendingRequests.has(requestKey)) {
+      console.log("🔄 Deduplicating request:", fullUrl);
+      return pendingRequests.get(requestKey);
+    }
+
+    console.log("🔒 Making authenticated API request to:", fullUrl);
+
+    // Try multiple token storage methods for compatibility
+    let bearerToken = null;
+    
+    if (typeof window !== "undefined") {
+      // Method 1: Check for JSON auth data (used by candidate components)
+      try {
+        const authData = JSON.parse(localStorage.getItem('auth') || '{}');
+        bearerToken = authData.access_token;
+      } catch (e) {
+        console.log("No JSON auth data found");
+      }
+      
+      // Method 2: Check for direct token storage (fallback)
+      if (!bearerToken) {
+        bearerToken = localStorage.getItem("auth_token") || localStorage.getItem("token");
+      }
+    }
+
+    const headers = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-Requested-With": "XMLHttpRequest", // This helps with CSRF bypass for SPA
+      Origin: window.location.origin, // Explicit origin for CORS validation
+      ...options.headers,
+    };
+
+    // Only add Bearer token if it's a real token (not session indicator)
+    if (bearerToken && bearerToken !== "session-authenticated") {
+      headers["Authorization"] = `Bearer ${bearerToken}`;
+      console.log("Using token-based authentication");
+    } else {
+      console.log("Using session-based authentication - No valid token found");
+    }
+
+    // Only log headers in development or for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Request headers:", headers);
+    }
+
+    try {
+      // Create the request promise
+      const requestPromise = fetch(fullUrl, {
+        credentials: "include", // Important for session auth
+        ...options,
+        headers,
+      });
+
+      // Store the pending request to prevent duplicates
+      pendingRequests.set(requestKey, requestPromise);
+
+      const response = await requestPromise;
+
+      // Clean up the pending request
+      pendingRequests.delete(requestKey);
+
+      // Log response status for debugging
+      if (!response.ok) {
+        console.warn(`API request failed: ${response.status} ${response.statusText} for ${fullUrl}`);
+      }
+
+      return response;
+    } catch (error) {
+      // Clean up the pending request on error
+      pendingRequests.delete(requestKey);
+      console.error(`Network error for ${fullUrl}:`, error.message);
+      throw error;
+    }
+  };
+
   const [userPreferences, setUserPreferences] = useState({
     theme: "light",
     primary_color: "#6366f1",
     language: "en",
   });
-  const router = useRouter();
 
   // Enhanced cookie helper with URL decoding
   const getCookie = (name) => {
@@ -29,49 +119,6 @@ export const AuthProvider = ({ children }) => {
     return null;
   };
 
-  // Enhanced Sanctum CSRF setup
-  const sanctumRequest = async (url, options = {}) => {
-    const method = options.method?.toUpperCase();
-
-    // Get CSRF cookie first for stateful requests
-    if (method && ["POST", "PUT", "DELETE", "PATCH"].includes(method)) {
-      try {
-        await fetch("http://localhost:8000/sanctum/csrf-cookie", {
-          credentials: "include",
-        });
-
-        // Small delay to ensure cookie is set
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      } catch (error) {
-        console.error("Failed to fetch CSRF cookie:", error);
-      }
-    }
-
-    // Get the CSRF token
-    const csrfToken = getCookie("XSRF-TOKEN");
-
-    const headers = {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-      ...options.headers,
-    };
-
-    // Add CSRF token to headers if available
-    if (csrfToken) {
-      headers["X-XSRF-TOKEN"] = csrfToken;
-    }
-
-    console.log("Making request with headers:", headers);
-    console.log("CSRF Token:", csrfToken);
-
-    return fetch(url, {
-      credentials: "include",
-      headers,
-      ...options,
-    });
-  };
-
   // Check authentication status on mount
   useEffect(() => {
     checkAuth();
@@ -79,23 +126,77 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      const response = await sanctumRequest("http://localhost:8000/api/user");
+      // Check if we have a token in localStorage first
+      const storedToken =
+        typeof window !== "undefined"
+          ? localStorage.getItem("auth_token")
+          : null;
+
+      if (!storedToken) {
+        console.log("No stored authentication token found");
+        setUser(null);
+        setIsAuthenticated(false);
+        setLoading(false);
+        return;
+      }
+
+      console.log(
+        "Checking authentication with stored token:",
+        storedToken ? "Present" : "Missing"
+      );
+
+      // Fetch CSRF cookie for Sanctum SPA authentication
+      try {
+        await fetch("http://localhost:8000/sanctum/csrf-cookie", {
+          credentials: "include",
+        });
+        console.log("✅ CSRF cookie fetched successfully");
+      } catch (csrfError) {
+        console.warn("⚠️ CSRF cookie fetch failed:", csrfError);
+      }
+
+      const response = await fetch("http://localhost:8000/api/user", {
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          ...(storedToken && storedToken !== "session-authenticated"
+            ? { Authorization: `Bearer ${storedToken}` }
+            : {}),
+        },
+      });
 
       if (response.ok) {
-        const userData = await response.json();
-        setUser(userData.user);
-        setIsAuthenticated(true);
+        const data = await response.json();
+        if (data.status === "success" && data.user) {
+          setUser(data.user);
+          setIsAuthenticated(true);
 
-        // Set user preferences if they exist
-        if (userData.user.preferences) {
-          setUserPreferences(userData.user.preferences);
+          // Set user preferences if they exist
+          if (data.user.preferences) {
+            setUserPreferences(data.user.preferences);
+          }
+
+          console.log("✅ Auth check successful - user:", data.user.email);
+        } else {
+          console.log("❌ Auth response invalid format:", data);
+          throw new Error("Invalid response format");
         }
       } else {
+        console.log("❌ Auth check failed - status:", response.status);
+        // Clear token if auth fails
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("auth_token");
+        }
         setUser(null);
         setIsAuthenticated(false);
       }
     } catch (error) {
-      console.error("Auth check failed:", error);
+      console.error("❌ Auth check failed:", error);
+      // Clear token on error
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("auth_token");
+      }
       setUser(null);
       setIsAuthenticated(false);
     } finally {
@@ -105,15 +206,8 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (loginData) => {
     try {
-      // First, ensure we get a fresh CSRF cookie
-      console.log("Getting CSRF cookie...");
-      await fetch("http://localhost:8000/sanctum/csrf-cookie", {
-        method: "GET",
-        credentials: "include",
-      });
-
-      // Wait a bit for cookie to be set
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Simplified approach - just use XMLHttpRequest header which backend recognizes
+      console.log("Starting login process...");
 
       const {
         email,
@@ -128,35 +222,27 @@ export const AuthProvider = ({ children }) => {
 
       const loginIdentifier = identifier || email;
 
-      console.log("Preparing login request with Sanctum:", {
+      console.log("Preparing login request:", {
         identifier: loginIdentifier,
         loginType,
         theme,
       });
 
-      // Get the CSRF token and decode it properly
-      const csrfToken = getCookie("XSRF-TOKEN");
-      console.log("Raw CSRF Token from cookie:", csrfToken);
-
-      if (!csrfToken) {
-        console.error("No CSRF token found in cookies");
-        // Try to get cookies again
-        const allCookies = document.cookie;
-        console.log("All cookies:", allCookies);
+      // Fetch CSRF cookie before login for Sanctum SPA authentication
+      try {
+        await fetch("http://localhost:8000/sanctum/csrf-cookie", {
+          credentials: "include",
+        });
+        console.log("✅ CSRF cookie fetched for login");
+      } catch (csrfError) {
+        console.warn("⚠️ CSRF cookie fetch failed:", csrfError);
       }
 
       const headers = {
         "Content-Type": "application/json",
         Accept: "application/json",
-        "X-Requested-With": "XMLHttpRequest",
+        "X-Requested-With": "XMLHttpRequest", // This triggers CSRF bypass in backend
       };
-
-      // Add CSRF token if available
-      if (csrfToken) {
-        headers["X-XSRF-TOKEN"] = csrfToken;
-      }
-
-      console.log("Login request headers:", headers);
 
       const response = await fetch("http://localhost:8000/api/login", {
         method: "POST",
@@ -176,13 +262,36 @@ export const AuthProvider = ({ children }) => {
       });
 
       console.log("Response status:", response.status);
-
       const data = await response.json();
       console.log("Response data:", data);
+      console.log("Available keys in response:", Object.keys(data));
+      console.log("Access token in response:", data.access_token ? "YES" : "NO");
 
       if (response.ok && data.success) {
         setUser(data.user);
         setIsAuthenticated(true);
+
+        // Store the actual Bearer token if available in multiple formats for compatibility
+        if (data.access_token) {
+          // Method 1: Store as auth_token (existing format)
+          localStorage.setItem("auth_token", data.access_token);
+          
+          // Method 2: Store as JSON in 'auth' key (what InterviewManager expects)
+          localStorage.setItem("auth", JSON.stringify({
+            access_token: data.access_token,
+            user: data.user
+          }));
+          
+          // Method 3: Store as direct token (fallback)
+          localStorage.setItem("token", data.access_token);
+          
+          console.log("✅ Using token-based authentication with Bearer token");
+          console.log("✅ Token stored in localStorage - length:", data.access_token.length);
+        } else {
+          localStorage.setItem("auth_token", "session-authenticated");
+          console.log("❌ No access_token found in response, using session-based authentication");
+          console.log("Response data structure:", JSON.stringify(data, null, 2));
+        }
 
         const preferences = {
           theme: theme || "light",
@@ -224,6 +333,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setUser(null);
       setIsAuthenticated(false);
+      localStorage.removeItem("auth_token");
       setUserPreferences({
         theme: "light",
         primary_color: "#6366f1",
@@ -267,6 +377,18 @@ export const AuthProvider = ({ children }) => {
     return userPreferences;
   };
 
+  // Debug function to check token status
+  const getTokenStatus = () => {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    return {
+      hasToken: !!token,
+      tokenLength: token ? token.length : 0,
+      isAuthenticated,
+      userEmail: user?.email || "Not logged in",
+    };
+  };
+
   const value = {
     user,
     loading,
@@ -280,6 +402,7 @@ export const AuthProvider = ({ children }) => {
     updatePreferences,
     userPreferences,
     sanctumRequest,
+    getTokenStatus,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
