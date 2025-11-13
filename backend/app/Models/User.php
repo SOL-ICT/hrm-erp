@@ -20,7 +20,8 @@ class User extends Authenticatable
         'password',
         'role',
         'user_type',
-        'profile_id',
+        'staff_profile_id',
+        'candidate_profile_id',
         'preferences',
         'is_active',
     ];
@@ -46,7 +47,7 @@ class User extends Authenticatable
      */
     public function staffProfile()
     {
-        return $this->belongsTo(\App\Models\Staff::class, 'profile_id')
+        return $this->belongsTo(\App\Models\Staff::class, 'staff_profile_id')
             ->when($this->user_type === 'staff' || $this->user_type === 'admin');
     }
 
@@ -55,7 +56,7 @@ class User extends Authenticatable
      */
     public function candidateProfile()
     {
-        return $this->belongsTo(\App\Models\Candidate::class, 'profile_id')
+        return $this->belongsTo(\App\Models\Candidate::class, 'candidate_profile_id')
             ->when($this->user_type === 'candidate');
     }
 
@@ -64,13 +65,13 @@ class User extends Authenticatable
      */
     public function hasRole(string $role): bool
     {
-        if (!in_array($this->user_type, ['staff', 'admin']) || !$this->profile_id) {
+        if (!in_array($this->user_type, ['staff', 'admin']) || !$this->staff_profile_id) {
             return false;
         }
 
         return DB::table('staff_roles')
             ->join('roles', 'staff_roles.role_id', '=', 'roles.id')
-            ->where('staff_roles.staff_id', $this->profile_id)
+            ->where('staff_roles.staff_id', $this->staff_profile_id)
             ->where(function ($q) use ($role) {
                 $q->where('roles.name', $role)
                     ->orWhere('roles.slug', $role);
@@ -91,12 +92,12 @@ class User extends Authenticatable
      */
     public function isSOLStaff(): bool
     {
-        if (!in_array($this->user_type, ['staff', 'admin']) || !$this->profile_id) {
+        if (!in_array($this->user_type, ['staff', 'admin']) || !$this->staff_profile_id) {
             return false;
         }
 
         return DB::table('staff')
-            ->where('id', $this->profile_id)
+            ->where('id', $this->staff_profile_id)
             ->where('client_id', 1) // SOL Nigeria client_id
             ->where('status', 'active')
             ->exists();
@@ -108,7 +109,7 @@ class User extends Authenticatable
     public function getStaffId(): ?int
     {
         if (in_array($this->user_type, ['staff', 'admin'])) {
-            return $this->profile_id;
+            return $this->staff_profile_id;
         }
 
         return null;
@@ -120,7 +121,7 @@ class User extends Authenticatable
     public function getCandidateId(): ?int
     {
         if ($this->user_type === 'candidate') {
-            return $this->profile_id;
+            return $this->candidate_profile_id;
         }
 
         return null;

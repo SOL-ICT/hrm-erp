@@ -53,7 +53,8 @@ class AuthController extends Controller
                     'email' => $userExists->email,
                     'role' => $userExists->role,
                     'user_type' => $userExists->user_type,
-                    'profile_id' => $userExists->profile_id, // ✅ Key field for staff ID
+                    'staff_profile_id' => $userExists->staff_profile_id ?? null, // ✅ Updated to use staff_profile_id
+                    'candidate_profile_id' => $userExists->candidate_profile_id ?? null, // ✅ Updated to use candidate_profile_id
                 ] : null
             ]);
 
@@ -117,18 +118,18 @@ class AuthController extends Controller
             } elseif ($loginType === 'staff') {
                 // Staff login - check if admin access is requested
                 if (isset($data['is_admin']) && $data['is_admin'] === true) {
-                    // Admin toggle is ON - verify if user is SOL staff using profile_id
-                    if (in_array($user->user_type, ['staff', 'admin']) && $user->profile_id) {
+                    // Admin toggle is ON - verify if user is SOL staff using staff_profile_id
+                    if (in_array($user->user_type, ['staff', 'admin']) && $user->staff_profile_id) {
 
                         $solStaff = DB::table('staff')
-                            ->where('id', $user->profile_id) // ✅ Direct lookup using profile_id
+                            ->where('id', $user->staff_profile_id) // ✅ Use staff_profile_id directly
                             ->where('client_id', 1) // SOL Nigeria client_id
                             ->where('status', 'active')
                             ->first();
 
-                        Log::info('Admin access check using profile_id', [
+                        Log::info('Admin access check using staff_profile_id', [
                             'user_id' => $user->id,
-                            'profile_id' => $user->profile_id,
+                            'staff_profile_id' => $user->staff_profile_id,
                             'is_sol_staff' => $solStaff ? 'YES' : 'NO',
                             'admin_requested' => true
                         ]);
@@ -141,14 +142,14 @@ class AuthController extends Controller
                             // Check if admin role is already assigned
                             $hasAdminRole = DB::table('staff_roles')
                                 ->join('roles', 'staff_roles.role_id', '=', 'roles.id')
-                                ->where('staff_roles.staff_id', $user->profile_id) // ✅ Use profile_id directly
+                                ->where('staff_roles.staff_id', $user->staff_profile_id) // ✅ Use staff_profile_id directly
                                 ->whereIn('roles.slug', ['super-admin', 'admin'])
                                 ->exists();
 
                             if (!$hasAdminRole) {
                                 // Assign admin role to SOL staff
                                 DB::table('staff_roles')->insert([
-                                    'staff_id' => $user->profile_id, // ✅ Use profile_id directly
+                                    'staff_id' => $user->staff_profile_id, // ✅ Use staff_profile_id directly
                                     'role_id' => 2, // Admin role ID
                                     'assigned_at' => now(),
                                     'created_at' => now(),
@@ -156,7 +157,7 @@ class AuthController extends Controller
                                 ]);
 
                                 Log::info('Admin role assigned to SOL staff', [
-                                    'staff_id' => $user->profile_id,
+                                    'staff_id' => $user->staff_profile_id,
                                     'user_id' => $user->id
                                 ]);
                             }
@@ -165,16 +166,16 @@ class AuthController extends Controller
                             $dashboardType = 'staff';
                             Log::warning('Non-SOL staff attempted admin access', [
                                 'user_id' => $user->id,
-                                'profile_id' => $user->profile_id
+                                'staff_profile_id' => $user->staff_profile_id
                             ]);
                         }
                     } else {
-                        // No profile_id or wrong user type -> staff dashboard
+                        // No staff_profile_id or wrong user type -> staff dashboard
                         $dashboardType = 'staff';
-                        Log::warning('Invalid user type or missing profile_id for admin access', [
+                        Log::warning('Invalid user type or missing staff_profile_id for admin access', [
                             'user_id' => $user->id,
                             'user_type' => $user->user_type,
-                            'profile_id' => $user->profile_id
+                            'staff_profile_id' => $user->staff_profile_id
                         ]);
                     }
                 } else {
@@ -182,9 +183,9 @@ class AuthController extends Controller
                     $dashboardType = 'staff';
 
                     // Still get staff info for regular staff dashboard
-                    if (in_array($user->user_type, ['staff', 'admin']) && $user->profile_id) {
+                    if (in_array($user->user_type, ['staff', 'admin']) && $user->staff_profile_id) {
                         $staffInfo = DB::table('staff')
-                            ->where('id', $user->profile_id)
+                            ->where('id', $user->staff_profile_id)
                             ->where('status', 'active')
                             ->first();
                     }
@@ -199,7 +200,8 @@ class AuthController extends Controller
                 'login_type' => $data['login_type'] ?? 'not_set',
                 'is_admin_requested' => $data['is_admin'] ?? false,
                 'user_id' => $user->id,
-                'profile_id' => $user->profile_id,
+                'staff_profile_id' => $user->staff_profile_id,
+                'candidate_profile_id' => $user->candidate_profile_id,
                 'final_dashboard_type' => $dashboardType,
                 'staff_info_loaded' => $staffInfo ? 'YES' : 'NO'
             ]);
@@ -212,7 +214,8 @@ class AuthController extends Controller
                 'email'          => $user->email,
                 'user_role'      => $user->role,
                 'user_type'      => $user->user_type,
-                'profile_id'     => $user->profile_id, // ✅ Include profile_id for frontend
+                'staff_profile_id'     => $user->staff_profile_id, // ✅ Include staff_profile_id for frontend
+                'candidate_profile_id' => $user->candidate_profile_id, // ✅ Include candidate_profile_id for frontend
                 'dashboard_type' => $dashboardType,
                 'is_active'      => $user->is_active,
                 'preferences'    => $preferences,
@@ -239,7 +242,7 @@ class AuthController extends Controller
             // Generate API token - Force for all logins for now
             $needsToken = true; // Force token generation
             Log::info('Token generation needed', ['needs_token' => $needsToken]);
-            
+
             if ($needsToken) {
                 try {
                     // Ensure we have a fresh User model instance with the HasApiTokens trait
@@ -398,14 +401,14 @@ class AuthController extends Controller
 
             // ✅ Get additional profile information based on user type
             $profileInfo = null;
-            if (in_array($user->user_type, ['staff', 'admin']) && $user->profile_id) {
+            if (in_array($user->user_type, ['staff', 'admin']) && $user->staff_profile_id) {
                 $profileInfo = DB::table('staff')
-                    ->where('id', $user->profile_id)
+                    ->where('id', $user->staff_profile_id)
                     ->select('id', 'employee_code', 'client_id', 'department', 'status')
                     ->first();
-            } elseif ($user->user_type === 'candidate' && $user->profile_id) {
+            } elseif ($user->user_type === 'candidate' && $user->candidate_profile_id) {
                 $profileInfo = DB::table('candidates')
-                    ->where('id', $user->profile_id)
+                    ->where('id', $user->candidate_profile_id)
                     ->select('id', 'first_name', 'last_name', 'phone', 'registration_status')
                     ->first();
             }
@@ -417,7 +420,8 @@ class AuthController extends Controller
                 'email'          => $user->email,
                 'user_role'      => $user->role,
                 'user_type'      => $user->user_type,
-                'profile_id'     => $user->profile_id, // ✅ Include profile_id
+                'staff_profile_id'     => $user->staff_profile_id, // ✅ Include staff_profile_id
+                'candidate_profile_id' => $user->candidate_profile_id, // ✅ Include candidate_profile_id
                 'dashboard_type' => $user->user_type ?? $user->role ?? 'candidate',
                 'is_active'      => $user->is_active,
                 'preferences'    => $this->getUserPreferences($user),
@@ -547,7 +551,7 @@ class AuthController extends Controller
                 'password' => Hash::make($data['password']),
                 'role' => 'candidate',
                 'user_type' => 'candidate',
-                'profile_id' => null,
+                'candidate_profile_id' => null, // ✅ Will be updated after candidate creation
                 'is_active' => true,
                 'preferences' => json_encode($preferences), // ✅ Store as JSON
                 'created_at' => now(),
@@ -571,8 +575,8 @@ class AuthController extends Controller
 
             $candidateId = $userId; // Use the same ID for candidate
 
-            // update user's profile_id to point to candidate
-            // DB::table('users')->where('id', $userId)->update(['profile_id' => $candidateId]);
+            // ✅ Update user's candidate_profile_id to point to candidate
+            DB::table('users')->where('id', $userId)->update(['candidate_profile_id' => $candidateId]);
 
             // ✅Create candidate profile
             DB::table('candidate_profiles')->insert([

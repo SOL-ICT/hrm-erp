@@ -60,11 +60,81 @@ class ClientController extends Controller
                 ]
             ], 200);
         } catch (\Exception $e) {
-            Log::error('Client index error: ' . $e->getMessage());
+            Log::error('Error adding contract for client: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve clients',
-                'error' => config('app.debug') ? $e->getMessage() : 'Server error'
+                'message' => 'Failed to add contract for client'
+            ], 500);
+        }
+    }
+
+    /**
+     * Store invoice export template for a client
+     */
+    public function storeInvoiceExportTemplate(Request $request, $clientId)
+    {
+        try {
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'line_items' => 'required|array',
+                'excel_settings' => 'nullable|array',
+            ]);
+
+            $template = \App\Models\ExportTemplate::create([
+                'client_id' => $clientId,
+                'name' => $request->name,
+                'description' => $request->description,
+                'format' => 'invoice_line_items', // Special format to distinguish from employee exports
+                'column_mappings' => $request->line_items, // Store line items here
+                'formatting_rules' => $request->excel_settings ?? [],
+                'grouping_rules' => [],
+                'use_credit_to_bank_model' => false,
+                'service_fee_percentage' => 0,
+                'fee_calculation_rules' => [],
+                'header_config' => [],
+                'footer_config' => [],
+                'styling_config' => [],
+                'is_active' => true,
+                'created_by' => Auth::user()->name ?? 'system',
+                'version' => '1.0',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => $template,
+                'message' => 'Invoice export template saved successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error saving invoice export template: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to save invoice export template',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get invoice export templates for a client
+     */
+    public function getInvoiceExportTemplates($clientId)
+    {
+        try {
+            $templates = \App\Models\ExportTemplate::where('client_id', $clientId)
+                ->where('format', 'invoice_line_items')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $templates,
+                'message' => 'Invoice export templates retrieved successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error getting invoice export templates: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get invoice export templates'
             ], 500);
         }
     }
@@ -83,12 +153,21 @@ class ClientController extends Controller
                 'phone' => 'nullable|string|max:20',
                 'head_office_address' => 'nullable|string',
                 'pay_calculation_basis' => 'required|in:working_days,calendar_days',
+                'status' => 'required|in:active,inactive,pending',
                 'contracts' => 'array',
-                'contracts.*.contract_type' => 'required|string|max:100',
+                'contracts.*.service_type' => 'required|string|max:100',
                 'contracts.*.contract_start_date' => 'required|date',
                 'contracts.*.contract_end_date' => 'required|date|after_or_equal:contracts.*.contract_start_date',
                 'contracts.*.status' => 'required|in:active,inactive,expired,terminated',
-                'contracts.*.notes' => 'nullable|string'
+                'contracts.*.notes' => 'nullable|string',
+                // FIRS e-invoicing validation rules
+                'firs_tin' => 'nullable|string|max:20',
+                'firs_business_description' => 'nullable|string|max:255',
+                'firs_city' => 'nullable|string|max:100',
+                'firs_postal_zone' => 'nullable|string|max:20',
+                'firs_country' => 'nullable|string|max:2',
+                'firs_contact_telephone' => 'nullable|string|max:20',
+                'firs_contact_email' => 'nullable|email|max:255',
             ]);
 
             DB::beginTransaction();
@@ -115,7 +194,15 @@ class ClientController extends Controller
                 'phone' => $validatedData['phone'],
                 'head_office_address' => $validatedData['head_office_address'],
                 'pay_calculation_basis' => $validatedData['pay_calculation_basis'],
-                'status' => 'active'
+                'status' => $validatedData['status'],
+                // FIRS e-invoicing fields
+                'firs_tin' => $validatedData['firs_tin'] ?? null,
+                'firs_business_description' => $validatedData['firs_business_description'] ?? null,
+                'firs_city' => $validatedData['firs_city'] ?? null,
+                'firs_postal_zone' => $validatedData['firs_postal_zone'] ?? null,
+                'firs_country' => $validatedData['firs_country'] ?? 'NG',
+                'firs_contact_telephone' => $validatedData['firs_contact_telephone'] ?? null,
+                'firs_contact_email' => $validatedData['firs_contact_email'] ?? null,
             ]);
 
             // Create contracts if provided
@@ -126,7 +213,7 @@ class ClientController extends Controller
                     ClientContract::create([
                         'contract_code' => $contractCode,
                         'client_id' => $client->id,
-                        'contract_type' => $contractData['contract_type'],
+                        'service_type' => $contractData['service_type'],
                         'contract_start_date' => $contractData['contract_start_date'],
                         'contract_end_date' => $contractData['contract_end_date'],
                         'status' => $contractData['status'],
@@ -206,11 +293,19 @@ class ClientController extends Controller
                 'status' => 'required|in:active,inactive',
                 'contracts' => 'array',
                 'contracts.*.id' => 'nullable|exists:client_contracts,id',
-                'contracts.*.contract_type' => 'required|string|max:100',
+                'contracts.*.service_type' => 'required|string|max:100',
                 'contracts.*.contract_start_date' => 'required|date',
                 'contracts.*.contract_end_date' => 'required|date|after_or_equal:contracts.*.contract_start_date',
                 'contracts.*.status' => 'required|in:active,inactive,expired,terminated',
-                'contracts.*.notes' => 'nullable|string'
+                'contracts.*.notes' => 'nullable|string',
+                // FIRS e-invoicing validation rules
+                'firs_tin' => 'nullable|string|max:20',
+                'firs_business_description' => 'nullable|string|max:255',
+                'firs_city' => 'nullable|string|max:100',
+                'firs_postal_zone' => 'nullable|string|max:20',
+                'firs_country' => 'nullable|string|max:2',
+                'firs_contact_telephone' => 'nullable|string|max:20',
+                'firs_contact_email' => 'nullable|email|max:255',
             ]);
 
             DB::beginTransaction();
@@ -224,7 +319,15 @@ class ClientController extends Controller
                 'phone' => $validatedData['phone'],
                 'head_office_address' => $validatedData['head_office_address'],
                 'pay_calculation_basis' => $validatedData['pay_calculation_basis'],
-                'status' => $validatedData['status']
+                'status' => $validatedData['status'],
+                // FIRS e-invoicing fields
+                'firs_tin' => $validatedData['firs_tin'] ?? null,
+                'firs_business_description' => $validatedData['firs_business_description'] ?? null,
+                'firs_city' => $validatedData['firs_city'] ?? null,
+                'firs_postal_zone' => $validatedData['firs_postal_zone'] ?? null,
+                'firs_country' => $validatedData['firs_country'] ?? 'NG',
+                'firs_contact_telephone' => $validatedData['firs_contact_telephone'] ?? null,
+                'firs_contact_email' => $validatedData['firs_contact_email'] ?? null,
             ]);
 
             // Handle contracts
@@ -237,7 +340,7 @@ class ClientController extends Controller
                         $contract = ClientContract::find($contractData['id']);
                         if ($contract && $contract->client_id == $client->id) {
                             $contract->update([
-                                'contract_type' => $contractData['contract_type'],
+                                'service_type' => $contractData['service_type'],
                                 'contract_start_date' => $contractData['contract_start_date'],
                                 'contract_end_date' => $contractData['contract_end_date'],
                                 'status' => $contractData['status'],
@@ -253,7 +356,7 @@ class ClientController extends Controller
                         $contract = ClientContract::create([
                             'contract_code' => $contractCode,
                             'client_id' => $client->id,
-                            'contract_type' => $contractData['contract_type'],
+                            'service_type' => $contractData['service_type'],
                             'contract_start_date' => $contractData['contract_start_date'],
                             'contract_end_date' => $contractData['contract_end_date'],
                             'status' => $contractData['status'],
@@ -341,7 +444,7 @@ class ClientController extends Controller
             $client = Client::findOrFail($clientId);
 
             $validatedData = $request->validate([
-                'contract_type' => 'required|string|max:100',
+                'service_type' => 'required|string|max:100',
                 'contract_start_date' => 'required|date',
                 'contract_end_date' => 'required|date|after_or_equal:contract_start_date',
                 'status' => 'required|in:active,inactive,expired,terminated',
@@ -353,7 +456,7 @@ class ClientController extends Controller
             $contract = ClientContract::create([
                 'contract_code' => $contractCode,
                 'client_id' => $clientId,
-                'contract_type' => $validatedData['contract_type'],
+                'service_type' => $validatedData['service_type'],
                 'contract_start_date' => $validatedData['contract_start_date'],
                 'contract_end_date' => $validatedData['contract_end_date'],
                 'status' => $validatedData['status'],

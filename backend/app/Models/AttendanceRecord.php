@@ -18,15 +18,18 @@ class AttendanceRecord extends Model
         'designation',
         'payroll_month',
         'days_worked',
-        'basic_salary',
-        'allowances',
-        'deductions',
-        'gross_pay',
-        'gross_salary', // Phase 3.1 - alternative field name
-        'net_pay',
-        'net_salary', // Phase 3.1 - alternative field name
         'status',
         'processing_notes',
+
+        // Phase 1.3: Enhanced attendance upload fields
+        'employee_code',
+        'pay_grade_structure_id',
+        'direct_id_matched',
+        'validation_errors',
+        'record_status',
+        'template_available',
+        'template_name',
+        'ready_for_calculation',
 
         // Phase 3.1 - Attendance calculation fields
         'attendance_factor',
@@ -38,28 +41,21 @@ class AttendanceRecord extends Model
         'calculated_at',
         'calculated_by',
 
-        // Phase 3.1 - Enhanced payroll fields
-        'credit_to_bank',
-        'adjusted_components',
+        // Phase 3.1 - Enhanced payroll fields (removed redundant salary fields - now template-driven)
         'calculation_details'
     ];
 
     protected $casts = [
-        'allowances' => 'array',
-        'deductions' => 'array',
-        'adjusted_components' => 'array', // Phase 3.1
-        'calculation_details' => 'array', // Phase 3.1
+        'validation_errors' => 'array',
+        'calculation_details' => 'array',
         'calculation_metadata' => 'array',
         'payroll_month' => 'date',
-        'basic_salary' => 'decimal:2',
-        'gross_pay' => 'decimal:2',
-        'gross_salary' => 'decimal:2', // Phase 3.1
-        'net_pay' => 'decimal:2',
-        'net_salary' => 'decimal:2', // Phase 3.1
-        'credit_to_bank' => 'decimal:2', // Phase 3.1
         'attendance_factor' => 'decimal:4',
         'prorated_percentage' => 'decimal:2',
-        'calculated_at' => 'datetime'
+        'calculated_at' => 'datetime',
+        'direct_id_matched' => 'boolean',
+        'template_available' => 'boolean',
+        'ready_for_calculation' => 'boolean'
     ];
 
     public function attendanceUpload(): BelongsTo

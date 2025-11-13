@@ -20,6 +20,7 @@ import {
   Save,
   ChevronDown,
   ChevronUp,
+  FileText,
 } from "lucide-react";
 import { useClients, useUtilityData } from "@/hooks/useClients";
 
@@ -55,9 +56,21 @@ const ClientMaster = ({ currentTheme, onClose }) => {
     phone: "",
     industry_category: "",
     client_category: "",
+    payment_terms: "",
+    contact_person_name: "",
+    contact_person_position: "",
+    contact_person_address: "",
     pay_calculation_basis: "working_days",
     status: "active",
     contracts: [],
+    // FIRS e-invoicing fields
+    firs_tin: "",
+    firs_business_description: "",
+    firs_city: "",
+    firs_postal_zone: "",
+    firs_country: "NG",
+    firs_contact_telephone: "",
+    firs_contact_email: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -141,10 +154,30 @@ const ClientMaster = ({ currentTheme, onClose }) => {
         phone: formData.phone,
         industry_category: formData.industry_category,
         client_category: formData.client_category,
+        payment_terms: formData.payment_terms,
+        contact_person_name: formData.contact_person_name,
+        contact_person_position: formData.contact_person_position,
+        contact_person_address: formData.contact_person_address,
         pay_calculation_basis: formData.pay_calculation_basis,
         status: formData.status,
         contracts: formData.contracts,
+        // FIRS e-invoicing fields
+        firs_tin: formData.firs_tin,
+        firs_business_description: formData.firs_business_description,
+        firs_city: formData.firs_city,
+        firs_postal_zone: formData.firs_postal_zone,
+        firs_country: formData.firs_country,
+        firs_contact_telephone: formData.firs_contact_telephone,
+        firs_contact_email: formData.firs_contact_email,
       };
+
+      console.log("Client data being sent to API:", clientData);
+      console.log("FIRS fields in payload:", {
+        firs_tin: clientData.firs_tin,
+        firs_business_description: clientData.firs_business_description,
+        firs_city: clientData.firs_city,
+        firs_country: clientData.firs_country,
+      });
 
       if (isEditMode) {
         await updateClient(selectedClient.id, clientData);
@@ -174,6 +207,10 @@ const ClientMaster = ({ currentTheme, onClose }) => {
       phone: "",
       industry_category: "",
       client_category: "",
+      payment_terms: "",
+      contact_person_name: "",
+      contact_person_position: "",
+      contact_person_address: "",
       pay_calculation_basis: "working_days",
       status: "active",
       contracts: [],
@@ -222,9 +259,21 @@ const ClientMaster = ({ currentTheme, onClose }) => {
       phone: client.phone || "",
       industry_category: client.industry_category || "",
       client_category: client.client_category || "",
+      payment_terms: client.payment_terms || "",
+      contact_person_name: client.contact_person_name || "",
+      contact_person_position: client.contact_person_position || "",
+      contact_person_address: client.contact_person_address || "",
       pay_calculation_basis: client.pay_calculation_basis || "working_days",
       status: client.status || "active",
       contracts: formattedContracts,
+      // FIRS e-invoicing fields
+      firs_tin: client.firs_tin || "",
+      firs_business_description: client.firs_business_description || "",
+      firs_city: client.firs_city || "",
+      firs_postal_zone: client.firs_postal_zone || "",
+      firs_country: client.firs_country || "NG",
+      firs_contact_telephone: client.firs_contact_telephone || "",
+      firs_contact_email: client.firs_contact_email || "",
     });
     setSelectedClient(client);
     setIsEditMode(true);
@@ -299,7 +348,7 @@ const ClientMaster = ({ currentTheme, onClose }) => {
   if (isAddModalOpen) {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           {/* Modal Header */}
           <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 text-white">
             <div className="flex items-center justify-between">
@@ -316,7 +365,7 @@ const ClientMaster = ({ currentTheme, onClose }) => {
           </div>
 
           {/* Modal Body */}
-          <form onSubmit={handleSubmit} className="p-6">
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Column */}
               <div className="space-y-6">
@@ -728,6 +777,291 @@ const ClientMaster = ({ currentTheme, onClose }) => {
                         </div>
                       ))
                     )}
+                  </div>
+                </div>
+
+                {/* Invoice & Payment Information */}
+                <div
+                  className={`p-4 rounded-xl border ${currentTheme.border} bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-900/20`}
+                >
+                  <h3
+                    className={`text-lg font-semibold ${currentTheme.textPrimary} mb-4 flex items-center`}
+                  >
+                    <DollarSign className="w-5 h-5 mr-2 text-orange-600" />
+                    Invoice & Payment Information
+                  </h3>
+
+                  <div className="space-y-4">
+                    {/* Payment Terms */}
+                    <div>
+                      <label
+                        className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                      >
+                        Payment Terms
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.payment_terms || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            payment_terms: e.target.value,
+                          }))
+                        }
+                        className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-orange-500`}
+                        placeholder="e.g., Net 30 days, 15 days from invoice date"
+                      />
+                    </div>
+
+                    {/* Contact Person Name */}
+                    <div>
+                      <label
+                        className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                      >
+                        Contact Person Name
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.contact_person_name || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            contact_person_name: e.target.value,
+                          }))
+                        }
+                        className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-orange-500`}
+                        placeholder="Primary contact person name"
+                      />
+                    </div>
+
+                    {/* Contact Person Position */}
+                    <div>
+                      <label
+                        className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                      >
+                        Contact Person Position
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.contact_person_position || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            contact_person_position: e.target.value,
+                          }))
+                        }
+                        className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-orange-500`}
+                        placeholder="e.g., HR Manager, Finance Director"
+                      />
+                    </div>
+
+                    {/* Contact Person Address */}
+                    <div>
+                      <label
+                        className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                      >
+                        Contact Person Address
+                      </label>
+                      <textarea
+                        value={formData.contact_person_address || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            contact_person_address: e.target.value,
+                          }))
+                        }
+                        rows={3}
+                        className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none`}
+                        placeholder="Contact person address"
+                      />
+                    </div>
+
+                    {/* FIRS E-Invoicing Section */}
+                    <div className="pt-6 border-t border-orange-200">
+                      <h4
+                        className={`text-md font-semibold ${currentTheme.textPrimary} mb-4 flex items-center`}
+                      >
+                        <FileText className="w-4 h-4 mr-2 text-orange-600" />
+                        FIRS E-Invoicing Settings
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* TIN */}
+                        <div>
+                          <label
+                            className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                          >
+                            Tax Identification Number (TIN) *
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.firs_tin || ""}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                firs_tin: e.target.value,
+                              }))
+                            }
+                            className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-orange-500`}
+                            placeholder="Enter TIN for FIRS compliance"
+                          />
+                        </div>
+
+                        {/* Business Description */}
+                        <div>
+                          <label
+                            className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                          >
+                            Business Description
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.firs_business_description || ""}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                firs_business_description: e.target.value,
+                              }))
+                            }
+                            className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-orange-500`}
+                            placeholder="Brief description of business"
+                          />
+                        </div>
+
+                        {/* City */}
+                        <div>
+                          <label
+                            className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                          >
+                            City
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.firs_city || ""}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                firs_city: e.target.value,
+                              }))
+                            }
+                            className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-orange-500`}
+                            placeholder="City"
+                          />
+                        </div>
+
+                        {/* Postal Zone */}
+                        <div>
+                          <label
+                            className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                          >
+                            Postal Zone
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.firs_postal_zone || ""}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                firs_postal_zone: e.target.value,
+                              }))
+                            }
+                            className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-orange-500`}
+                            placeholder="Postal code or zone"
+                          />
+                        </div>
+
+                        {/* Country */}
+                        <div>
+                          <label
+                            className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                          >
+                            Country
+                          </label>
+                          <select
+                            value={formData.firs_country || "NG"}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                firs_country: e.target.value,
+                              }))
+                            }
+                            className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-orange-500`}
+                          >
+                            <option value="NG">Nigeria</option>
+                            <option value="US">United States</option>
+                            <option value="GB">United Kingdom</option>
+                            <option value="CA">Canada</option>
+                            <option value="AU">Australia</option>
+                          </select>
+                        </div>
+
+                        {/* Contact Telephone */}
+                        <div>
+                          <label
+                            className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                          >
+                            Contact Telephone
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.firs_contact_telephone || ""}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                firs_contact_telephone: e.target.value,
+                              }))
+                            }
+                            className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-orange-500`}
+                            placeholder="+234-XXX-XXX-XXXX"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Contact Email - Full Width */}
+                      <div className="mt-4">
+                        <label
+                          className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
+                        >
+                          Contact Email
+                        </label>
+                        <input
+                          type="email"
+                          value={formData.firs_contact_email || ""}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              firs_contact_email: e.target.value,
+                            }))
+                          }
+                          className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-orange-500`}
+                          placeholder="contact@company.com"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Used for FIRS correspondence and notifications
+                        </p>
+                      </div>
+
+                      {/* FIRS Status Indicator */}
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className={`w-3 h-3 rounded-full ${
+                              formData.firs_tin ? "bg-green-500" : "bg-red-500"
+                            }`}
+                          ></div>
+                          <span
+                            className={`text-sm ${
+                              formData.firs_tin
+                                ? "text-green-700"
+                                : "text-red-700"
+                            }`}
+                          >
+                            {formData.firs_tin
+                              ? "Ready for FIRS e-invoicing"
+                              : "TIN required for FIRS integration"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

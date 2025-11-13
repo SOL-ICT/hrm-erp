@@ -9,6 +9,8 @@ const ClientContractDashboard = lazy(() =>
   import("./modules/client-contract-management/ClientContractDashboard")
 );
 const SOLMaster = lazy(() => import("./modules/administration/SOLMaster"));
+const RBACManagement = lazy(() => import("./modules/administration/RBACManagementClean"));
+const AdministrationDashboard = lazy(() => import("./modules/administration/AdministrationDashboard"));
 
 //Recruitment Management
 const RecruitmentDashboard = lazy(() =>
@@ -28,7 +30,11 @@ const EmployeeRecord = lazy(() =>
 );
 
 // Invoicing Component
-const InvoiceManagement = lazy(() => import("../invoicing/InvoiceManagement"));
+const InvoiceManagement = lazy(() =>
+  import(
+    "./modules/hr-payroll-management/submodules/invoicing/InvoiceManagement"
+  )
+);
 
 // Direct submodule imports
 const ClientMaster = lazy(() =>
@@ -370,6 +376,16 @@ const AdminRouter = ({
             />
           );
 
+        case "rbac-management":
+          return (
+            <RBACManagement
+              {...commonProps}
+              onBack={() => {
+                window.history.back();
+              }}
+            />
+          );
+
         // HR & PAYROLL MANAGEMENT SUBMODULES
         case "employee-record":
           return (
@@ -511,7 +527,7 @@ const AdminRouter = ({
         );
 
       case "administration":
-        return <SOLMaster {...commonProps} />;
+        return <AdministrationDashboard {...commonProps} />;
 
       default:
         return <DashboardOverview {...commonProps} />;

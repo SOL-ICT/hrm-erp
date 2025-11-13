@@ -661,8 +661,16 @@ const HRMLoginPage = () => {
               )}
               {loginType === "staff" && (
                 <p className={"text-sm " + currentTheme.textSecondary}>
-                  New staff member? Contact your HR administrator for account
-                  setup.
+                  New staff member?{" "}
+                  <button
+                    onClick={() =>
+                      (window.location.href = "/staff-registration")
+                    }
+                    className="hover:underline"
+                    style={{ color: settings.primaryColor }}
+                  >
+                    Staff enrollment here
+                  </button>
                 </p>
               )}
             </div>

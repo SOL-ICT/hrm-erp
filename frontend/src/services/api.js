@@ -32,7 +32,7 @@ class APIService {
     // For authenticated requests, ensure CSRF cookie is available
     if (!options.skipCsrf && typeof window !== "undefined") {
       try {
-        await fetch(`${this.baseURL.replace('/api', '')}/sanctum/csrf-cookie`, {
+        await fetch(`${this.baseURL.replace("/api", "")}/sanctum/csrf-cookie`, {
           credentials: "include",
         });
         console.log("✅ CSRF cookie ensured for:", endpoint);
@@ -47,6 +47,11 @@ class APIService {
       "X-Requested-With": "XMLHttpRequest", // Required for Laravel Sanctum
       ...options.headers,
     };
+
+    // Remove Content-Type for FormData uploads to let browser set proper boundary
+    if (options.body instanceof FormData) {
+      delete headers["Content-Type"];
+    }
 
     // Add Authorization header if token is available
     if (this.authToken) {
@@ -168,10 +173,10 @@ class APIService {
         // For validation errors, include the validation details
         if (response.status === 422 && data.errors) {
           const validationErrors = Object.entries(data.errors)
-            .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
-            .join('; ');
+            .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
+            .join("; ");
           throw new Error(
-            `${data.message || 'Validation failed'}: ${validationErrors}`
+            `${data.message || "Validation failed"}: ${validationErrors}`
           );
         }
 
@@ -220,6 +225,9 @@ import clientInterviewAPI from "./modules/recruitment-management/clientInterview
 // OFFER LETTER MANAGEMENT IMPORT
 import { offerLetterAPI } from "./modules/client-contract-management/offer-letter";
 
+// INVOICING MANAGEMENT IMPORT
+import firsAPI from "./modules/invoicing/firsAPI";
+
 // Clean, organized exports (no legacy naming confusion)
 export {
   // Client Contract Management APIs
@@ -238,6 +246,9 @@ export {
 
   // Offer Letter Management APIs
   offerLetterAPI,
+
+  // Invoicing Management APIs
+  firsAPI,
 };
 
 // Legacy aliases for backward compatibility (clean version)

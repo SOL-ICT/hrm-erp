@@ -150,6 +150,7 @@ const AdminNavigation = ({
       submodules: [
         { id: "sol-master", name: "SOL Master" },
         { id: "user-management", name: "User Management" },
+        { id: "rbac-management", name: "Roles & Permissions" },
         { id: "system-settings", name: "System Settings" },
         { id: "audit-logs", name: "Audit Logs" },
       ],

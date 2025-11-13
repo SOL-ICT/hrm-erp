@@ -18,7 +18,16 @@ const PayGradeForm = ({
   editingPayGrade = null,
   onSave,
   jobStructures = [],
+  selectedJobStructure = null, // New prop for pre-selecting job structure
 }) => {
+  // Debug logging for props
+  console.log("🔍 PayGradeForm Props Debug:");
+  console.log("- isOpen:", isOpen);
+  console.log("- jobStructures:", jobStructures);
+  console.log("- jobStructures length:", jobStructures.length);
+  console.log("- selectedJobStructure:", selectedJobStructure);
+  console.log("- editingPayGrade:", editingPayGrade);
+
   const [formData, setFormData] = useState({
     job_structure_id: "",
     grade_name: "",
@@ -31,7 +40,7 @@ const PayGradeForm = ({
   const [loading, setLoading] = useState(false);
   const [payStructureTypes, setPayStructureTypes] = useState([]);
   const [emolumentComponents, setEmolumentComponents] = useState([]);
-  const [selectedJobStructure, setSelectedJobStructure] = useState(null);
+  const [currentJobStructure, setCurrentJobStructure] = useState(null);
   const [totalCompensation, setTotalCompensation] = useState(0);
   const [errors, setErrors] = useState({});
 
@@ -45,6 +54,12 @@ const PayGradeForm = ({
 
   // Reset form when editing grade changes
   useEffect(() => {
+    console.log("🔄 PayGradeForm useEffect triggered:");
+    console.log("- isOpen:", isOpen);
+    console.log("- editingPayGrade:", editingPayGrade);
+    console.log("- selectedJobStructure:", selectedJobStructure);
+    console.log("- jobStructures:", jobStructures);
+
     if (isOpen) {
       if (editingPayGrade) {
         // Find the job structure for this pay grade
@@ -84,7 +99,7 @@ const PayGradeForm = ({
               : true,
         });
 
-        setSelectedJobStructure(jobStructure);
+        setCurrentJobStructure(jobStructure);
 
         // If job structure has pay_structures, set the available types
         if (jobStructure?.pay_structures) {
@@ -119,13 +134,57 @@ const PayGradeForm = ({
           }
         }
       } else {
-        resetForm();
-        // For new pay grades, we still need to load pay structure types
-        loadPayStructureTypes();
+        // For new pay grades, pre-populate with selectedJobStructure if provided
+        if (selectedJobStructure) {
+          setFormData({
+            job_structure_id: selectedJobStructure.id || "",
+            grade_name: "",
+            grade_code: "",
+            pay_structure_type: "",
+            emoluments: {},
+            currency: "NGN",
+            is_active: true,
+          });
+          setCurrentJobStructure(selectedJobStructure);
+
+          // Load pay structure types for the selected job structure
+          if (selectedJobStructure.pay_structures) {
+            try {
+              let payStructures = selectedJobStructure.pay_structures;
+              // Handle both string and array formats
+              if (typeof payStructures === "string") {
+                payStructures = JSON.parse(payStructures);
+              }
+
+              // Convert to the format expected by the dropdown
+              const availableTypes = payStructures.map((type) => ({
+                id: type,
+                name: type,
+                code: type,
+              }));
+
+              setPayStructureTypes(availableTypes);
+
+              // Auto-select the first available pay structure type
+              if (availableTypes.length > 0) {
+                setFormData((prev) => ({
+                  ...prev,
+                  pay_structure_type: availableTypes[0].code,
+                }));
+              }
+            } catch (error) {
+              console.error("Error parsing pay_structures:", error);
+            }
+          }
+        } else {
+          resetForm();
+          // For new pay grades without selectedJobStructure, load all pay structure types
+          loadPayStructureTypes();
+        }
       }
       setErrors({});
     }
-  }, [editingPayGrade, isOpen, jobStructures]);
+  }, [editingPayGrade, isOpen, jobStructures, selectedJobStructure]);
 
   // Calculate total compensation when emoluments change
   useEffect(() => {
@@ -213,7 +272,7 @@ const PayGradeForm = ({
       currency: "NGN",
       is_active: true,
     });
-    setSelectedJobStructure(null);
+    setCurrentJobStructure(null);
     setTotalCompensation(0);
     setErrors({});
   };
@@ -229,7 +288,7 @@ const PayGradeForm = ({
     // Handle job structure selection
     if (field === "job_structure_id") {
       const jobStructure = jobStructures.find((js) => js.id == value);
-      setSelectedJobStructure(jobStructure);
+      setCurrentJobStructure(jobStructure);
       // Reset pay structure type when job structure changes
       setFormData((prev) => ({ ...prev, pay_structure_type: "" }));
     }
@@ -302,12 +361,12 @@ const PayGradeForm = ({
   };
 
   const getAvailablePayStructureTypes = () => {
-    if (!selectedJobStructure || !selectedJobStructure.pay_structures) {
+    if (!currentJobStructure || !currentJobStructure.pay_structures) {
       return [];
     }
 
     return payStructureTypes.filter((type) =>
-      selectedJobStructure.pay_structures.includes(type.type_code)
+      currentJobStructure.pay_structures.includes(type.type_code)
     );
   };
 
@@ -481,7 +540,17 @@ const PayGradeForm = ({
                         editingPayGrade ? "bg-gray-100 cursor-not-allowed" : ""
                       } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                     >
-                      <option value="">Select Job Structure</option>
+                      {/* Debug dropdown content */}
+                      {console.log("🎯 Dropdown Debug:", {
+                        jobStructuresLength: jobStructures.length,
+                        formDataJobStructureId: formData.job_structure_id,
+                        showPlaceholder: !formData.job_structure_id,
+                      })}
+
+                      {/* Only show placeholder option if no job structure is pre-selected */}
+                      {!formData.job_structure_id && (
+                        <option value="">Select Job Structure</option>
+                      )}
                       {jobStructures.map((job) => (
                         <option key={job.id} value={job.id}>
                           {job.job_code} - {job.job_title}

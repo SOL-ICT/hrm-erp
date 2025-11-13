@@ -16,8 +16,12 @@ class InvoiceTemplate extends Model
         'template_name',
         'description',
         'custom_components',
+        'employer_costs',
         'statutory_components',
+        'management_fees',
         'calculation_rules',
+        'annual_division_factor',
+        'template_version',
         'use_credit_to_bank_model',
         'service_fee_percentage',
         'attendance_calculation_method',
@@ -32,8 +36,11 @@ class InvoiceTemplate extends Model
 
     protected $casts = [
         'custom_components' => 'array',
+        'employer_costs' => 'array',
         'statutory_components' => 'array',
+        'management_fees' => 'array',
         'calculation_rules' => 'array',
+        'annual_division_factor' => 'decimal:2',
         'use_credit_to_bank_model' => 'boolean',
         'prorate_salary' => 'boolean',
         'is_active' => 'boolean',
@@ -91,7 +98,9 @@ class InvoiceTemplate extends Model
     {
         return [
             'custom_components' => $this->custom_components ?? [],
+            'employer_costs' => $this->employer_costs ?? [],
             'statutory_components' => $this->statutory_components ?? [],
+            'management_fees' => $this->management_fees ?? [],
             'calculation_rules' => $this->calculation_rules ?? [],
             'credit_to_bank' => [
                 'enabled' => $this->use_credit_to_bank_model,
@@ -126,5 +135,65 @@ class InvoiceTemplate extends Model
 
         // Then set this template as default
         $this->update(['is_default' => true]);
+    }
+
+    /**
+     * Convert annual rate to monthly rate
+     */
+    public function getMonthlyRate(float $annualRate): float
+    {
+        return $annualRate / ($this->annual_division_factor ?? 12);
+    }
+
+    /**
+     * Get custom components with monthly rates calculated from annual
+     */
+    public function getMonthlyCustomComponents(): array
+    {
+        $components = $this->custom_components ?? [];
+
+        foreach ($components as $key => $component) {
+            if (isset($component['rate'])) {
+                $components[$key]['monthly_rate'] = $this->getMonthlyRate($component['rate']);
+                $components[$key]['annual_rate'] = $component['rate'];
+            }
+        }
+
+        return $components;
+    }
+
+    /**
+     * Get statutory components with monthly rates calculated from annual
+     */
+    public function getMonthlyStatutoryComponents(): array
+    {
+        $components = $this->statutory_components ?? [];
+
+        foreach ($components as $key => $component) {
+            if (isset($component['rate'])) {
+                $components[$key]['monthly_rate'] = $this->getMonthlyRate($component['rate']);
+                $components[$key]['annual_rate'] = $component['rate'];
+            }
+            if (isset($component['amount'])) {
+                $components[$key]['monthly_amount'] = $this->getMonthlyRate($component['amount']);
+                $components[$key]['annual_amount'] = $component['amount'];
+            }
+        }
+
+        return $components;
+    }
+
+    /**
+     * Get all annual components for display/editing
+     */
+    public function getAnnualComponents(): array
+    {
+        return [
+            'custom_components' => $this->custom_components ?? [],
+            'employer_costs' => $this->employer_costs ?? [],
+            'statutory_components' => $this->statutory_components ?? [],
+            'management_fees' => $this->management_fees ?? [],
+            'annual_division_factor' => $this->annual_division_factor ?? 12,
+        ];
     }
 }

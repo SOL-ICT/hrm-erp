@@ -43,8 +43,8 @@ class DashboardController extends Controller
         $user = Auth::user();
 
         // For candidates, the user_id should be the candidate ID from the candidates table
-        // Your user table has profile_id that links to candidates.id
-        $candidateId = $user->profile_id ?? $user->id;
+        // Your user table has candidate_profile_id that links to candidates.id
+        $candidateId = $user->candidate_profile_id ?? $user->id;
 
         return [
             'id' => $user->id,

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiService } from "@/services/api";
+import { useOptimizedAPI } from "@/utils/optimizedAPI";
 
 const API_BASE = "http://localhost:8000/api";
 
@@ -13,8 +13,11 @@ export const useClients = (initialParams = {}) => {
   const [pagination, setPagination] = useState({});
   const [statistics, setStatistics] = useState({});
 
-  // Get sanctumRequest from existing AuthContext
-  const { sanctumRequest, isAuthenticated, hasRole } = useAuth();
+  // Get authentication status from AuthContext
+  const { isAuthenticated, hasRole } = useAuth();
+
+  // Get optimized API with deduplication and caching
+  const { makeRequest } = useOptimizedAPI();
 
   const fetchClients = async (params = initialParams) => {
     // Only fetch if user is authenticated and has admin role
@@ -35,7 +38,7 @@ export const useClients = (initialParams = {}) => {
         page: params.page || 1,
       });
 
-      const data = await apiService.makeRequest(`/clients?${queryParams}`);
+      const data = await makeRequest(`/clients?${queryParams}`);
 
       // API service already handles response parsing and errors
 
@@ -75,16 +78,7 @@ export const useClients = (initialParams = {}) => {
 
     try {
       console.log("Fetching statistics from API...");
-      const response = await sanctumRequest(`${API_BASE}/clients/statistics`);
-
-      // Check if response is ok before trying to parse JSON
-      if (!response.ok) {
-        console.log("API response not ok, using fallback");
-        throw new Error("API response not successful");
-      }
-
-      // Parse JSON only once
-      const data = await response.json();
+      const data = await makeRequest("/clients/statistics");
 
       if (data.success) {
         console.log("Statistics fetched successfully:", data.data);
@@ -145,19 +139,11 @@ export const useClients = (initialParams = {}) => {
 
     setLoading(true);
     try {
-      const response = await sanctumRequest(`${API_BASE}/clients`, {
+      const data = await makeRequest("/clients", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(clientData),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to create client");
-      }
-
-      const data = await response.json();
       if (data.success) {
         // Refresh the clients list
         fetchClients();
@@ -180,19 +166,11 @@ export const useClients = (initialParams = {}) => {
 
     setLoading(true);
     try {
-      const response = await sanctumRequest(`${API_BASE}/clients/${id}`, {
+      const data = await makeRequest(`/clients/${id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(clientData),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to update client");
-      }
-
-      const data = await response.json();
       if (data.success) {
         // Refresh the clients list
         fetchClients();
@@ -215,15 +193,10 @@ export const useClients = (initialParams = {}) => {
 
     setLoading(true);
     try {
-      const response = await sanctumRequest(`${API_BASE}/clients/${id}`, {
+      const data = await makeRequest(`/clients/${id}`, {
         method: "DELETE",
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to delete client");
-      }
-
-      const data = await response.json();
       if (data.success) {
         // Refresh the clients list
         fetchClients();
@@ -247,25 +220,12 @@ export const useClients = (initialParams = {}) => {
     try {
       setLoading(true);
 
-      const response = await sanctumRequest(
-        `${API_BASE}/clients/${id}/toggle-status`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            status: status === "active" ? "inactive" : "active",
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to update status");
-      }
-
-      const result = await response.json();
+      const result = await makeRequest(`/clients/${id}/toggle-status`, {
+        method: "PUT",
+        body: JSON.stringify({
+          status: status === "active" ? "inactive" : "active",
+        }),
+      });
 
       if (result.success) {
         // Update client in local state
@@ -386,7 +346,8 @@ export const useUtilityData = () => {
   const [statesLgas, setStatesLgas] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const { sanctumRequest, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
+  const { makeRequest } = useOptimizedAPI();
 
   const fetchUtilityData = async () => {
     if (!isAuthenticated) {
@@ -399,40 +360,39 @@ export const useUtilityData = () => {
       // This fixes the ERR_CONNECTION_RESET issue in development
 
       // Fetch industry categories first
-      const industriesRes = await sanctumRequest(
-        `${API_BASE}/utilities/industry-categories`
-      );
-      if (industriesRes.ok) {
-        const data = await industriesRes.json();
+      try {
+        const data = await makeRequest("/utilities/industry-categories");
         if (data.success) {
           setIndustryCategories(data.data || []);
         }
+      } catch (err) {
+        console.error("Error fetching industry categories:", err);
       }
 
       // Small delay before next request
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Fetch client categories
-      const categoriesRes = await sanctumRequest(
-        `${API_BASE}/utilities/client-categories`
-      );
-      if (categoriesRes.ok) {
-        const data = await categoriesRes.json();
+      try {
+        const data = await makeRequest("/utilities/client-categories");
         if (data.success) {
           setClientCategories(data.data || []);
         }
+      } catch (err) {
+        console.error("Error fetching client categories:", err);
       }
 
       // Small delay before next request
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Fetch states/LGAs
-      const statesRes = await sanctumRequest(`${API_BASE}/states-lgas`);
-      if (statesRes.ok) {
-        const data = await statesRes.json();
+      try {
+        const data = await makeRequest("/states-lgas");
         if (data.success) {
           setStatesLgas(data.data || []);
         }
+      } catch (err) {
+        console.error("Error fetching states/LGAs:", err);
       }
     } catch (err) {
       console.error("Error fetching utility data:", err);

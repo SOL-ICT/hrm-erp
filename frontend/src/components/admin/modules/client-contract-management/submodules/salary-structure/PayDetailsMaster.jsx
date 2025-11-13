@@ -487,6 +487,7 @@ const PayDetailsMaster = ({
         editingPayGrade={editingPayGrade}
         onSave={handlePayGradeSave}
         jobStructures={jobStructures}
+        selectedJobStructure={selectedJobCategory} // Pass selectedJobCategory to pre-populate job structure
       />
 
       {showEmolumentModal && (

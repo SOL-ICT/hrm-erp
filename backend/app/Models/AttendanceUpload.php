@@ -14,21 +14,39 @@ class AttendanceUpload extends Model
         'client_id',
         'file_name',
         'file_path',
-        'file_size',
         'file_type',
-        'status',
-        'records_processed',
-        'records_failed',
-        'error_details',
+        'total_records',
+        'processed_records',
+        'failed_records',
+        'processing_status',
+        'processing_errors',
+        'payroll_month',
         'uploaded_by',
-        'processing_started_at',
-        'processing_completed_at'
+        'processed_at',
+        // Phase 1.3: Enhanced upload tracking fields
+        'format_validation_results',
+        'matching_validation_results',
+        'template_coverage_results',
+        'successfully_matched',
+        'failed_matches',
+        'match_percentage',
+        'validation_status',
+        'ready_for_processing',
+        'validation_completed_at',
+
     ];
 
     protected $casts = [
-        'error_details' => 'array',
-        'processing_started_at' => 'datetime',
-        'processing_completed_at' => 'datetime'
+        'processing_errors' => 'array',
+        'format_validation_results' => 'array',
+        'matching_validation_results' => 'array',
+        'template_coverage_results' => 'array',
+        'payroll_month' => 'date',
+        'processed_at' => 'datetime',
+        'validation_completed_at' => 'datetime',
+        'match_percentage' => 'decimal:2',
+        'ready_for_processing' => 'boolean',
+
     ];
 
     public function client(): BelongsTo

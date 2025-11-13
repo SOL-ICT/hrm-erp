@@ -15,7 +15,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import EmployeeRecord from "./submodules/employee-record/EmployeeRecord";
-import InvoiceManagement from "../../../invoicing/InvoiceManagement";
+import InvoiceManagement from "./submodules/invoicing/InvoiceManagement";
 import employeeRecordAPI from "../../../../services/modules/hr-payroll-management/employeeRecordAPI";
 
 const HRPayrollDashboard = ({

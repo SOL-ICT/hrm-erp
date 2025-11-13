@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use App\Models\JobStructure;
 use App\Models\PayGradeStructure;
 use App\Models\PayStructureType;
@@ -228,7 +229,14 @@ class SalaryStructureController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'client_id' => 'required|exists:clients,id',
-                'job_code' => 'required|string|max:20|unique:job_structures,job_code',
+                'job_code' => [
+                    'required',
+                    'string',
+                    'max:20',
+                    Rule::unique('job_structures')->where(function ($query) use ($request) {
+                        return $query->where('client_id', $request->client_id);
+                    })
+                ],
                 'job_title' => 'required|string|max:255',
                 'description' => 'nullable|string',
                 'contract_type' => 'required|in:employment,service',
@@ -293,7 +301,14 @@ class SalaryStructureController extends Controller
             $jobStructure = JobStructure::findOrFail($id);
 
             $validator = Validator::make($request->all(), [
-                'job_code' => 'required|string|max:20|unique:job_structures,job_code,' . $id,
+                'job_code' => [
+                    'required',
+                    'string',
+                    'max:20',
+                    Rule::unique('job_structures')->where(function ($query) use ($jobStructure) {
+                        return $query->where('client_id', $jobStructure->client_id);
+                    })->ignore($id)
+                ],
                 'job_title' => 'required|string|max:255',
                 'description' => 'nullable|string',
                 'contract_type' => 'required|in:employment,service',
