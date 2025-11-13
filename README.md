@@ -136,11 +136,48 @@ php artisan cache:stats
 - **Current**: Docker development with Redis caching (expect sub-2s cached responses)
 - **Production**: AWS optimized with Redis clustering (target 0.5-1.5s load times)
 
+## 🚀 Quick Start (Port Conflict-Free!)
+
+### **Automatic Setup (Recommended)**
+
+```powershell
+# 1. Clone repository
+git clone https://github.com/SOL-ICT/hrm-erp.git
+cd hrm-erp
+
+# 2. Auto-detect and configure environment
+.\deploy-environment.ps1
+
+# 3. Access application (URLs shown after setup)
+```
+
+### **Manual Setup**
+
+```bash
+# Development (safe ports)
+docker-compose -f docker-compose.dev.yml up -d
+
+# Production (modified ports for Apache compatibility)
+docker-compose up -d
+```
+
 ## Links
+
+**Development Environment:**
+
+- Frontend: http://localhost:3001 (conflict-free)
+- Backend API: http://localhost:8001/api (conflict-free)
+- phpMyAdmin: http://localhost:8082 (conflict-free)
+
+**Production Environment:**
 
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000
-- phpMyAdmin: http://localhost:8080
+- phpMyAdmin: http://localhost:8081
+
+**Documentation:**
+
 - Performance Guide: [PERFORMANCE_README.md](./PERFORMANCE_README.md)
 - **📋 Implementation Tracker**: [ENHANCED_INVOICING_IMPLEMENTATION_TRACKER.md](./ENHANCED_INVOICING_IMPLEMENTATION_TRACKER.md)
 - **📚 Documentation Guide**: [PROJECT_DOCUMENTATION_REFERENCE.md](./PROJECT_DOCUMENTATION_REFERENCE.md)
+- **🛠️ Deployment Guide**: [COMPREHENSIVE_DEPLOYMENT_GUIDE.md](./COMPREHENSIVE_DEPLOYMENT_GUIDE.md)
