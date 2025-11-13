@@ -16,8 +16,28 @@ class Client extends Model
         'client_category',
         'phone',
         'head_office_address',
+        'payment_terms',
+        'contact_person_name',
+        'contact_person_position',
+        'contact_person_address',
         'pay_calculation_basis',
-        'status'
+        'status',
+        // FIRS e-invoicing fields
+        'tin',
+        'business_description',
+        'city',
+        'postal_zone',
+        'country',
+        'contact_person_email',
+        'contact_person_phone',
+        // FIRS fields (matching frontend ClientMaster.jsx)
+        'firs_tin',
+        'firs_business_description',
+        'firs_city',
+        'firs_postal_zone',
+        'firs_country',
+        'firs_contact_telephone',
+        'firs_contact_email'
     ];
 
     protected $casts = [

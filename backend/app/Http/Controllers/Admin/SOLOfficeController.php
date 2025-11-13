@@ -21,14 +21,14 @@ class SOLOfficeController extends Controller
             throw new \Exception('Authentication required', 401);
         }
 
-        // Check if user is staff/admin type with profile_id
-        if (!in_array($user->user_type, ['staff', 'admin']) || !$user->profile_id) {
+        // Check if user is staff/admin type with staff_profile_id
+        if (!in_array($user->user_type, ['staff', 'admin']) || !$user->staff_profile_id) {
             throw new \Exception('Only staff/admin users can access SOL offices', 403);
         }
 
-        // Verify SOL staff using direct profile_id (staff ID)
+        // Verify SOL staff using direct staff_profile_id (staff ID)
         $solStaff = DB::table('staff')
-            ->where('id', $user->profile_id)
+            ->where('id', $user->staff_profile_id)
             ->where('client_id', 1) // SOL Nigeria only
             ->where('status', 'active')
             ->first();
@@ -40,7 +40,7 @@ class SOLOfficeController extends Controller
         // Check admin permissions
         $hasAdminRole = DB::table('staff_roles')
             ->join('roles', 'staff_roles.role_id', '=', 'roles.id')
-            ->where('staff_roles.staff_id', $user->profile_id)
+            ->where('staff_roles.staff_id', $user->staff_profile_id)
             ->whereIn('roles.slug', ['super-admin', 'admin'])
             ->exists();
 
@@ -50,7 +50,7 @@ class SOLOfficeController extends Controller
 
         return [
             'user' => $user,
-            'staff_id' => $user->profile_id,
+            'staff_id' => $user->staff_profile_id,
             'staff' => $solStaff
         ];
     }

@@ -54,6 +54,21 @@ class InvoiceApiService {
   }
 
   /**
+   * Get detailed invoice with line items
+   */
+  async getInvoiceWithDetails(invoiceId) {
+    try {
+      const response = await apiService.get(
+        `/attendance/invoice/${invoiceId}/details`
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching invoice details ${invoiceId}:`, error);
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
    * Generate new invoice from attendance upload
    */
   async generateInvoice(attendanceUploadId, invoiceType, invoicePeriod) {
@@ -71,12 +86,30 @@ class InvoiceApiService {
   }
 
   /**
+   * Generate invoice from attendance upload (new endpoint)
+   */
+  async generateInvoiceFromAttendance(uploadId, invoiceType) {
+    try {
+      const response = await apiService.post(
+        `/attendance/${uploadId}/generate-invoice`,
+        {
+          invoice_type: invoiceType,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error generating invoice from attendance:", error);
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
    * Export invoice to Excel (triggers download)
    */
   async exportInvoiceToExcel(invoiceId) {
     try {
       const response = await apiService.get(
-        `${this.baseUrl}/${invoiceId}/export-excel`,
+        `/attendance/invoice/${invoiceId}/export-excel`,
         {
           responseType: "blob",
         }
@@ -112,6 +145,96 @@ class InvoiceApiService {
   }
 
   /**
+   * Export invoice to PDF (triggers download)
+   */
+  async exportInvoiceToPDF(invoiceId, issueDate = null) {
+    try {
+      // Prepare request data
+      const requestData = {};
+      if (issueDate) {
+        requestData.issue_date = issueDate;
+      }
+
+      const response = await apiService.post(
+        `/attendance/invoice/${invoiceId}/export-pdf`,
+        requestData,
+        {
+          responseType: "blob",
+        }
+      );
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+
+      // Extract filename from response headers
+      const contentDisposition = response.headers["content-disposition"];
+      let filename = `invoice_${invoiceId}.pdf`;
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      return { success: true, filename };
+    } catch (error) {
+      console.error(`Error exporting invoice to PDF ${invoiceId}:`, error);
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Export FIRS-compliant PDF with QR code (only for FIRS-approved invoices)
+   */
+  async exportFIRSCompliancePDF(invoiceId) {
+    try {
+      const response = await apiService.post(
+        `/attendance/invoice/${invoiceId}/export-firs-pdf`,
+        {},
+        {
+          responseType: "blob",
+        }
+      );
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+
+      // Extract filename from response headers
+      const contentDisposition = response.headers["content-disposition"];
+      let filename = `firs_compliant_invoice_${invoiceId}.pdf`;
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      return { success: true, filename };
+    } catch (error) {
+      console.error(`Error exporting FIRS-compliant PDF ${invoiceId}:`, error);
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
    * Get invoice statistics for dashboard
    */
   async getInvoiceStatistics() {
@@ -120,6 +243,51 @@ class InvoiceApiService {
       return response.data;
     } catch (error) {
       console.error("Error fetching invoice statistics:", error);
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Export FIRS-compliant PDF with QR code (only for FIRS-approved invoices)
+   */
+  async exportFIRSCompliancePDF(invoiceId) {
+    try {
+      const response = await apiService.post(
+        `/attendance/invoice/${invoiceId}/export-firs-pdf`,
+        {},
+        {
+          responseType: "blob",
+        }
+      );
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+
+      // Extract filename from response headers
+      const contentDisposition = response.headers["content-disposition"];
+      let filename = `firs_compliant_invoice_${invoiceId}.pdf`;
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      return { success: true, filename };
+    } catch (error) {
+      console.error(
+        `Error exporting FIRS-compliant PDF for invoice ${invoiceId}:`,
+        error
+      );
       throw this.handleApiError(error);
     }
   }
@@ -150,27 +318,6 @@ class InvoiceApiService {
       return response.data;
     } catch (error) {
       console.error(`Error deleting invoice ${invoiceId}:`, error);
-      throw this.handleApiError(error);
-    }
-  }
-
-  /**
-   * Get attendance uploads with invoice status
-   */
-  async getAttendanceUploads(params = {}) {
-    try {
-      const queryParams = new URLSearchParams();
-      if (params.page) queryParams.append("page", params.page);
-      if (params.per_page) queryParams.append("per_page", params.per_page);
-
-      const url = queryParams.toString()
-        ? `/attendance-uploads?${queryParams.toString()}`
-        : "/attendance-uploads";
-
-      const response = await apiService.get(url);
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching attendance uploads:", error);
       throw this.handleApiError(error);
     }
   }
@@ -272,6 +419,66 @@ class InvoiceApiService {
   }
 
   /**
+   * Phase 1.3: Upload with direct pay_grade_structure_id matching
+   */
+  async uploadWithDirectMatching(file, clientId, payrollMonth) {
+    try {
+      const formData = new FormData();
+      formData.append("attendance_file", file);
+      formData.append("client_id", clientId);
+      if (payrollMonth) {
+        formData.append("payroll_month", payrollMonth);
+      }
+
+      const response = await apiService.post(
+        "/attendance/upload-with-direct-matching",
+        formData
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Error uploading with direct matching:", error);
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Phase 1.3: Get validation results for an upload
+   */
+  async getValidationResults(uploadId) {
+    try {
+      const response = await apiService.get(
+        `/attendance/validation-results/${uploadId}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error(
+        `Error fetching validation results for upload ${uploadId}:`,
+        error
+      );
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Phase 1.3: Get template coverage analysis for an upload
+   */
+  async getTemplateCoverage(uploadId) {
+    try {
+      const response = await apiService.get(
+        `/attendance/template-coverage/${uploadId}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error(
+        `Error fetching template coverage for upload ${uploadId}:`,
+        error
+      );
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
    * Get attendance uploads with pagination and filters
    */
   async getAttendanceUploads(params = {}) {
@@ -324,6 +531,128 @@ class InvoiceApiService {
       return response.data;
     } catch (error) {
       console.error(`Error deleting upload ${uploadId}:`, error);
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Delete individual attendance record
+   */
+  async deleteAttendanceRecord(recordId) {
+    try {
+      const response = await apiService.delete(
+        `/attendance/record/${recordId}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting attendance record ${recordId}:`, error);
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Update individual attendance record
+   */
+  async updateAttendanceRecord(recordId, updates) {
+    try {
+      const response = await apiService.put(
+        `/attendance/record/${recordId}/update`,
+        updates
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating attendance record ${recordId}:`, error);
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Add staff to attendance upload
+   */
+  async addStaffToAttendance(uploadId, staffData) {
+    try {
+      const response = await apiService.post(
+        `/attendance/${uploadId}/add-staff`,
+        staffData
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Error adding staff to upload ${uploadId}:`, error);
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Phase 1.3: Validate uploaded attendance data
+   */
+  async validateUploadedAttendance(uploadId) {
+    try {
+      const response = await apiService.get(
+        `/attendance/validation-results/${uploadId}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Error validating upload ${uploadId}:`, error);
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Download attendance template for a specific client
+   */
+  async downloadAttendanceTemplate(clientId) {
+    try {
+      const response = await apiService.get(
+        `/attendance/template/download/${clientId}`,
+        {
+          responseType: "blob",
+        }
+      );
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+
+      // Extract filename from response headers or use default
+      const contentDisposition = response.headers["content-disposition"];
+      let filename = `attendance_template_client_${clientId}.xlsx`;
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      return { success: true, filename };
+    } catch (error) {
+      console.error(
+        `Error downloading template for client ${clientId}:`,
+        error
+      );
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Phase 2.1: Get comprehensive preview data for an upload
+   */
+  async getUploadPreview(uploadId) {
+    try {
+      const response = await apiService.get(`/attendance/${uploadId}/preview`);
+      return response.data;
+    } catch (error) {
+      console.error(
+        `Error fetching upload preview for upload ${uploadId}:`,
+        error
+      );
       throw this.handleApiError(error);
     }
   }

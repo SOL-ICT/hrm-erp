@@ -19,6 +19,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class BoardingController extends Controller
@@ -119,15 +120,126 @@ class BoardingController extends Controller
     }
 
     /**
+     * Debug method to check job structure data integrity
+     */
+    public function debugJobStructure(Request $request): JsonResponse
+    {
+        try {
+            $recruitmentRequestId = $request->recruitment_request_id;
+
+            if (!$recruitmentRequestId) {
+                // If no specific request ID, show general debug info
+                $allRequests = RecruitmentRequest::with(['client'])
+                    ->take(5)
+                    ->get(['id', 'ticket_id', 'job_structure_id', 'client_id'])
+                    ->map(function ($req) {
+                        return [
+                            'id' => $req->id,
+                            'ticket_id' => $req->ticket_id,
+                            'job_structure_id' => $req->job_structure_id,
+                            'client_name' => $req->client ? $req->client->company_name : 'No client'
+                        ];
+                    });
+
+                $jobStructureCount = DB::table('job_structures')->count();
+                $payGradeCount = DB::table('pay_grade_structures')->count();
+
+                return response()->json([
+                    'success' => true,
+                    'debug_data' => [
+                        'sample_recruitment_requests' => $allRequests,
+                        'total_job_structures' => $jobStructureCount,
+                        'total_pay_grades' => $payGradeCount,
+                        'message' => 'Add ?recruitment_request_id=X to debug specific request'
+                    ]
+                ]);
+            }
+
+            // Get recruitment request with job structure
+            $recruitmentRequest = RecruitmentRequest::with(['jobStructure.payGradeStructures', 'client'])
+                ->find($recruitmentRequestId);
+
+            if (!$recruitmentRequest) {
+                return response()->json([
+                    'error' => 'Recruitment request not found',
+                    'recruitment_request_id' => $recruitmentRequestId
+                ], 404);
+            }
+
+            $debug = [
+                'recruitment_request' => [
+                    'id' => $recruitmentRequest->id,
+                    'ticket_id' => $recruitmentRequest->ticket_id,
+                    'job_structure_id' => $recruitmentRequest->job_structure_id,
+                    'client_id' => $recruitmentRequest->client_id,
+                    'client_name' => $recruitmentRequest->client ? $recruitmentRequest->client->company_name : 'No client'
+                ],
+                'job_structure' => null,
+                'pay_grades_count' => 0,
+                'active_pay_grades_count' => 0
+            ];
+
+            if ($recruitmentRequest->jobStructure) {
+                $debug['job_structure'] = [
+                    'id' => $recruitmentRequest->jobStructure->id,
+                    'structure_name' => $recruitmentRequest->jobStructure->structure_name,
+                    'is_active' => $recruitmentRequest->jobStructure->is_active,
+                    'client_id' => $recruitmentRequest->jobStructure->client_id
+                ];
+
+                $debug['pay_grades_count'] = $recruitmentRequest->jobStructure->payGradeStructures->count();
+                $debug['active_pay_grades_count'] = $recruitmentRequest->jobStructure->payGradeStructures
+                    ->where('is_active', true)->count();
+
+                $debug['pay_grades'] = $recruitmentRequest->jobStructure->payGradeStructures
+                    ->map(function ($grade) {
+                        return [
+                            'id' => $grade->id,
+                            'grade_name' => $grade->grade_name,
+                            'is_active' => $grade->is_active,
+                            'total_compensation' => $grade->total_compensation
+                        ];
+                    });
+            } else {
+                $debug['error'] = 'Job structure not found for ID: ' . $recruitmentRequest->job_structure_id;
+            }
+
+            return response()->json([
+                'success' => true,
+                'debug_data' => $debug
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Debug job structure failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Debug failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Get pay grades for a job structure
      */
     public function getPayGrades(Request $request): JsonResponse
     {
-        $request->validate([
-            'job_structure_id' => 'required|exists:job_structures,id'
-        ]);
-
         try {
+            $validator = Validator::make($request->all(), [
+                'job_structure_id' => 'required|exists:job_structures,id'
+            ]);
+
+            if ($validator->fails()) {
+                Log::warning('Pay grades validation failed', [
+                    'job_structure_id' => $request->job_structure_id,
+                    'errors' => $validator->errors()
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The selected job structure id is invalid.',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
             $payGrades = PayGradeStructure::where('job_structure_id', $request->job_structure_id)
                 ->where('is_active', true)
                 ->orderBy('total_compensation')
@@ -150,7 +262,10 @@ class BoardingController extends Controller
                 'message' => $payGrades->isEmpty() ? 'No pay grades found for this job structure' : 'Pay grades retrieved successfully'
             ]);
         } catch (\Exception $e) {
-            Log::error('Failed to fetch pay grades: ' . $e->getMessage());
+            Log::error('Failed to fetch pay grades: ' . $e->getMessage(), [
+                'job_structure_id' => $request->job_structure_id ?? 'null',
+                'request_data' => $request->all()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch pay grades',
@@ -342,7 +457,6 @@ class BoardingController extends Controller
                     );
 
                     $successCount++;
-
                 } catch (\Exception $e) {
                     $failedCandidates[] = [
                         'candidate_id' => $offer['candidate_id'],
@@ -361,7 +475,6 @@ class BoardingController extends Controller
                     'failed_candidates' => $failedCandidates
                 ]
             ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Failed to send offers: ' . $e->getMessage());
@@ -392,7 +505,7 @@ class BoardingController extends Controller
                 try {
                     $boardingRequest = BoardingRequest::with([
                         'candidate',
-                        'client', 
+                        'client',
                         'recruitmentRequest',
                         'jobStructure',
                         'payGradeStructure',
@@ -471,7 +584,6 @@ class BoardingController extends Controller
                     );
 
                     $successCount++;
-
                 } catch (\Exception $e) {
                     Log::error("Failed to board candidate: " . $e->getMessage());
                     $failedCandidates[] = [
@@ -491,7 +603,6 @@ class BoardingController extends Controller
                     'failed_candidates' => $failedCandidates
                 ]
             ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Failed to board candidates: ' . $e->getMessage());
@@ -601,7 +712,7 @@ class BoardingController extends Controller
             // If candidate provided updated banking/legal info during offer acceptance
             if ($offerResponse && !empty($offerResponse->updated_candidate_info)) {
                 $updatedInfo = $offerResponse->updated_candidate_info;
-                
+
                 // Banking information
                 if (!empty($updatedInfo['banking'])) {
                     DB::table('staff_banking')->insert([
@@ -628,7 +739,6 @@ class BoardingController extends Controller
                     ]);
                 }
             }
-
         } catch (\Exception $e) {
             Log::error("Failed to copy candidate data to staff tables: " . $e->getMessage());
             throw $e;
@@ -642,18 +752,18 @@ class BoardingController extends Controller
     {
         $year = date('Y');
         $prefix = strtoupper($clientCode) . '-' . $year . '-';
-        
+
         $lastStaff = Staff::where('staff_id', 'like', $prefix . '%')
             ->orderBy('staff_id', 'desc')
             ->first();
-        
+
         if ($lastStaff) {
             $lastNumber = intval(substr($lastStaff->staff_id, -4));
             $nextNumber = $lastNumber + 1;
         } else {
             $nextNumber = 1;
         }
-        
+
         return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
 
@@ -663,18 +773,18 @@ class BoardingController extends Controller
     private function generateEmployeeCode($clientId): string
     {
         $prefix = 'EMP' . str_pad($clientId, 3, '0', STR_PAD_LEFT) . '-';
-        
+
         $lastEmployee = Staff::where('employee_code', 'like', $prefix . '%')
             ->orderBy('employee_code', 'desc')
             ->first();
-        
+
         if ($lastEmployee) {
             $lastNumber = intval(substr($lastEmployee->employee_code, -4));
             $nextNumber = $lastNumber + 1;
         } else {
             $nextNumber = 1;
         }
-        
+
         return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
 }

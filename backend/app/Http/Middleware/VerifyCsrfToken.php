@@ -16,6 +16,8 @@ class VerifyCsrfToken extends Middleware
         '/api/*',
         'sanctum/*',
         '/sanctum/*',
+        'api/attendance/upload-with-direct-matching',
+        '/api/attendance/upload-with-direct-matching',
     ];
 
     /**

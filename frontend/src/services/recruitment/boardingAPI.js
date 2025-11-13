@@ -1,8 +1,8 @@
-import { apiService } from '../api';
+import { apiService } from "../api";
 
 class BoardingAPI {
   // Base URL for boarding endpoints
-  baseURL = '/recruitment-management/boarding';
+  baseURL = "/recruitment-management/boarding";
 
   /**
    * Get clients with active recruitment requests
@@ -12,7 +12,7 @@ class BoardingAPI {
       const response = await apiService.makeRequest(`${this.baseURL}/clients`);
       return response;
     } catch (error) {
-      console.error('Failed to fetch clients:', error);
+      console.error("Failed to fetch clients:", error);
       throw error;
     }
   }
@@ -23,12 +23,12 @@ class BoardingAPI {
   async getTickets(clientId) {
     try {
       const response = await apiService.makeRequest(`${this.baseURL}/tickets`, {
-        method: 'GET',
-        params: { client_id: clientId }
+        method: "GET",
+        params: { client_id: clientId },
       });
       return response;
     } catch (error) {
-      console.error('Failed to fetch tickets:', error);
+      console.error("Failed to fetch tickets:", error);
       throw error;
     }
   }
@@ -38,13 +38,32 @@ class BoardingAPI {
    */
   async getPayGrades(jobStructureId) {
     try {
-      const response = await apiService.makeRequest(`${this.baseURL}/pay-grades`, {
-        method: 'GET',
-        params: { job_structure_id: jobStructureId }
-      });
+      // Validate input
+      if (!jobStructureId) {
+        throw new Error("Job structure ID is required");
+      }
+
+      const response = await apiService.makeRequest(
+        `${this.baseURL}/pay-grades`,
+        {
+          method: "GET",
+          params: { job_structure_id: jobStructureId },
+        }
+      );
       return response;
     } catch (error) {
-      console.error('Failed to fetch pay grades:', error);
+      // Check if it's a validation error (422)
+      if (error.response?.status === 422) {
+        console.warn("Invalid job structure ID:", jobStructureId);
+        return {
+          success: false,
+          message:
+            "Invalid job structure. Please verify the recruitment request data.",
+          data: [],
+        };
+      }
+
+      console.error("Failed to fetch pay grades:", error);
       throw error;
     }
   }
@@ -54,13 +73,16 @@ class BoardingAPI {
    */
   async getCandidatesForOffer(recruitmentRequestId) {
     try {
-      const response = await apiService.makeRequest(`${this.baseURL}/candidates/offer`, {
-        method: 'GET',
-        params: { recruitment_request_id: recruitmentRequestId }
-      });
+      const response = await apiService.makeRequest(
+        `${this.baseURL}/candidates/offer`,
+        {
+          method: "GET",
+          params: { recruitment_request_id: recruitmentRequestId },
+        }
+      );
       return response;
     } catch (error) {
-      console.error('Failed to fetch candidates for offer:', error);
+      console.error("Failed to fetch candidates for offer:", error);
       throw error;
     }
   }
@@ -70,13 +92,16 @@ class BoardingAPI {
    */
   async getCandidatesForBoarding(recruitmentRequestId) {
     try {
-      const response = await apiService.makeRequest(`${this.baseURL}/candidates/boarding`, {
-        method: 'GET',
-        params: { recruitment_request_id: recruitmentRequestId }
-      });
+      const response = await apiService.makeRequest(
+        `${this.baseURL}/candidates/boarding`,
+        {
+          method: "GET",
+          params: { recruitment_request_id: recruitmentRequestId },
+        }
+      );
       return response;
     } catch (error) {
-      console.error('Failed to fetch candidates for boarding:', error);
+      console.error("Failed to fetch candidates for boarding:", error);
       throw error;
     }
   }
@@ -86,13 +111,16 @@ class BoardingAPI {
    */
   async sendOffers(offerData) {
     try {
-      const response = await apiService.makeRequest(`${this.baseURL}/offers/send`, {
-        method: 'POST',
-        body: JSON.stringify(offerData)
-      });
+      const response = await apiService.makeRequest(
+        `${this.baseURL}/offers/send`,
+        {
+          method: "POST",
+          body: JSON.stringify(offerData),
+        }
+      );
       return response;
     } catch (error) {
-      console.error('Failed to send offers:', error);
+      console.error("Failed to send offers:", error);
       throw error;
     }
   }
@@ -102,13 +130,16 @@ class BoardingAPI {
    */
   async boardCandidates(candidateData) {
     try {
-      const response = await apiService.makeRequest(`${this.baseURL}/candidates/board`, {
-        method: 'POST',
-        body: JSON.stringify(candidateData)
-      });
+      const response = await apiService.makeRequest(
+        `${this.baseURL}/candidates/board`,
+        {
+          method: "POST",
+          body: JSON.stringify(candidateData),
+        }
+      );
       return response;
     } catch (error) {
-      console.error('Failed to board candidates:', error);
+      console.error("Failed to board candidates:", error);
       throw error;
     }
   }

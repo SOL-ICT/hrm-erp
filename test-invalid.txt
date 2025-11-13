@@ -1,0 +1,3 @@
+This is not an Excel file.
+Just plain text to test file validation.
+Should trigger "invalid file format" error.

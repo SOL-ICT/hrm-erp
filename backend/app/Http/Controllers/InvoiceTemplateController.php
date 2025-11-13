@@ -5,11 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\InvoiceTemplate;
 use App\Models\Client;
 use App\Models\PayGradeStructure;
+use App\Services\ExcelTemplateImporter;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InvoiceTemplateController extends Controller
 {
@@ -126,9 +131,15 @@ class InvoiceTemplateController extends Controller
         try {
             $template = InvoiceTemplate::with(['client', 'payGradeStructure'])->findOrFail($id);
 
+            // Enhance response with annual and monthly component data
+            $enhancedTemplate = $template->toArray();
+            $enhancedTemplate['monthly_custom_components'] = $template->getMonthlyCustomComponents();
+            $enhancedTemplate['monthly_statutory_components'] = $template->getMonthlyStatutoryComponents();
+            $enhancedTemplate['annual_components'] = $template->getAnnualComponents();
+
             return response()->json([
                 'success' => true,
-                'data' => $template,
+                'data' => $enhancedTemplate,
                 'message' => 'Invoice template retrieved successfully'
             ]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -326,6 +337,436 @@ class InvoiceTemplateController extends Controller
                 'success' => false,
                 'message' => 'Failed to clone invoice template',
                 'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Import invoice template from Excel file
+     */
+    public function importFromExcel(Request $request): JsonResponse
+    {
+        try {
+            $validatedData = $request->validate([
+                'excel_file' => 'required|file|mimes:xlsx,xls,csv|max:5120', // 5MB max
+                'client_id' => 'required|exists:clients,id',
+                'pay_grade_structure_id' => 'required|exists:pay_grade_structures,id',
+                'template_name' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'set_as_default' => 'boolean',
+            ]);
+
+            $importer = new ExcelTemplateImporter();
+            $result = $importer->importFromExcel(
+                $request->file('excel_file'),
+                $validatedData['client_id'],
+                $validatedData['pay_grade_structure_id'],
+                $validatedData['template_name'],
+                $validatedData['description'] ?? null,
+                $validatedData['set_as_default'] ?? false
+            );
+
+            if ($result['success']) {
+                $template = $result['template'];
+                $template->load(['client', 'payGradeStructure']);
+
+                return response()->json([
+                    'success' => true,
+                    'data' => $template,
+                    'warnings' => $result['warnings'] ?? [],
+                    'extracted_data' => $result['extracted_data'] ?? [],
+                    'message' => $result['message']
+                ], 201);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message'],
+                    'errors' => $result['errors'] ?? [],
+                    'warnings' => $result['warnings'] ?? []
+                ], 422);
+            }
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error importing Excel template: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to import Excel template',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Preview Excel template before importing
+     */
+    public function previewExcelTemplate(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'excel_file' => 'required|file|mimes:xlsx,xls,csv|max:5120', // 5MB max
+            ]);
+
+            $importer = new ExcelTemplateImporter();
+            $result = $importer->previewExcelTemplate($request->file('excel_file'));
+
+            if ($result['success']) {
+                return response()->json([
+                    'success' => true,
+                    'preview_data' => $result['preview_data'],
+                    'validation_errors' => $result['validation_errors'] ?? [],
+                    'validation_warnings' => $result['validation_warnings'] ?? [],
+                    'structure_analysis' => $result['structure_analysis'] ?? [],
+                    'message' => 'Excel template preview generated successfully'
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message'],
+                    'errors' => $result['errors'] ?? []
+                ], 422);
+            }
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error previewing Excel template: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to preview Excel template',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Download sample Excel template
+     */
+    public function downloadSampleTemplate()
+    {
+        try {
+            $importer = new ExcelTemplateImporter();
+            $spreadsheet = $importer->generateSampleTemplate();
+
+            $writer = new Xlsx($spreadsheet);
+            $filename = 'SOL_ICT_Payroll_Template_' . date('Y-m-d') . '.xlsx';
+
+            // Prepare response
+            $response = response()->stream(
+                function () use ($writer) {
+                    $writer->save('php://output');
+                },
+                200,
+                [
+                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                    'Cache-Control' => 'max-age=0',
+                ]
+            );
+
+            Log::info('Sample template downloaded', ['filename' => $filename]);
+
+            return $response;
+        } catch (\Exception $e) {
+            Log::error('Error generating sample template: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to generate sample template',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Export existing template to Excel format
+     */
+    public function exportToExcel(string $id)
+    {
+        try {
+            $template = InvoiceTemplate::with(['client', 'payGradeStructure'])->findOrFail($id);
+
+            $importer = new ExcelTemplateImporter();
+            $spreadsheet = $this->convertTemplateToExcel($template);
+
+            $writer = new Xlsx($spreadsheet);
+            $filename = 'Template_' . str_replace(' ', '_', $template->template_name) . '_' . date('Y-m-d') . '.xlsx';
+
+            // Prepare response
+            $response = response()->stream(
+                function () use ($writer) {
+                    $writer->save('php://output');
+                },
+                200,
+                [
+                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                    'Cache-Control' => 'max-age=0',
+                ]
+            );
+
+            Log::info('Template exported to Excel', [
+                'template_id' => $id,
+                'filename' => $filename
+            ]);
+
+            return $response;
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice template not found'
+            ], 404);
+        } catch (\Exception $e) {
+            Log::error('Error exporting template to Excel: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to export template to Excel',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Convert InvoiceTemplate to Excel Spreadsheet
+     */
+    private function convertTemplateToExcel(InvoiceTemplate $template): Spreadsheet
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Payroll Template');
+
+        // Header information
+        $sheet->setCellValue('A1', 'SOL-ICT PAYROLL TEMPLATE');
+        $sheet->mergeCells('A1:D1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+
+        $sheet->setCellValue('A2', 'Template: ' . $template->template_name);
+        $sheet->setCellValue('A3', 'Client: ' . $template->client->name ?? 'N/A');
+        $sheet->setCellValue('A4', 'Pay Grade: ' . $template->payGradeStructure->name ?? 'N/A');
+        $sheet->setCellValue('A5', 'Generated: ' . date('Y-m-d H:i:s'));
+
+        $row = 7;
+
+        // Custom Components (Allowances)
+        if (!empty($template->custom_components)) {
+            $sheet->setCellValue("A{$row}", 'ALLOWANCES & EARNINGS');
+            $sheet->getStyle("A{$row}")->getFont()->setBold(true);
+            $row++;
+
+            foreach ($template->custom_components as $component) {
+                $sheet->setCellValue("A{$row}", $component['name'] ?? $component['description'] ?? 'Unknown');
+
+                if (isset($component['amount'])) {
+                    $sheet->setCellValue("B{$row}", $component['amount']);
+                } elseif (isset($component['rate'])) {
+                    $sheet->setCellValue("B{$row}", ($component['rate'] ?? 0) . '%');
+                } elseif (isset($component['formula'])) {
+                    $sheet->setCellValue("B{$row}", '=' . $component['formula']);
+                }
+
+                $row++;
+            }
+            $row++;
+        }
+
+        // Statutory Components
+        if (!empty($template->statutory_components)) {
+            $sheet->setCellValue("A{$row}", 'STATUTORY DEDUCTIONS');
+            $sheet->getStyle("A{$row}")->getFont()->setBold(true);
+            $row++;
+
+            foreach ($template->statutory_components as $component) {
+                $sheet->setCellValue("A{$row}", $component['name'] ?? $component['description'] ?? 'Unknown');
+
+                if (isset($component['amount'])) {
+                    $sheet->setCellValue("B{$row}", $component['amount']);
+                } elseif (isset($component['rate'])) {
+                    $sheet->setCellValue("B{$row}", ($component['rate'] ?? 0) . '%');
+                } elseif (isset($component['formula'])) {
+                    $sheet->setCellValue("B{$row}", '=' . $component['formula']);
+                }
+
+                $row++;
+            }
+        }
+
+        // Format columns
+        $sheet->getColumnDimension('A')->setWidth(25);
+        $sheet->getColumnDimension('B')->setWidth(15);
+
+        return $spreadsheet;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Invoice Export Template Methods (Line Items for Invoice Generation)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Store invoice export template (line items for invoice generation)
+     */
+    public function storeExportTemplate(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'client_id' => 'required|exists:clients,id',
+                'name' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'line_items' => 'required|array',
+                'excel_settings' => 'nullable|array',
+            ]);
+
+            // Use ExportTemplate model with special format to distinguish from employee exports
+            $template = \App\Models\ExportTemplate::create([
+                'client_id' => $request->client_id,
+                'name' => $request->name,
+                'description' => $request->description,
+                'format' => 'invoice_line_items', // Special format identifier
+                'column_mappings' => $request->line_items, // Store line items here
+                'formatting_rules' => $request->excel_settings ?? [],
+                'grouping_rules' => [],
+                'use_credit_to_bank_model' => false,
+                'service_fee_percentage' => 0,
+                'fee_calculation_rules' => [],
+                'header_config' => [],
+                'footer_config' => [],
+                'styling_config' => [],
+                'is_active' => true,
+                'created_by' => Auth::user()->name ?? 'system',
+                'version' => '1.0',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => $template,
+                'message' => 'Invoice export template saved successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error saving invoice export template: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to save invoice export template',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get invoice export templates for a client
+     */
+    public function getExportTemplates(Request $request): JsonResponse
+    {
+        try {
+            $query = \App\Models\ExportTemplate::where('format', 'invoice_line_items');
+
+            if ($request->has('client_id')) {
+                $query->where('client_id', $request->client_id);
+            }
+
+            $templates = $query->with('client')->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $templates,
+                'message' => 'Invoice export templates retrieved successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error getting invoice export templates: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get invoice export templates'
+            ], 500);
+        }
+    }
+
+    /**
+     * Show specific invoice export template
+     */
+    public function showExportTemplate($id): JsonResponse
+    {
+        try {
+            $template = \App\Models\ExportTemplate::where('format', 'invoice_line_items')
+                ->with('client')
+                ->findOrFail($id);
+
+            return response()->json([
+                'success' => true,
+                'data' => $template,
+                'message' => 'Invoice export template retrieved successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error showing invoice export template: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice export template not found'
+            ], 404);
+        }
+    }
+
+    /**
+     * Update invoice export template
+     */
+    public function updateExportTemplate(Request $request, $id): JsonResponse
+    {
+        try {
+            $template = \App\Models\ExportTemplate::where('format', 'invoice_line_items')
+                ->findOrFail($id);
+
+            $request->validate([
+                'name' => 'sometimes|required|string|max:255',
+                'description' => 'nullable|string',
+                'line_items' => 'sometimes|required|array',
+                'excel_settings' => 'nullable|array',
+            ]);
+
+            $template->update([
+                'name' => $request->name ?? $template->name,
+                'description' => $request->description ?? $template->description,
+                'column_mappings' => $request->line_items ?? $template->column_mappings,
+                'formatting_rules' => $request->excel_settings ?? $template->formatting_rules,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => $template->fresh('client'),
+                'message' => 'Invoice export template updated successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error updating invoice export template: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update invoice export template'
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete invoice export template
+     */
+    public function destroyExportTemplate($id): JsonResponse
+    {
+        try {
+            $template = \App\Models\ExportTemplate::where('format', 'invoice_line_items')
+                ->findOrFail($id);
+
+            $template->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Invoice export template deleted successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error deleting invoice export template: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete invoice export template'
             ], 500);
         }
     }

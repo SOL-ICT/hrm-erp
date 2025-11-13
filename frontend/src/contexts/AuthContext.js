@@ -11,6 +11,13 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
 
+  // Helper function to get base API URL
+  const getBaseApiUrl = () => {
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+    return apiUrl.replace("/api", "");
+  };
+
   // Request deduplication to prevent multiple simultaneous identical requests
   const requestCache = new Map();
   const pendingRequests = new Map();
@@ -18,11 +25,14 @@ export const AuthProvider = ({ children }) => {
   // Enhanced Sanctum request with better security and deduplication
   const sanctumRequest = async (url, options = {}) => {
     // Handle relative URLs by prepending the backend base URL
-    const fullUrl = url.startsWith('/') ? `http://localhost:8000${url}` : url;
-    
+    const baseUrl = getBaseApiUrl();
+    const fullUrl = url.startsWith("/") ? `${baseUrl}${url}` : url;
+
     // Create a unique key for this request to prevent duplicates
-    const requestKey = `${options.method || 'GET'}:${fullUrl}:${JSON.stringify(options.body || {})}`;
-    
+    const requestKey = `${options.method || "GET"}:${fullUrl}:${JSON.stringify(
+      options.body || {}
+    )}`;
+
     // If the same request is already pending, return the existing promise
     if (pendingRequests.has(requestKey)) {
       console.log("🔄 Deduplicating request:", fullUrl);
@@ -33,19 +43,20 @@ export const AuthProvider = ({ children }) => {
 
     // Try multiple token storage methods for compatibility
     let bearerToken = null;
-    
+
     if (typeof window !== "undefined") {
       // Method 1: Check for JSON auth data (used by candidate components)
       try {
-        const authData = JSON.parse(localStorage.getItem('auth') || '{}');
+        const authData = JSON.parse(localStorage.getItem("auth") || "{}");
         bearerToken = authData.access_token;
       } catch (e) {
         console.log("No JSON auth data found");
       }
-      
+
       // Method 2: Check for direct token storage (fallback)
       if (!bearerToken) {
-        bearerToken = localStorage.getItem("auth_token") || localStorage.getItem("token");
+        bearerToken =
+          localStorage.getItem("auth_token") || localStorage.getItem("token");
       }
     }
 
@@ -66,7 +77,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     // Only log headers in development or for debugging
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === "development") {
       console.log("Request headers:", headers);
     }
 
@@ -88,7 +99,9 @@ export const AuthProvider = ({ children }) => {
 
       // Log response status for debugging
       if (!response.ok) {
-        console.warn(`API request failed: ${response.status} ${response.statusText} for ${fullUrl}`);
+        console.warn(
+          `API request failed: ${response.status} ${response.statusText} for ${fullUrl}`
+        );
       }
 
       return response;
@@ -147,7 +160,8 @@ export const AuthProvider = ({ children }) => {
 
       // Fetch CSRF cookie for Sanctum SPA authentication
       try {
-        await fetch("http://localhost:8000/sanctum/csrf-cookie", {
+        const baseUrl = getBaseApiUrl();
+        await fetch(`${baseUrl}/sanctum/csrf-cookie`, {
           credentials: "include",
         });
         console.log("✅ CSRF cookie fetched successfully");
@@ -155,7 +169,7 @@ export const AuthProvider = ({ children }) => {
         console.warn("⚠️ CSRF cookie fetch failed:", csrfError);
       }
 
-      const response = await fetch("http://localhost:8000/api/user", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/user`, {
         credentials: "include",
         headers: {
           Accept: "application/json",
@@ -230,7 +244,8 @@ export const AuthProvider = ({ children }) => {
 
       // Fetch CSRF cookie before login for Sanctum SPA authentication
       try {
-        await fetch("http://localhost:8000/sanctum/csrf-cookie", {
+        const baseUrl = getBaseApiUrl();
+        await fetch(`${baseUrl}/sanctum/csrf-cookie`, {
           credentials: "include",
         });
         console.log("✅ CSRF cookie fetched for login");
@@ -244,7 +259,12 @@ export const AuthProvider = ({ children }) => {
         "X-Requested-With": "XMLHttpRequest", // This triggers CSRF bypass in backend
       };
 
-      const response = await fetch("http://localhost:8000/api/login", {
+      // Use environment variable for API URL
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+      const baseUrl = apiUrl.replace("/api", "");
+
+      const response = await fetch(`${baseUrl}/api/login`, {
         method: "POST",
         credentials: "include",
         headers,
@@ -265,7 +285,10 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
       console.log("Response data:", data);
       console.log("Available keys in response:", Object.keys(data));
-      console.log("Access token in response:", data.access_token ? "YES" : "NO");
+      console.log(
+        "Access token in response:",
+        data.access_token ? "YES" : "NO"
+      );
 
       if (response.ok && data.success) {
         setUser(data.user);
@@ -275,22 +298,33 @@ export const AuthProvider = ({ children }) => {
         if (data.access_token) {
           // Method 1: Store as auth_token (existing format)
           localStorage.setItem("auth_token", data.access_token);
-          
+
           // Method 2: Store as JSON in 'auth' key (what InterviewManager expects)
-          localStorage.setItem("auth", JSON.stringify({
-            access_token: data.access_token,
-            user: data.user
-          }));
-          
+          localStorage.setItem(
+            "auth",
+            JSON.stringify({
+              access_token: data.access_token,
+              user: data.user,
+            })
+          );
+
           // Method 3: Store as direct token (fallback)
           localStorage.setItem("token", data.access_token);
-          
+
           console.log("✅ Using token-based authentication with Bearer token");
-          console.log("✅ Token stored in localStorage - length:", data.access_token.length);
+          console.log(
+            "✅ Token stored in localStorage - length:",
+            data.access_token.length
+          );
         } else {
           localStorage.setItem("auth_token", "session-authenticated");
-          console.log("❌ No access_token found in response, using session-based authentication");
-          console.log("Response data structure:", JSON.stringify(data, null, 2));
+          console.log(
+            "❌ No access_token found in response, using session-based authentication"
+          );
+          console.log(
+            "Response data structure:",
+            JSON.stringify(data, null, 2)
+          );
         }
 
         const preferences = {
@@ -325,7 +359,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await sanctumRequest("http://localhost:8000/api/logout", {
+      await sanctumRequest(`${process.env.NEXT_PUBLIC_API_URL}/logout`, {
         method: "POST",
       });
     } catch (error) {
@@ -346,7 +380,7 @@ export const AuthProvider = ({ children }) => {
   const updatePreferences = async (newPreferences) => {
     try {
       const response = await sanctumRequest(
-        "http://localhost:8000/api/user/preferences",
+        `${process.env.NEXT_PUBLIC_API_URL}/user/preferences`,
         {
           method: "PUT",
           body: JSON.stringify(newPreferences),

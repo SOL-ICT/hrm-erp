@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, Save, AlertCircle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const EmolumentComponentForm = ({
   isOpen,
@@ -9,6 +10,8 @@ const EmolumentComponentForm = ({
   editingComponent,
   onSave,
 }) => {
+  const { sanctumRequest } = useAuth();
+
   const [formData, setFormData] = useState({
     component_code: "",
     component_name: "",
@@ -128,22 +131,25 @@ const EmolumentComponentForm = ({
       setLoading(true);
 
       const url = editingComponent
-        ? `/api/salary-structure/emolument-components/${editingComponent.id}`
-        : "/api/salary-structure/emolument-components";
+        ? `${process.env.NEXT_PUBLIC_API_URL}/salary-structure/emolument-components/${editingComponent.id}`
+        : `${process.env.NEXT_PUBLIC_API_URL}/salary-structure/emolument-components`;
 
       const method = editingComponent ? "PUT" : "POST";
 
-      const response = await fetch(url, {
+      const response = await sanctumRequest(url, {
         method,
-        credentials: "include",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(formData),
       });
 
-      const data = await response.json();
+      let data;
+      if (response.ok) {
+        data = await response.json();
+      } else {
+        const errorText = await response.text();
+        throw new Error(
+          errorText || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
 
       if (data.success) {
         alert(

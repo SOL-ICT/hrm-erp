@@ -9,26 +9,49 @@ class Staff extends Model
     protected $table = 'staff';
 
     protected $fillable = [
+        'candidate_id',
+        'client_id',
+        'service_location_id',
+        'staff_type_id',
         'employee_code',
         'staff_id',
         'employee_id',
+        'email',
         'first_name',
         'last_name',
         'middle_name',
         'gender',
-        'email',
-        'phone',
-        'client_id',
-        'service_location_id',
+        'entry_date',
+        'end_date',
+        'appointment_status',
+        'employment_type',
         'status',
+        'pay_grade_structure_id',
+        'salary_effective_date',
+        'salary_currency',
+        'job_title',
         'department',
+        'location',
+        'state_lga_id',
+        'supervisor_id',
+        'leave_category_level',
+        'appraisal_category',
+        'tax_id_no',
+        'pf_no',
+        'pf_administrator',
+        'pfa_code',
+        'bv_no',
+        'nhf_account_no',
+        'client_assigned_code',
+        'deployment_code',
+        'onboarding_method',
+        'onboarded_by',
+        'custom_fields',
+        'phone',
         'designation',
         'position',
         'hire_date',
-        'salary',
-        'pay_grade_structure_id', // Phase 3.1
-        'salary_effective_date', // Phase 3.1
-        'salary_currency' // Phase 3.1
+        'salary'
     ];
 
     protected $casts = [

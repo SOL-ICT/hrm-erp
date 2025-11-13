@@ -11,6 +11,7 @@ use App\Models\Staff;
 use App\Models\AttendanceRecord;
 use App\Services\InvoiceGenerationService;
 use App\Services\InvoiceExcelExportService;
+use App\Services\AttendanceExportService;
 use App\Services\AttendanceFileProcessingService;
 use App\Services\AttendanceBasedPayrollService; // Phase 3.1 - Attendance-Based Salary Calculation
 use Illuminate\Http\Request;
@@ -163,21 +164,8 @@ class InvoiceController extends Controller
             $invoice = GeneratedInvoice::with(['client', 'lineItems', 'attendanceUpload'])
                 ->findOrFail($id);
 
-            $result = InvoiceExcelExportService::exportInvoice($id);
-
-            // Since files are stored in private storage, we need to create a temporary public link
-            // or return the file content directly
-            $filePath = $result['file_path'];
-
-            if (file_exists($filePath)) {
-                return response()->download($filePath, $result['file_name'])
-                    ->deleteFileAfterSend(true);
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Excel file could not be generated'
-                ], 500);
-            }
+            // Use multi-sheet export with template-based content
+            return InvoiceExcelExportService::exportInvoice($id);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -922,5 +910,206 @@ class InvoiceController extends Controller
         }
 
         return $invoice->load(['client', 'lineItems'])->toArray();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Phase 1.3: Enhanced Attendance Upload Process
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Upload attendance file with direct pay_grade_structure_id matching
+     * Phase 1.3: Enhanced upload process with template validation
+     */
+    public function uploadWithDirectMatching(Request $request): JsonResponse
+    {
+        try {
+            // Validate request
+            $validator = Validator::make($request->all(), [
+                'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+                'client_id' => 'required|exists:clients,id',
+                'month' => 'required|string|max:20',
+                'description' => 'nullable|string|max:255'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Use the existing file processing service
+            $result = $this->fileProcessingService->processAttendanceFile(
+                $request->file('file'),
+                $request->client_id,
+                Auth::id()
+            );
+
+            if (!$result['success']) {
+                return response()->json($result, 422);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Attendance file uploaded and processed successfully with direct matching',
+                'data' => $result['data'],
+                'validation_summary' => $result['validation_summary'] ?? null
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Enhanced attendance upload failed: ' . $e->getMessage(), [
+                'exception' => $e,
+                'request_data' => $request->except(['file'])
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to process attendance file: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get validation results for an attendance upload
+     * Phase 1.3: Detailed validation reporting
+     */
+    public function getValidationResults(int $uploadId): JsonResponse
+    {
+        try {
+            $upload = AttendanceUpload::findOrFail($uploadId);
+
+            // Check authorization
+            if (!$this->canAccessUpload($upload)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access to upload validation results'
+                ], 403);
+            }
+
+            // Get validation results from attendance records
+            $attendanceRecords = AttendanceRecord::where('attendance_upload_id', $uploadId)
+                ->with(['staff.payGradeStructure'])
+                ->get();
+
+            $validationResults = [
+                'total_records' => $attendanceRecords->count(),
+                'valid_records' => 0,
+                'invalid_records' => 0,
+                'template_coverage' => [],
+                'validation_errors' => [],
+                'missing_templates' => []
+            ];
+
+            foreach ($attendanceRecords as $record) {
+                if ($record->validation_status === 'valid') {
+                    $validationResults['valid_records']++;
+                } else {
+                    $validationResults['invalid_records']++;
+                    $validationResults['validation_errors'][] = [
+                        'employee_code' => $record->employee_code,
+                        'employee_name' => $record->employee_name,
+                        'error' => $record->validation_notes
+                    ];
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $validationResults
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to get validation results: ' . $e->getMessage(), [
+                'upload_id' => $uploadId,
+                'exception' => $e
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve validation results: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get template coverage for an attendance upload
+     * Phase 1.3: Template coverage validation
+     */
+    public function getTemplateCoverage(int $uploadId): JsonResponse
+    {
+        try {
+            $upload = AttendanceUpload::with('client')->findOrFail($uploadId);
+
+            // Check authorization
+            if (!$this->canAccessUpload($upload)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access to template coverage data'
+                ], 403);
+            }
+
+            // Get unique pay_grade_structure_ids from the upload
+            $payGradeStructureIds = AttendanceRecord::where('attendance_upload_id', $uploadId)
+                ->whereNotNull('pay_grade_structure_id')
+                ->distinct()
+                ->pluck('pay_grade_structure_id')
+                ->toArray();
+
+            // Check template coverage using AttendanceExportService if available
+            // For now, we'll provide basic coverage info
+            $coverageResults = [
+                'client_id' => $upload->client_id,
+                'client_name' => $upload->client->organisation_name,
+                'upload_id' => $uploadId,
+                'pay_grade_structures' => [],
+                'coverage_percentage' => 0,
+                'missing_templates' => [],
+                'covered_templates' => []
+            ];
+
+            // Basic template coverage check
+            foreach ($payGradeStructureIds as $payGradeId) {
+                $hasTemplate = \App\Models\InvoiceTemplate::where('client_id', $upload->client_id)
+                    ->where('pay_grade_structure_id', $payGradeId)
+                    ->exists();
+
+                if ($hasTemplate) {
+                    $coverageResults['covered_templates'][] = $payGradeId;
+                } else {
+                    $coverageResults['missing_templates'][] = $payGradeId;
+                }
+            }
+
+            $totalStructures = count($payGradeStructureIds);
+            $coveredStructures = count($coverageResults['covered_templates']);
+            $coverageResults['coverage_percentage'] = $totalStructures > 0
+                ? round(($coveredStructures / $totalStructures) * 100, 2)
+                : 100;
+
+            return response()->json([
+                'success' => true,
+                'data' => $coverageResults
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to get template coverage: ' . $e->getMessage(), [
+                'upload_id' => $uploadId,
+                'exception' => $e
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve template coverage: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Check if the current user can access the upload
+     */
+    private function canAccessUpload(AttendanceUpload $upload): bool
+    {
+        // For now, basic authorization - can be enhanced based on user roles
+        return true;
     }
 }

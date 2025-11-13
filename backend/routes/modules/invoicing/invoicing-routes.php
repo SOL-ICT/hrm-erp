@@ -48,6 +48,48 @@ Route::prefix('invoices')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
+| FIRS E-Invoicing Routes
+|--------------------------------------------------------------------------
+| Routes for FIRS (Federal Inland Revenue Service) e-invoicing integration
+| Part of Invoicing Module Extension
+*/
+
+use App\Http\Controllers\Admin\HRPayrollManagement\Invoicing\FIRSInvoiceController;
+
+Route::prefix('admin/firs-invoice')->group(function () {
+
+    // FIRS Service Status
+    Route::get('/status', [FIRSInvoiceController::class, 'getFIRSServiceStatus'])
+        ->name('firs.service.status');
+
+    // Preview invoice for FIRS submission
+    Route::get('/attendance/{uploadId}/preview', [FIRSInvoiceController::class, 'previewInvoiceForFIRS'])
+        ->name('firs.invoice.preview')
+        ->where('uploadId', '[0-9]+');
+
+    // Submit invoice directly to FIRS (backend proxy)
+    Route::post('/attendance/{uploadId}/submit-to-firs', [FIRSInvoiceController::class, 'submitToFIRS'])
+        ->name('firs.invoice.submit')
+        ->where('uploadId', '[0-9]+');
+
+    // Store FIRS approval data from frontend (legacy method)
+    Route::post('/attendance/{uploadId}/store-approval', [FIRSInvoiceController::class, 'storeFIRSApproval'])
+        ->name('firs.invoice.store.approval')
+        ->where('uploadId', '[0-9]+');
+
+    // Check FIRS invoice status
+    Route::get('/attendance/{uploadId}/status', [FIRSInvoiceController::class, 'checkFIRSStatus'])
+        ->name('firs.invoice.status')
+        ->where('uploadId', '[0-9]+');
+
+    // Generate invoice PDF with FIRS data
+    Route::post('/attendance/{uploadId}/generate-invoice', [FIRSInvoiceController::class, 'generateInvoiceWithFIRS'])
+        ->name('firs.invoice.generate')
+        ->where('uploadId', '[0-9]+');
+});
+
+/*
+|--------------------------------------------------------------------------
 | Attendance Upload & File Processing Routes
 |--------------------------------------------------------------------------
 | Routes for uploading and processing attendance files
@@ -63,6 +105,10 @@ Route::prefix('attendance')->group(function () {
     // Upload and process simplified attendance file (Phase 2.2)
     Route::post('/upload-simplified', [InvoiceController::class, 'uploadSimplifiedAttendanceFile'])
         ->name('attendance.upload.simplified');
+
+    // Phase 1.3: Upload with direct pay_grade_structure_id matching
+    Route::post('/upload-with-direct-matching', [InvoiceController::class, 'uploadWithDirectMatching'])
+        ->name('attendance.upload.direct.matching');
 
     // Test attendance-based payroll calculation (Phase 3.1 - Development)
     Route::post('/test-payroll-calculation', [InvoiceController::class, 'testAttendancePayrollCalculation'])
@@ -86,6 +132,16 @@ Route::middleware(['auth:sanctum'])->prefix('attendance')->group(function () {
     // Get upload statistics
     Route::get('/uploads/{uploadId}/statistics', [InvoiceController::class, 'getUploadStatistics'])
         ->name('attendance.upload.statistics')
+        ->where('uploadId', '[0-9]+');
+
+    // Phase 1.3: Get validation results for an upload
+    Route::get('/validation-results/{uploadId}', [InvoiceController::class, 'getValidationResults'])
+        ->name('attendance.validation.results')
+        ->where('uploadId', '[0-9]+');
+
+    // Phase 1.3: Get template coverage for an upload
+    Route::get('/template-coverage/{uploadId}', [InvoiceController::class, 'getTemplateCoverage'])
+        ->name('attendance.template.coverage')
         ->where('uploadId', '[0-9]+');
 
     // Delete attendance upload and all associated records
@@ -129,6 +185,20 @@ Route::prefix('invoice-templates')->group(function () {
         ->name('invoice-templates.clone')
         ->where('id', '[0-9]+');
 
+    // Excel import/export routes
+    Route::post('/import-excel', [InvoiceTemplateController::class, 'importFromExcel'])
+        ->name('invoice-templates.import-excel');
+
+    Route::post('/preview-excel', [InvoiceTemplateController::class, 'previewExcelTemplate'])
+        ->name('invoice-templates.preview-excel');
+
+    Route::get('/download-sample', [InvoiceTemplateController::class, 'downloadSampleTemplate'])
+        ->name('invoice-templates.download-sample');
+
+    Route::get('/{id}/export-excel', [InvoiceTemplateController::class, 'exportToExcel'])
+        ->name('invoice-templates.export-excel')
+        ->where('id', '[0-9]+');
+
     // Standard CRUD operations
     Route::get('/', [InvoiceTemplateController::class, 'index'])
         ->name('invoice-templates.index');
@@ -146,5 +216,39 @@ Route::prefix('invoice-templates')->group(function () {
 
     Route::delete('/{id}', [InvoiceTemplateController::class, 'destroy'])
         ->name('invoice-templates.destroy')
+        ->where('id', '[0-9]+');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Invoice Export Template Routes (Client-specific invoice line items)
+|--------------------------------------------------------------------------
+| Routes for managing invoice export templates with line items and formulas
+| Part of HR & Payroll Management Module
+*/
+
+Route::prefix('invoice-export-templates')->group(function () {
+
+    // Get invoice export templates for a client
+    Route::get('/', [InvoiceTemplateController::class, 'getExportTemplates'])
+        ->name('invoice-export-templates.index');
+
+    // Store new invoice export template
+    Route::post('/', [InvoiceTemplateController::class, 'storeExportTemplate'])
+        ->name('invoice-export-templates.store');
+
+    // Get specific invoice export template
+    Route::get('/{id}', [InvoiceTemplateController::class, 'showExportTemplate'])
+        ->name('invoice-export-templates.show')
+        ->where('id', '[0-9]+');
+
+    // Update invoice export template
+    Route::put('/{id}', [InvoiceTemplateController::class, 'updateExportTemplate'])
+        ->name('invoice-export-templates.update')
+        ->where('id', '[0-9]+');
+
+    // Delete invoice export template
+    Route::delete('/{id}', [InvoiceTemplateController::class, 'destroyExportTemplate'])
+        ->name('invoice-export-templates.destroy')
         ->where('id', '[0-9]+');
 });

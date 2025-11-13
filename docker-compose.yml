@@ -21,7 +21,7 @@ services:
       - ./backend/bootstrap/cache:/var/www/bootstrap/cache
       - /var/www/vendor # Anonymous volume for vendor directory
     ports:
-      - "8000:8000"
+      - "0.0.0.0:8000:8000"
     environment:
       # Database Configuration
       - DB_CONNECTION=mysql
@@ -72,12 +72,12 @@ services:
       - /app/node_modules # Anonymous volume for node_modules
       - /app/.next # Anonymous volume for Next.js build cache
     ports:
-      - "3000:3000"
+      - "0.0.0.0:3000:3000"
     environment:
       # Next.js Configuration
       - NODE_ENV=${NODE_ENV:-development}
-      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
-      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      - NEXT_PUBLIC_API_URL=http://192.168.1.118:8000/api
+      - NEXT_PUBLIC_APP_URL=http://192.168.1.118:3000
       # Performance Optimizations
       - NEXT_TELEMETRY_DISABLED=1
       # File Watching (fixes hot reload in Docker)

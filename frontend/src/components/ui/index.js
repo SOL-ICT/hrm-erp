@@ -91,12 +91,12 @@ export const Input = ({
 );
 
 // Select Components
-export const Select = ({ children, value, onValueChange }) => (
+export const Select = ({ children, value, onValueChange, className = "" }) => (
   <div className="relative">
     <select
       value={value}
-      onChange={(e) => onValueChange(e.target.value)}
-      className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none pr-8"
+      onChange={(e) => onValueChange && onValueChange(e.target.value)}
+      className={`w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none pr-8 ${className}`}
     >
       {children}
     </select>
@@ -118,20 +118,49 @@ export const Select = ({ children, value, onValueChange }) => (
   </div>
 );
 
-export const SelectTrigger = ({ children, className = "" }) => (
-  <div className={className}>{children}</div>
+// Fixed SelectTrigger - should not be used inside Select component
+export const SelectTrigger = ({ children, className = "", onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-left flex items-center justify-between ${className}`}
+  >
+    {children}
+    <svg
+      className="w-4 h-4 text-gray-400 ml-2"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M19 9l-7 7-7-7"
+      />
+    </svg>
+  </button>
 );
 
-export const SelectValue = ({ placeholder }) => (
-  <option value="" disabled>
-    {placeholder}
+// SelectValue should be used as placeholder text, not as option
+export const SelectValue = ({ placeholder = "Select an option..." }) => (
+  <span className="text-gray-500">{placeholder}</span>
+);
+
+// SelectContent for dropdown items container
+export const SelectContent = ({ children, className = "" }) => (
+  <div
+    className={`absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto ${className}`}
+  >
+    {children}
+  </div>
+);
+
+// SelectItem for individual options
+export const SelectItem = ({ value, children, onClick }) => (
+  <option value={value} onClick={onClick}>
+    {children}
   </option>
-);
-
-export const SelectContent = ({ children }) => <>{children}</>;
-
-export const SelectItem = ({ value, children }) => (
-  <option value={value}>{children}</option>
 );
 
 // Badge Component
@@ -274,4 +303,51 @@ export const TabsTrigger = ({ children, value, activeTab, setActiveTab }) => (
 export const TabsContent = ({ children, value, activeTab }) => {
   if (activeTab !== value) return null;
   return <div>{children}</div>;
+};
+
+// Progress Component
+export const Progress = ({ value = 0, max = 100, className = "" }) => {
+  const percentage = Math.min(100, Math.max(0, (value / max) * 100));
+
+  return (
+    <div className={`w-full bg-gray-200 rounded-full h-2 ${className}`}>
+      <div
+        className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-in-out"
+        style={{ width: `${percentage}%` }}
+      />
+    </div>
+  );
+};
+
+// Modal Component
+export const Modal = ({ isOpen, onClose, title, children, className = "" }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
+
+      {/* Modal Content */}
+      <div
+        className={`relative bg-white rounded-lg shadow-xl max-h-[90vh] overflow-auto w-full max-w-4xl mx-4 ${className}`}
+      >
+        {/* Header */}
+        {title && (
+          <div className="flex items-center justify-between p-6 border-b">
+            <h2 className="text-xl font-semibold">{title}</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* Body */}
+        <div className="p-6">{children}</div>
+      </div>
+    </div>
+  );
 };

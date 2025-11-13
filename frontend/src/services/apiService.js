@@ -44,10 +44,33 @@ class APIService {
   async makeRequest(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
 
-    // Simplified approach - no CSRF cookie fetch needed since backend bypasses it
+    // For FormData, don't include Content-Type header - let browser set it
+    const isFormData = options.body instanceof FormData;
+    const headers = isFormData
+      ? this.getHeaders({ ...options.headers, "Content-Type": undefined })
+      : this.getHeaders(options.headers);
+
+    // Remove undefined headers
+    Object.keys(headers).forEach((key) => {
+      if (headers[key] === undefined) {
+        delete headers[key];
+      }
+    });
+
+    // For POST requests with auth, fetch CSRF cookie first
+    if (options.method === "POST" && this.getAuthToken()) {
+      try {
+        await fetch(`${this.baseURL.replace("/api", "")}/sanctum/csrf-cookie`, {
+          credentials: "include",
+        });
+      } catch (error) {
+        console.warn("Failed to fetch CSRF cookie:", error);
+      }
+    }
+
     const config = {
       method: options.method || "GET",
-      headers: this.getHeaders(options.headers),
+      headers,
       credentials: "include", // For session-based auth
       ...options,
     };
@@ -68,8 +91,23 @@ class APIService {
       }
 
       if (!response.ok) {
+        // Log the full error response for debugging
+        console.error("API Error Response:", {
+          status: response.status,
+          statusText: response.statusText,
+          url: url,
+          data: data,
+          headers: Object.fromEntries(response.headers.entries()),
+        });
+
+        // Also log just the data for easier debugging
+        console.error("Error Data:", data);
+
         throw new Error(
-          data.message || `HTTP error! status: ${response.status}`
+          data.message ||
+            data.error ||
+            data ||
+            `HTTP error! status: ${response.status}`
         );
       }
 
@@ -89,7 +127,8 @@ class APIService {
     return this.makeRequest(endpoint, {
       ...options,
       method: "POST",
-      body: data ? JSON.stringify(data) : null,
+      body:
+        data instanceof FormData ? data : data ? JSON.stringify(data) : null,
     });
   }
 

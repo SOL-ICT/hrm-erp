@@ -10,7 +10,11 @@ export default function Home() {
   useEffect(() => {
     const checkApiStatus = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/health");
+        // Use environment variable instead of hardcoded localhost
+        const apiUrl =
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+        const baseUrl = apiUrl.replace("/api", "");
+        const response = await fetch(`${baseUrl}/api/health`);
         if (response.ok) {
           const data = await response.json();
           if (data.status === "ok") {
@@ -79,9 +83,13 @@ export default function Home() {
               Register New Employee
             </Link>
             <button
-              onClick={() =>
-                window.open("http://localhost:8000/api/hrm/dashboard", "_blank")
-              }
+              onClick={() => {
+                const apiUrl =
+                  process.env.NEXT_PUBLIC_API_URL ||
+                  "http://localhost:8000/api";
+                const baseUrl = apiUrl.replace("/api", "");
+                window.open(`${baseUrl}/api/hrm/dashboard`, "_blank");
+              }}
               className="block w-full bg-gray-600 text-white py-2 px-4 rounded hover:bg-gray-700 transition"
             >
               View API Dashboard

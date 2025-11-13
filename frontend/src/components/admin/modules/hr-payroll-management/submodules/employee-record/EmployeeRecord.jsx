@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useClients } from "../../../../../../hooks/useClients";
 import {
   ArrowLeft,
   Building2,
@@ -16,27 +17,33 @@ import {
   Phone,
   Calendar,
   FileText,
+  Download,
 } from "lucide-react";
 import StaffDetailView from "./StaffDetailView";
 import employeeRecordAPI from "../../../../../../services/modules/hr-payroll-management/employeeRecordAPI";
+import { apiService } from "../../../../../../services/apiService";
 
 const EmployeeRecord = ({ currentTheme, onBack }) => {
+  // Use the proven useClients hook instead of custom API
+  const {
+    clients,
+    loading: clientsLoading,
+    error: clientsError,
+  } = useClients();
+
   const [selectedClient, setSelectedClient] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState("all");
   const [selectedStaff, setSelectedStaff] = useState(null);
-  const [clients, setClients] = useState([]);
   const [locations, setLocations] = useState([]);
   const [staff, setStaff] = useState([]);
   const [paginationData, setPaginationData] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [staffLoading, setStaffLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [view, setView] = useState("list"); // 'list' or 'detail'
 
-  // Load initial data
-  useEffect(() => {
-    loadClients();
-  }, []);
+  // Combined loading state
+  const isLoading = clientsLoading || staffLoading;
 
   // Load locations when client changes
   useEffect(() => {
@@ -55,31 +62,14 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
     }
   }, [selectedClient, selectedLocation, searchTerm]);
 
-  const loadClients = async () => {
-    try {
-      setLoading(true);
-      const response = await employeeRecordAPI.getClients();
-      
-      if (response.success) {
-        setClients(response.data);
-      } else {
-        console.error("Failed to load clients:", response.message);
-        setClients([]);
-      }
-    } catch (error) {
-      console.error("Error loading clients:", error);
-      setClients([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const loadLocations = async () => {
     try {
       if (!selectedClient) return;
-      
-      const response = await employeeRecordAPI.getLocationsByClient(selectedClient.id);
-      
+
+      const response = await employeeRecordAPI.getLocationsByClient(
+        selectedClient.id
+      );
+
       if (response.success) {
         setLocations(response.data);
       } else {
@@ -95,13 +85,13 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
   const loadStaff = async (page = 1) => {
     try {
       if (!selectedClient) return;
-      
-      setLoading(true);
+
+      setStaffLoading(true);
       const params = {
         client_id: selectedClient.id,
         search: searchTerm,
         page: page,
-        per_page: 20 // Increase from default 15 to 20
+        per_page: 20, // Increase from default 15 to 20
       };
 
       // Add location filter if specific location is selected
@@ -110,7 +100,7 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
       }
 
       const response = await employeeRecordAPI.getStaff(params);
-      
+
       if (response.success) {
         setStaff(response.data.data || []);
         setPaginationData({
@@ -119,7 +109,7 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
           per_page: response.data.per_page,
           total: response.data.total,
           from: response.data.from,
-          to: response.data.to
+          to: response.data.to,
         });
         setCurrentPage(response.data.current_page || 1);
       } else {
@@ -132,7 +122,7 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
       setStaff([]);
       setPaginationData(null);
     } finally {
-      setLoading(false);
+      setStaffLoading(false);
     }
   };
 
@@ -144,6 +134,44 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
   const handleBackToList = () => {
     setSelectedStaff(null);
     setView("list");
+  };
+
+  const handleExportAttendanceTemplate = async () => {
+    if (!selectedClient) {
+      alert("Please select a client first");
+      return;
+    }
+
+    try {
+      setStaffLoading(true);
+
+      // Call the attendance export API
+      const response = await apiService.post(
+        "/attendance-export/export-template",
+        { client_id: selectedClient.id },
+        { responseType: "blob" }
+      );
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute(
+        "download",
+        `attendance_template_${selectedClient.organisation_name}_${
+          new Date().toISOString().split("T")[0]
+        }.xlsx`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Export failed:", error);
+      alert("Failed to export attendance template. Please try again.");
+    } finally {
+      setStaffLoading(false);
+    }
   };
 
   if (view === "detail" && selectedStaff) {
@@ -173,13 +201,19 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
               <span>Back</span>
             </button>
             <div className="h-6 border-l border-gray-300" />
-            <h1 className="text-2xl font-bold text-gray-900">Employee Records</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Employee Records
+            </h1>
           </div>
           <div className="flex items-center space-x-3">
             <button
               onClick={() => {
-                if (selectedClient) loadStaff();
-                else loadClients();
+                if (selectedClient) {
+                  loadStaff();
+                } else {
+                  // Clients are loaded automatically by the hook
+                  window.location.reload();
+                }
               }}
               className="flex items-center space-x-2 px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
@@ -192,6 +226,20 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
+        {/* Display client loading error if any */}
+        {clientsError && (
+          <div className="p-4">
+            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+              <h3 className="text-sm font-medium text-red-800">
+                Error loading clients
+              </h3>
+              <p className="text-sm text-red-700 mt-1">
+                {clientsError.message ||
+                  "Failed to load client data. Please try again."}
+              </p>
+            </div>
+          </div>
+        )}
         <div className="p-6">
           {/* Filters Section */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
@@ -199,7 +247,7 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
               <Filter className="w-5 h-5 mr-2 text-blue-600" />
               Search Filters
             </h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Client Selection */}
               <div>
@@ -210,7 +258,7 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
                   value={selectedClient?.id || ""}
                   onChange={(e) => {
                     const clientId = e.target.value;
-                    const client = clients.find(c => c.id == clientId);
+                    const client = clients.find((c) => c.id == clientId);
                     setSelectedClient(client || null);
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -273,11 +321,12 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
                   Select a Client to View Employee Records
                 </h3>
                 <p className="text-gray-600">
-                  Choose a client from the dropdown above to view their employee records
+                  Choose a client from the dropdown above to view their employee
+                  records
                 </p>
               </div>
             </div>
-          ) : loading ? (
+          ) : isLoading ? (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
               <div className="text-center">
                 <RefreshCw className="w-8 h-8 text-blue-600 mx-auto mb-4 animate-spin" />
@@ -292,25 +341,39 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
                   No Employee Records Found
                 </h3>
                 <p className="text-gray-600">
-                  {searchTerm 
+                  {searchTerm
                     ? `No staff members found matching "${searchTerm}" for this client and location`
-                    : `No staff members found for this client${selectedLocation !== 'all' ? ' and location' : ''}`
-                  }
+                    : `No staff members found for this client${
+                        selectedLocation !== "all" ? " and location" : ""
+                      }`}
                 </p>
               </div>
             </div>
           ) : (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
               <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold flex items-center">
-                  <Users className="w-5 h-5 mr-2 text-blue-600" />
-                  Employee Records ({staff.length})
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold flex items-center">
+                    <Users className="w-5 h-5 mr-2 text-blue-600" />
+                    Employee Records ({staff.length})
+                  </h3>
+                  <button
+                    onClick={handleExportAttendanceTemplate}
+                    disabled={!selectedClient || isLoading}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export Attendance Template
+                  </button>
+                </div>
               </div>
-              
+
               <div className="divide-y divide-gray-200">
                 {staff.map((staffMember) => (
-                  <div key={staffMember.id} className="p-4 hover:bg-gray-50 transition-colors">
+                  <div
+                    key={staffMember.id}
+                    className="p-4 hover:bg-gray-50 transition-colors"
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <div className="p-2 bg-blue-100 rounded-full">
@@ -323,26 +386,30 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
                           <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
                             <span className="flex items-center">
                               <Briefcase className="w-3 h-3 mr-1" />
-                              {staffMember.job_title || 'N/A'}
+                              {staffMember.job_title || "N/A"}
                             </span>
                             <span className="flex items-center">
                               <UserCircle className="w-3 h-3 mr-1" />
-                              {staffMember.gender || 'Not specified'}
+                              {staffMember.gender || "Not specified"}
                             </span>
                             <span className="flex items-center">
                               <Calendar className="w-3 h-3 mr-1" />
-                              {new Date(staffMember.entry_date).toLocaleDateString()}
+                              {new Date(
+                                staffMember.entry_date
+                              ).toLocaleDateString()}
                             </span>
                           </div>
                           <div className="flex items-center space-x-2 mt-1">
                             <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
                               {staffMember.employee_code}
                             </span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${
-                              staffMember.status === 'active' 
-                                ? 'bg-green-100 text-green-600'
-                                : 'bg-red-100 text-red-600'
-                            }`}>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded ${
+                                staffMember.status === "active"
+                                  ? "bg-green-100 text-green-600"
+                                  : "bg-red-100 text-red-600"
+                              }`}
+                            >
                               {staffMember.status}
                             </span>
                           </div>
@@ -359,13 +426,14 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
                   </div>
                 ))}
               </div>
-              
+
               {/* Pagination Controls */}
               {paginationData && paginationData.last_page > 1 && (
                 <div className="px-6 py-4 border-t border-gray-200">
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-600">
-                      Showing {paginationData.from} to {paginationData.to} of {paginationData.total} staff
+                      Showing {paginationData.from} to {paginationData.to} of{" "}
+                      {paginationData.total} staff
                     </div>
                     <div className="flex items-center space-x-2">
                       <button
@@ -373,49 +441,55 @@ const EmployeeRecord = ({ currentTheme, onBack }) => {
                         disabled={currentPage === 1}
                         className={`px-3 py-1 rounded-lg text-sm ${
                           currentPage === 1
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
                         }`}
                       >
                         Previous
                       </button>
-                      
+
                       <div className="flex items-center space-x-1">
-                        {Array.from({ length: Math.min(5, paginationData.last_page) }, (_, i) => {
-                          let pageNum;
-                          if (paginationData.last_page <= 5) {
-                            pageNum = i + 1;
-                          } else if (currentPage <= 3) {
-                            pageNum = i + 1;
-                          } else if (currentPage >= paginationData.last_page - 2) {
-                            pageNum = paginationData.last_page - 4 + i;
-                          } else {
-                            pageNum = currentPage - 2 + i;
+                        {Array.from(
+                          { length: Math.min(5, paginationData.last_page) },
+                          (_, i) => {
+                            let pageNum;
+                            if (paginationData.last_page <= 5) {
+                              pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1;
+                            } else if (
+                              currentPage >=
+                              paginationData.last_page - 2
+                            ) {
+                              pageNum = paginationData.last_page - 4 + i;
+                            } else {
+                              pageNum = currentPage - 2 + i;
+                            }
+
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => loadStaff(pageNum)}
+                                className={`px-3 py-1 rounded-lg text-sm ${
+                                  currentPage === pageNum
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
                           }
-                          
-                          return (
-                            <button
-                              key={pageNum}
-                              onClick={() => loadStaff(pageNum)}
-                              className={`px-3 py-1 rounded-lg text-sm ${
-                                currentPage === pageNum
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                              }`}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        })}
+                        )}
                       </div>
-                      
+
                       <button
                         onClick={() => loadStaff(currentPage + 1)}
                         disabled={currentPage === paginationData.last_page}
                         className={`px-3 py-1 rounded-lg text-sm ${
                           currentPage === paginationData.last_page
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
                         }`}
                       >
                         Next

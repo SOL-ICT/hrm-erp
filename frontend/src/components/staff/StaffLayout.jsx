@@ -11,7 +11,7 @@ import MyLeaves from "./modules/LeaveAdministration/MyLeaves";
 import Payslip from "./modules/PaySlip/Payslip";
 import NameChange from "./modules/StaffChangeRequest/NameChange";
 import TrainingFeedback from "./modules/TrainingDev/TrainingFeedback";
-import InvoiceManagement from "../invoicing/InvoiceManagement";
+import InvoiceManagement from "../admin/modules/hr-payroll-management/submodules/invoicing/InvoiceManagement";
 
 // Placeholder component for pages that are not yet developed
 const UnderDevelopment = ({ moduleName }) => (

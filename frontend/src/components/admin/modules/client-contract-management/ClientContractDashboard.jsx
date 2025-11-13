@@ -94,7 +94,7 @@ const ClientContractDashboard = ({ currentTheme, preferences, onBack }) => {
         </div>
 
         {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <div
             className={`${currentTheme.cardBg} rounded-xl shadow-sm p-6 ${currentTheme.border}`}
           >
@@ -166,7 +166,7 @@ const ClientContractDashboard = ({ currentTheme, preferences, onBack }) => {
         </div>
 
         {/* Module Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {modules.map((module) => (
             <div
               key={module.id}

@@ -27,8 +27,32 @@ class GeneratedInvoice extends Model
         'status',
         'excel_file_path',
         'calculation_breakdown',
+        'export_line_items',
         'generated_by',
-        'generated_at'
+        'generated_at',
+        // FIRS e-invoicing fields
+        'firs_submitted',
+        'firs_approved',
+        'firs_status',
+        'firs_invoice_number',
+        'firs_reference',
+        'firs_irn',
+        'firs_certificate',
+        'firs_qr_data',
+        'firs_response_data',
+        'firs_submitted_at',
+        'firs_approved_at',
+        'firs_last_checked_at',
+        'firs_error_message',
+        'firs_validation_errors',
+        'firs_retry_count',
+        'firs_vat_rate',
+        'firs_tax_scheme',
+        'firs_withholding_tax_applicable',
+        // Legacy FIRS fields (for backward compatibility)
+        'firs_qr_code',
+        'firs_submission_payload',
+        'firs_approval_date'
     ];
 
     protected $casts = [
@@ -41,7 +65,21 @@ class GeneratedInvoice extends Model
         'wht_amount' => 'decimal:2',
         'total_invoice_amount' => 'decimal:2',
         'calculation_breakdown' => 'array',
-        'generated_at' => 'datetime'
+        'export_line_items' => 'array',
+        'generated_at' => 'datetime',
+        // FIRS e-invoicing casts
+        'firs_submitted' => 'boolean',
+        'firs_approved' => 'boolean',
+        'firs_response_data' => 'array',
+        'firs_validation_errors' => 'array',
+        'firs_submitted_at' => 'datetime',
+        'firs_approved_at' => 'datetime',
+        'firs_last_checked_at' => 'datetime',
+        'firs_vat_rate' => 'decimal:2',
+        'firs_withholding_tax_applicable' => 'boolean',
+        // Legacy FIRS casts (for backward compatibility)
+        'firs_submission_payload' => 'array',
+        'firs_approval_date' => 'datetime'
     ];
 
     protected $appends = ['total_amount', 'invoice_period'];

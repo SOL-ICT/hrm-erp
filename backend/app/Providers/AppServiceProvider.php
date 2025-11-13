@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Contracts\FormulaCalculatorInterface;
+use App\Services\SafeFormulaCalculator;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,7 +13,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // IDE Helper removed temporarily to avoid conflicts
+        // Bind FormulaCalculatorInterface to SafeFormulaCalculator
+        $this->app->bind(FormulaCalculatorInterface::class, SafeFormulaCalculator::class);
     }
 
     /**

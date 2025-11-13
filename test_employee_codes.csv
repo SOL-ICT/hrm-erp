@@ -1,0 +1,5 @@
+Employee Code,Staff ID,First Name,Last Name,Email,Phone,Gender,Position,Department
+,,"John","Doe","john.doe@test.com","1234567890","Male","Software Engineer","IT"
+SOL/TEST/005,,"Jane","Smith","jane.smith@test.com","1234567891","Female","Product Manager","Product"
+,"TEST/STF/123","Bob","Johnson","bob.johnson@test.com","1234567892","Male","Designer","Design"
+SOL/TEST/010,TEST/STF/456,"Alice","Brown","alice.brown@test.com","1234567893","Female","QA Engineer","Quality"

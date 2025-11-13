@@ -45,6 +45,9 @@ Route::post('/performance/test-endpoint', [PerformanceController::class, 'testEn
 Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/register', [AuthController::class, 'register']);
 
+// Staff self-registration (public)
+require __DIR__ . '/modules/auth/staff-registration.php';
+
 // Protected routes group
 
 // TEMPORARY: Check service_locations table structure
@@ -290,6 +293,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     require __DIR__ . '/modules/recruitment-management/client-interview-feedback.php';
     require __DIR__ . '/modules/recruitment-management/applicants-profile.php';
     require __DIR__ . '/modules/recruitment-management/boarding.php';
+    require __DIR__ . '/modules/recruitment-management/manual-boarding.php';
 
     // Administration Module
     require __DIR__ . '/modules/administration/sol-master.php';
@@ -297,6 +301,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     require __DIR__ . '/modules/administration/system-preferences.php';
     require __DIR__ . '/modules/administration/audit-logs.php';
     require __DIR__ . '/modules/administration/utilities.php';
+    require __DIR__ . '/modules/administration/rbac.php';
 
     // Candidate Staff Management Module
     require __DIR__ . '/modules/candidate-staff-management/candidates.php';
@@ -309,9 +314,16 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // HR & Payroll Management Module
     require __DIR__ . '/modules/hr-payroll-management/employee-record.php';
+    require __DIR__ . '/modules/hr-payroll-management/calculation-templates.php';
 
     // Invoicing Module - HR & Payroll Management Extension
     require __DIR__ . '/modules/invoicing/invoicing-routes.php';
+
+    // New Template System (v2) - Separated Architecture
+    require __DIR__ . '/modules/invoicing/new-template-system.php';
+
+    // Attendance Export Module - HR & Payroll Management Extension
+    require __DIR__ . '/modules/attendance/attendance-export-routes.php';
 });
 
 /*
@@ -406,6 +418,7 @@ Route::middleware(['auth:sanctum'])->prefix('services')->group(function () {
     // Test specific service integration
     Route::post('/test-integration', [ServiceIntegrationController::class, 'testServiceIntegration']);
 });
+
 
 // Public health check (simplified)
 Route::get('/health/services', function () {

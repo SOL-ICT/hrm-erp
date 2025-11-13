@@ -250,10 +250,180 @@ export const invoiceTemplateService = {
   },
 
   /**
+   * Extract component names referenced in a formula
+   */
+  extractComponentsFromFormula(formula, availableComponents = []) {
+    if (!formula) return [];
+
+    const componentNames = [];
+
+    // Create a list of all possible component names to look for
+    const componentPatterns = [
+      "BASIC_SALARY",
+      "HOUSING",
+      "TRANSPORT_ALLOWANCE",
+      "UTILITY_ALLOWANCE",
+      "GROSS_SALARY",
+      "MANAGEMENT_FEE",
+      "VAT_ON_MGT_FEE",
+      "TOTAL_DEDUCTIONS",
+      "NET_SALARY",
+      "PENSION",
+      "PAYE_TAX",
+      "ECA",
+      "ITF",
+      "FIDELITY_GUARANTEE",
+      "BACKGROUD_CHECK",
+      "GROUP_LIFE_INSURANCE",
+      "EMPLOYER_S_CONTRIBUTION_TO_PENSION",
+    ];
+
+    // Add available components if they exist and are valid
+    if (Array.isArray(availableComponents)) {
+      availableComponents.forEach((component) => {
+        if (component && typeof component === "string") {
+          componentPatterns.push(component);
+        } else if (
+          component &&
+          component.name &&
+          typeof component.name === "string"
+        ) {
+          componentPatterns.push(component.name);
+        }
+      });
+    }
+
+    // Find which components are referenced in the formula
+    componentPatterns.forEach((componentName) => {
+      // Ensure componentName is a string
+      if (typeof componentName === "string") {
+        const regex = new RegExp(`\\b${componentName}\\b`, "gi");
+        if (formula.match(regex)) {
+          componentNames.push({
+            name: componentName,
+            originalName: componentName.replace(/_/g, " "),
+            id: componentName.toLowerCase(),
+          });
+        }
+      }
+    });
+
+    return componentNames;
+  },
+
+  /**
    * Parse template data from API response for frontend use
    */
   parseTemplateData(template) {
     if (!template) return null;
+
+    // Parse JSON strings from database
+    let customComponents = [];
+    let statutoryComponents = {};
+
+    try {
+      const rawCustomComponents =
+        typeof template.custom_components === "string"
+          ? JSON.parse(template.custom_components)
+          : template.custom_components || [];
+
+      // Convert database format to frontend format
+      customComponents = rawCustomComponents.map((component) => {
+        const componentData = {
+          id: component.id || `custom_${Date.now()}_${Math.random()}`,
+          name: component.name || "",
+          description: component.description || component.name || "",
+          type: component.type || "fixed",
+          calculation_type: component.type || "fixed", // frontend expects this field
+          rate: component.amount || component.rate || 0, // Map amount to rate for frontend
+          amount: component.amount || component.rate || 0, // Keep amount as well
+          formula: component.formula || "",
+          enabled: true,
+          source_cell: component.source_cell || null,
+          sample_value: component.sample_value || null,
+          imported_from_excel: component.imported_from_excel || false,
+        };
+
+        // Extract components from formula if it's a formula type
+        if (component.type === "formula" && component.formula) {
+          componentData.components = this.extractComponentsFromFormula(
+            component.formula
+          );
+        } else {
+          componentData.components = [];
+        }
+
+        return componentData;
+      });
+    } catch (error) {
+      console.error("Error parsing custom_components:", error);
+      customComponents = [];
+    }
+
+    try {
+      const rawStatutoryComponents =
+        typeof template.statutory_components === "string"
+          ? JSON.parse(template.statutory_components)
+          : template.statutory_components || {};
+
+      // Check if rawStatutoryComponents is already an object (not an array)
+      if (Array.isArray(rawStatutoryComponents)) {
+        // Convert array of statutory components to object format expected by frontend
+        statutoryComponents = {};
+        rawStatutoryComponents.forEach((component) => {
+          const key = component.name.toLowerCase().replace(/[^a-z0-9]/g, "_");
+          const componentData = {
+            enabled: true,
+            name: component.name,
+            type: component.type,
+            calculation_type: component.type, // Add this field
+            rate:
+              component.type === "fixed"
+                ? component.amount || 0
+                : this.extractRateFromFormula(component.formula),
+            amount: component.amount || null, // Keep original amount
+            fixed_amount: component.amount || null, // Add this field for fixed components
+            annual_amount: component.amount || null, // Add this field
+            formula: component.formula || null,
+            description: component.description || component.name,
+            source_cell: component.source_cell || null,
+            sample_value: component.sample_value || null,
+            imported_from_excel: component.imported_from_excel || false,
+          };
+
+          // Extract components from formula if it's a formula type
+          if (component.type === "formula" && component.formula) {
+            componentData.components = this.extractComponentsFromFormula(
+              component.formula
+            );
+          } else {
+            componentData.components = [];
+          }
+
+          statutoryComponents[key] = componentData;
+        });
+      } else {
+        // Data is already in object format - use it directly but add components array
+        statutoryComponents = {};
+        Object.entries(rawStatutoryComponents).forEach(([key, component]) => {
+          const componentData = { ...component };
+
+          // Extract components from formula if it's a formula type
+          if (component.type === "formula" && component.formula) {
+            componentData.components = this.extractComponentsFromFormula(
+              component.formula
+            );
+          } else if (!componentData.components) {
+            componentData.components = [];
+          }
+
+          statutoryComponents[key] = componentData;
+        });
+      }
+    } catch (error) {
+      console.error("Error parsing statutory_components:", error);
+      statutoryComponents = {};
+    }
 
     return {
       id: template.id,
@@ -262,8 +432,8 @@ export const invoiceTemplateService = {
       template_name: template.template_name,
       description: template.description,
       templateSettings: {
-        custom: template.custom_components || [],
-        statutory: template.statutory_components || {},
+        custom: customComponents,
+        statutory: statutoryComponents,
         calculation_rules: template.calculation_rules || null,
       },
       metadata: {
@@ -283,6 +453,28 @@ export const invoiceTemplateService = {
         updated_at: template.updated_at,
       },
     };
+  },
+
+  /**
+   * Extract percentage rate from formula strings
+   */
+  extractRateFromFormula(formula) {
+    if (!formula || typeof formula !== "string") return null;
+
+    // Look for percentage patterns like "8%", "7.5%", "* 0.01" (1%), etc.
+    const percentageMatch = formula.match(/(\d+(?:\.\d+)?)%/);
+    if (percentageMatch) {
+      return parseFloat(percentageMatch[1]);
+    }
+
+    // Look for decimal patterns like "* 0.08" (8%), "* 0.075" (7.5%)
+    const decimalMatch = formula.match(/\*\s*0\.(\d+)/);
+    if (decimalMatch) {
+      const decimal = parseFloat("0." + decimalMatch[1]);
+      return decimal * 100; // Convert to percentage
+    }
+
+    return null;
   },
 };
 

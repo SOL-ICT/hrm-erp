@@ -235,8 +235,26 @@ const JobStructureForm = ({
       }
     } catch (error) {
       console.error("Error saving job structure:", error);
-      if (error.response?.data?.errors) {
+
+      // Check if it's a validation error (422)
+      if (error.response?.status === 422 && error.response?.data?.errors) {
+        // Set the validation errors to display in the form
         setErrors(error.response.data.errors);
+
+        // Also show a summary alert
+        const errorMessages = Object.entries(error.response.data.errors)
+          .map(
+            ([field, messages]) =>
+              `${field}: ${
+                Array.isArray(messages) ? messages.join(", ") : messages
+              }`
+          )
+          .join("\n");
+
+        alert(`Validation failed:\n${errorMessages}`);
+      } else if (error.response?.data?.message) {
+        // Show the backend error message
+        alert(`Error: ${error.response.data.message}`);
       } else {
         alert("Error saving job structure. Please try again.");
       }
@@ -350,9 +368,15 @@ const JobStructureForm = ({
                       placeholder="e.g., DSA01, SEC01"
                       maxLength="20"
                     />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Job code must be unique. Avoid: ACC01, DSA, DRIVER,
+                      OPERATIVE, SALES, SRV01, TELLER, etc.
+                    </p>
                     {errors.job_code && (
                       <p className="mt-1 text-sm text-red-600">
-                        {errors.job_code}
+                        {Array.isArray(errors.job_code)
+                          ? errors.job_code[0]
+                          : errors.job_code}
                       </p>
                     )}
                   </div>

@@ -1,0 +1,128 @@
+# Main Domain .htaccess for mysol360.com
+# Handles both frontend routing and API proxying
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Force HTTPS (disable during testing if needed)
+    RewriteCond %{HTTPS} off
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+    
+    # Handle CORS preflight requests
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=204,L]
+    
+    # API Routes - Proxy to Laravel via api_handler.php
+    RewriteCond %{REQUEST_URI} ^/api/(.*)$
+    RewriteRule ^api/(.*)$ /api_handler.php?route=$1 [QSA,L]
+    
+    # Frontend Routes - Single Page Application
+    # Serve static files directly if they exist
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    # Don't rewrite API calls
+    RewriteCond %{REQUEST_URI} !^/api/
+    # Don't rewrite specific files
+    RewriteCond %{REQUEST_URI} !^/diagnostic\.php
+    RewriteCond %{REQUEST_URI} !^/api_handler\.php
+    # Rewrite everything else to index.html for frontend routing
+    RewriteRule ^(.*)$ /index.html [QSA,L]
+</IfModule>
+
+# Security Headers
+<IfModule mod_headers.c>
+    # Basic security headers
+    Header always set X-Content-Type-Options nosniff
+    Header always set X-Frame-Options SAMEORIGIN
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # HTTPS Security (uncomment when SSL is working)
+    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    
+    # CORS Headers for API requests
+    Header always set Access-Control-Allow-Origin "https://mysol360.com"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, Accept, Origin"
+    Header always set Access-Control-Allow-Credentials true
+    Header always set Access-Control-Max-Age 86400
+</IfModule>
+
+# Compression for better performance
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript
+    AddOutputFilterByType DEFLATE application/javascript application/json application/xml
+    AddOutputFilterByType DEFLATE application/rss+xml application/atom+xml
+    AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# Browser Caching
+<IfModule mod_expires.c>
+    ExpiresActive On
+    # Cache static assets for 1 year
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year" 
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+    
+    # Cache HTML for 1 hour
+    ExpiresByType text/html "access plus 1 hour"
+    
+    # Don't cache API responses
+    <LocationMatch "^/api/">
+        ExpiresActive Off
+        Header unset Expires
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+    </LocationMatch>
+</IfModule>
+
+# File Upload Limits
+<IfModule mod_php.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 10M
+    php_value max_execution_time 300
+    php_value max_input_vars 3000
+    php_value memory_limit 512M
+</IfModule>
+
+# Deny access to sensitive files
+<Files ".env">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "composer.json">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "composer.lock">
+    Order allow,deny  
+    Deny from all
+</Files>
+
+# Prevent access to Laravel files if accidentally placed in public_html
+<FilesMatch "\.(blade\.php|php)$">
+    <RequireAll>
+        Require all denied
+    </RequireAll>
+</FilesMatch>
+
+# Allow specific PHP files
+<Files "api_handler.php">
+    Require all granted
+</Files>
+
+<Files "diagnostic.php">
+    Require all granted
+</Files>
+
+<Files "index.php">
+    Require all granted
+</Files>

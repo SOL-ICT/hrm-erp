@@ -1,4 +1,4 @@
-import apiService from "../../apiService";
+import { apiService } from "../../api";
 
 export const employeeRecordAPI = {
   // Get all active clients

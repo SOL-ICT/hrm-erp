@@ -162,3 +162,22 @@ FROM INFORMATION_SCHEMA.COLUMNS
 WHERE TABLE_NAME = 'recruitment_requests' 
 AND TABLE_SCHEMA = 'hrm_database'
 AND COLUMN_NAME LIKE '%service%';
+PS C:\Projects\hrm-erp\backend> php artisan tinker
+Psy Shell v0.12.8 (PHP 8.4.8 — cli) by Justin Hileman
+> <?php
+> // Check if there are any invoices
+> $invoice = \App\Models\GeneratedInvoice::first();
+SQL: select * from `generated_invoices` limit 1).
+>
+> // If invoice exists, show its ID
+> if($invoice) {
+.     echo "Found invoice ID: " . $invoice->id . "\n";
+.     echo "Invoice Number: " . $invoice->invoice_number . "\n";
+.     echo "Client: " . $invoice->client->name . "\n";
+. } else {
+.     echo "No invoices found in database\n";
+. }
+No invoices found in database
+>
+> // Exit tinker
+> exit
