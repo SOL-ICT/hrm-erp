@@ -20,6 +20,7 @@ import {
 import { salaryStructureAPI } from "../../../../../../services/modules/client-contract-management/salary-structure";
 import EmolumentComponentMaster from "../salary-structure/emolument/EmolumentComponentMaster";
 import PayGradeForm from "./PayGradeForm";
+import BulkUploadModal from "./BulkUploadModal";
 
 const PayDetailsMaster = ({
   currentTheme,
@@ -40,6 +41,7 @@ const PayDetailsMaster = ({
   const [showPayGradeForm, setShowPayGradeForm] = useState(false);
   const [editingPayGrade, setEditingPayGrade] = useState(null);
   const [showEmolumentModal, setShowEmolumentModal] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false); // NEW: For Excel upload
 
   // Load data
   useEffect(() => {
@@ -276,13 +278,21 @@ const PayDetailsMaster = ({
           <div className="flex items-center space-x-3">
             {" "}
             {/* Add this wrapper div */}
-            {/* Manage Components Button - ADD THIS */}
+            {/* Manage Components Button */}
             <button
               onClick={() => setShowEmolumentModal(true)}
               className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               <Settings className="w-4 h-4" />
               <span>Manage Components</span>
+            </button>
+            {/* NEW: Excel Upload Button */}
+            <button
+              onClick={() => setShowBulkUploadModal(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Excel Upload</span>
             </button>
             {/* Existing Add Pay Grade Button */}
             <button
@@ -393,7 +403,10 @@ const PayDetailsMaster = ({
                                 className="flex justify-between text-xs"
                               >
                                 <span className="text-slate-600">
-                                  {emolument.name}:
+                                  {emolument.component_name ||
+                                    emolument.name ||
+                                    emolument.component_code}
+                                  :
                                 </span>
                                 <span className="text-slate-800 font-medium">
                                   {formatCurrency(emolument.amount)}
@@ -488,6 +501,21 @@ const PayDetailsMaster = ({
         onSave={handlePayGradeSave}
         jobStructures={jobStructures}
         selectedJobStructure={selectedJobCategory} // Pass selectedJobCategory to pre-populate job structure
+        currentClient={selectedClient} // Pass current client for custom components
+      />
+
+      {/* NEW: Bulk Upload Modal for Excel Upload */}
+      <BulkUploadModal
+        isOpen={showBulkUploadModal}
+        onClose={() => setShowBulkUploadModal(false)}
+        onSuccess={() => {
+          setShowBulkUploadModal(false);
+          loadPayGrades(); // Refresh pay grades list
+          onDataChange?.(); // Notify parent
+        }}
+        currentClient={selectedClient}
+        selectedJobStructure={selectedJobCategory}
+        currentTheme={currentTheme}
       />
 
       {showEmolumentModal && (

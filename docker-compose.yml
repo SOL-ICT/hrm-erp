@@ -37,9 +37,10 @@ services:
       - SESSION_DRIVER=redis
       - QUEUE_CONNECTION=redis
       # Laravel Development Settings
-      - APP_ENV=${APP_ENV:-local}
-      - APP_DEBUG=${APP_DEBUG:-true}
-      - LOG_LEVEL=${LOG_LEVEL:-error}
+      - APP_KEY=base64:x4IAUfkCCUqoqjysXwePlzJFto5+MoSlJzz2vG3NHPw=
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - LOG_LEVEL=error
       - DB_SLOW_QUERY_LOG=false
       # PHP Performance Optimizations
       - PHP_OPCACHE_ENABLE=1
@@ -54,10 +55,7 @@ services:
     command: >
       sh -c "
         composer install --optimize-autoloader --no-scripts &&
-        php artisan config:cache &&
-        php artisan route:cache &&
-        php artisan view:cache &&
-        php -d opcache.enable=1 -d opcache.enable_cli=1 artisan serve --host=0.0.0.0 --port=8000
+        php artisan serve --host=0.0.0.0 --port=8000
       "
 
   # Next.js Frontend - Optimized for Development
@@ -76,8 +74,8 @@ services:
     environment:
       # Next.js Configuration
       - NODE_ENV=${NODE_ENV:-development}
-      - NEXT_PUBLIC_API_URL=http://192.168.1.118:8000/api
-      - NEXT_PUBLIC_APP_URL=http://192.168.1.118:3000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
       # Performance Optimizations
       - NEXT_TELEMETRY_DISABLED=1
       # File Watching (fixes hot reload in Docker)
@@ -103,7 +101,7 @@ services:
     container_name: hrm-mysql
     restart: unless-stopped
     ports:
-      - "3307:3306"   # Changed from 3306 to avoid MySQL conflict
+      - "3307:3306" # Changed from 3306 to avoid MySQL conflict
     environment:
       # Database Configuration
       - MYSQL_DATABASE=hrm_database
@@ -163,7 +161,7 @@ services:
     container_name: hrm-phpmyadmin
     restart: unless-stopped
     ports:
-      - "8081:80"     # Changed from 8080 to avoid nginx conflict
+      - "8081:80" # Changed from 8080 to avoid nginx conflict
     environment:
       - PMA_HOST=mysql
       - PMA_USER=hrm_user
@@ -182,8 +180,8 @@ services:
     container_name: hrm-nginx
     restart: unless-stopped
     ports:
-      - "8080:80"     # Changed from 80 to avoid Apache conflict
-      - "8443:443"    # Changed from 443 to avoid Apache SSL conflict
+      - "8080:80" # Changed from 80 to avoid Apache conflict
+      - "8443:443" # Changed from 443 to avoid Apache SSL conflict
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro

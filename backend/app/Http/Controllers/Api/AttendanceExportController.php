@@ -154,28 +154,37 @@ class AttendanceExportController extends Controller
             'client_id' => $request->input('client_id'),
             'has_file' => $request->hasFile('attendance_file'),
             'method' => $request->method(),
-            'content_type' => $request->header('content-type')
+            'content_type' => $request->header('content-type'),
+            'is_for_payroll' => $request->input('is_for_payroll')
         ]);
 
         try {
             $request->validate([
                 'client_id' => 'required|integer|exists:clients,id',
                 'attendance_file' => 'required|file|mimes:xlsx,xls,csv|max:10240', // 10MB max
-                'payroll_month' => 'nullable|date_format:Y-m'
+                'payroll_month' => 'nullable|date_format:Y-m',
+                'is_for_payroll' => 'nullable|boolean' // PAYROLL PROCESSING FLAG
             ]);
 
             $clientId = $request->input('client_id');
             $file = $request->file('attendance_file');
             $payrollMonth = $request->input('payroll_month');
+            $isForPayroll = $request->input('is_for_payroll', true); // Default to true (payroll)
 
             Log::info('Validation passed, processing file', [
                 'client_id' => $clientId,
                 'filename' => $file->getClientOriginalName(),
-                'payroll_month' => $payrollMonth
+                'payroll_month' => $payrollMonth,
+                'is_for_payroll' => $isForPayroll
             ]);
 
             // Process the uploaded file and save to database
-            $result = $this->attendanceExportService->processUploadedAttendanceWithSave($clientId, $file, $payrollMonth);
+            $result = $this->attendanceExportService->processUploadedAttendanceWithSave(
+                $clientId,
+                $file,
+                $payrollMonth,
+                $isForPayroll // Pass flag to service
+            );
 
             Log::info('File processed successfully', ['upload_id' => $result['upload_id']]);
 
@@ -265,8 +274,11 @@ class AttendanceExportController extends Controller
             $clientId = $request->query('client_id');
             $status = $request->query('status');
 
-            // Build query
-            $query = \App\Models\AttendanceUpload::with(['client']);
+            // Build query with relationships
+            $query = \App\Models\AttendanceUpload::with([
+                'client',
+                'uploader:id,name,email' // Load user who uploaded
+            ]);
 
             // Apply filters
             if ($clientId) {
@@ -283,10 +295,34 @@ class AttendanceExportController extends Controller
             // Paginate results
             $uploads = $query->paginate($perPage);
 
+            // Transform data to include calculated fields
+            $transformedData = collect($uploads->items())->map(function ($upload) {
+                // Use the successfully_matched and failed_matches columns from DB
+                $matchedCount = $upload->successfully_matched ?? 0;
+                $unmatchedCount = $upload->failed_matches ?? 0;
+                $totalRecords = $upload->total_records ?? 0;
+
+                return [
+                    'id' => $upload->id,
+                    'file_name' => $upload->file_name,
+                    'month' => $upload->payroll_month ? $upload->payroll_month->format('M Y') : null,
+                    'uploaded_at' => $upload->created_at ? $upload->created_at->format('Y-m-d H:i:s') : null,
+                    'uploaded_by' => $upload->uploader ?
+                        $upload->uploader->name :
+                        'System',
+                    'total_records' => $totalRecords,
+                    'matched_count' => $matchedCount,
+                    'unmatched_count' => $unmatchedCount,
+                    'status' => $upload->processing_status ?? 'pending',
+                    'client_id' => $upload->client_id,
+                    'client_name' => $upload->client ? $upload->client->client_name : null,
+                ];
+            });
+
             return response()->json([
                 'success' => true,
                 'message' => 'Attendance uploads retrieved successfully',
-                'data' => $uploads->items(),
+                'data' => $transformedData,
                 'pagination' => [
                     'current_page' => $uploads->currentPage(),
                     'last_page' => $uploads->lastPage(),
@@ -979,5 +1015,70 @@ class AttendanceExportController extends Controller
             // Complete FIRS API Response (for audit trail)
             'firs_api_response' => $firsResponseData
         ];
+    }
+
+    // ============================================================================
+    // PAYROLL PROCESSING MODULE - ATTENDANCE FOR PAYROLL
+    // ============================================================================
+
+    /**
+     * Get attendance uploads filtered for payroll processing
+     * 
+     * Returns only uploads where is_for_payroll = true (payroll-related attendance)
+     * Excludes uploads intended for invoicing purposes
+     * 
+     * @param Request $request (client_id, status, per_page)
+     * @return JsonResponse
+     */
+    public function getAttendanceForPayroll(Request $request): JsonResponse
+    {
+        try {
+            // Get query parameters
+            $perPage = $request->query('per_page', 10);
+            $clientId = $request->query('client_id');
+            $status = $request->query('status');
+
+            // Build query - filter for payroll uploads
+            $query = \App\Models\AttendanceUpload::with(['client', 'uploader:id,name'])
+                ->where('is_for_payroll', true); // PAYROLL FILTER
+
+            // Apply additional filters
+            if ($clientId) {
+                $query->where('client_id', $clientId);
+            }
+
+            if ($status) {
+                $query->where('processing_status', $status);
+            }
+
+            // Order by latest first
+            $query->orderBy('created_at', 'desc');
+
+            // Paginate results
+            $uploads = $query->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payroll attendance uploads retrieved successfully',
+                'data' => $uploads->items(),
+                'pagination' => [
+                    'current_page' => $uploads->currentPage(),
+                    'last_page' => $uploads->lastPage(),
+                    'per_page' => $uploads->perPage(),
+                    'total' => $uploads->total(),
+                ]
+            ]);
+        } catch (Exception $e) {
+            Log::error('AttendanceExportController::getAttendanceForPayroll error: ' . $e->getMessage(), [
+                'request' => $request->all(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve payroll attendance uploads',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

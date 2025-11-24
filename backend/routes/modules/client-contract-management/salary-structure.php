@@ -24,9 +24,17 @@ Route::prefix('salary-structure')->name('salary-structure.')->group(function () 
         Route::get('/', [SalaryStructureController::class, 'getPayGrades'])->name('index');
         Route::get('/job/{jobStructureId}', [SalaryStructureController::class, 'getPayGrades'])->name('by-job');
         Route::post('/', [SalaryStructureController::class, 'storePayGrade'])->name('store');
+
+        // Payroll Processing - Bulk Upload Endpoints (MUST be before /{id} route)
+        Route::get('/bulk-template', [SalaryStructureController::class, 'downloadBulkTemplate'])->name('bulk-template');
+        Route::post('/bulk-upload', [SalaryStructureController::class, 'uploadBulkEmoluments'])->name('bulk-upload');
+        Route::post('/bulk-confirm', [SalaryStructureController::class, 'confirmBulkEmoluments'])->name('bulk-confirm');
+
+        // Individual pay grade routes (MUST be after bulk routes to avoid conflicts)
         Route::get('/{id}', [SalaryStructureController::class, 'showPayGrade'])->name('show');
         Route::put('/{id}', [SalaryStructureController::class, 'updatePayGrade'])->name('update');
         Route::delete('/{id}', [SalaryStructureController::class, 'deletePayGrade'])->name('destroy');
+        Route::post('/{id}/load-universal-template', [SalaryStructureController::class, 'loadUniversalTemplate'])->name('load-universal-template');
     });
 
     // Utility Routes
@@ -37,6 +45,7 @@ Route::prefix('salary-structure')->name('salary-structure.')->group(function () 
     // Emolument Components Routes
     Route::prefix('emolument-components')->name('emolument-components.')->group(function () {
         Route::get('/', [EmolumentComponentController::class, 'index'])->name('index');
+        Route::get('/universal', [EmolumentComponentController::class, 'getUniversalTemplate'])->name('universal'); // Get 11 universal components
         Route::get('/statistics', [EmolumentComponentController::class, 'getStatistics'])->name('statistics');
         Route::get('/export', [EmolumentComponentController::class, 'export'])->name('export');
         Route::get('/template', [EmolumentComponentController::class, 'downloadTemplate'])->name('template');

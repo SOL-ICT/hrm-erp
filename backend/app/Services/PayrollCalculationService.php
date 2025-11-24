@@ -6,7 +6,12 @@ use Carbon\Carbon;
 use App\Models\Client;
 use App\Models\EmolumentComponent;
 use App\Models\PayGrade;
+use App\Models\PayrollRun;
+use App\Models\PayrollItem;
+use App\Models\Staff;
+use App\Models\AttendanceRecord;
 use App\Services\AttendanceCalculationService;
+use App\Services\PayrollCalculationEngine;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -456,5 +461,270 @@ class PayrollCalculationService
                 'base_components' => ['basic_salary', 'housing_allowance', 'transport_allowance'] // Standard pensionable components
             ]
         ];
+    }
+
+    /**
+     * Calculate payroll for all employees in a payroll run
+     * 
+     * @param int $runId Payroll run ID
+     * @return array Result with success status and message
+     */
+    public static function calculatePayrollRun($runId)
+    {
+        \Log::info('===== CALCULATE PAYROLL RUN STARTED =====', ['run_id' => $runId]);
+
+        try {
+            // Start database transaction
+            DB::beginTransaction();
+
+            // Get payroll run
+            $run = PayrollRun::with('client')->find($runId);
+            if (!$run) {
+                return [
+                    'success' => false,
+                    'message' => 'Payroll run not found'
+                ];
+            }
+
+            // Validate status
+            if ($run->status !== 'draft') {
+                return [
+                    'success' => false,
+                    'message' => 'Can only calculate payroll runs in draft status'
+                ];
+            }
+
+            // Get all active staff for the client
+            $staff = Staff::where('client_id', $run->client_id)
+                ->where('status', 'active')
+                ->with(['payGradeStructure']) // Only load pay grade structure
+                ->get();
+
+            if ($staff->isEmpty()) {
+                return [
+                    'success' => false,
+                    'message' => 'No active staff found for this client'
+                ];
+            }
+
+            // Initialize calculation engine
+            $engine = new PayrollCalculationEngine();
+
+            // Get attendance records if attendance_upload_id is set
+            $attendanceRecords = collect([]); // Initialize as empty collection
+            if ($run->attendance_upload_id) {
+                $attendanceRecords = AttendanceRecord::where('attendance_upload_id', $run->attendance_upload_id)
+                    ->where('ready_for_calculation', true)
+                    ->get()
+                    ->keyBy('staff_id');
+
+                // DEBUG: Log what we loaded
+                \Log::info('Loaded attendance records', [
+                    'count' => $attendanceRecords->count(),
+                    'keys' => $attendanceRecords->keys()->toArray(),
+                    'first_record' => $attendanceRecords->first() ? get_class($attendanceRecords->first()) : 'null'
+                ]);
+            } else {
+                // Attendance is required for payroll calculation
+                return [
+                    'success' => false,
+                    'message' => 'Attendance data is required for payroll calculation. Please upload and link attendance data first.'
+                ];
+            }
+
+            // Track totals
+            $totalGross = 0;
+            $totalDeductions = 0;
+            $totalNet = 0;
+            $totalCredit = 0;
+            $processedCount = 0;
+            $skippedStaff = []; // Staff without attendance records
+            $failedStaff = []; // Staff with calculation errors
+
+            // Calculate for each staff member
+            foreach ($staff as $employee) {
+                try {
+                    // Get attendance record - REQUIRED for calculation
+                    $attendanceRecord = $attendanceRecords->get($employee->id);
+
+                    // Attendance is mandatory - collect staff without attendance
+                    if (!$attendanceRecord) {
+                        $skippedStaff[] = [
+                            'staff_id' => $employee->id,
+                            'staff_name' => $employee->first_name . ' ' . $employee->last_name,
+                            'employee_code' => $employee->employee_code ?? 'N/A'
+                        ];
+                        continue; // Skip this employee
+                    }
+
+                    // Check if pay grade structure is loaded
+                    if (!$employee->payGradeStructure) {
+                        $failedStaff[] = [
+                            'staff_id' => $employee->id,
+                            'staff_name' => $employee->first_name . ' ' . $employee->last_name,
+                            'employee_code' => $employee->employee_code ?? 'N/A',
+                            'error' => 'Pay grade structure not found for this employee'
+                        ];
+
+                        Log::error('Pay grade structure missing for staff', [
+                            'staff_id' => $employee->id,
+                            'pay_grade_structure_id' => $employee->pay_grade_structure_id
+                        ]);
+                        continue;
+                    }
+
+                    // Build attendance data
+                    // Calculate total expected days if not set
+                    $totalExpectedDays = $attendanceRecord->total_expected_days ?? $engine->calculateTotalDays(
+                        $run->month,
+                        $run->year,
+                        $run->client->pay_calculation_basis ?? 'calendar_days'
+                    );
+
+                    // Calculate prorated percentage if not set
+                    $proratedPercentage = $attendanceRecord->prorated_percentage
+                        ?? (($attendanceRecord->days_worked / $totalExpectedDays) * 100);
+
+                    // Engine expects: days_worked, total_expected_days, prorated_percentage
+                    $attendance = [
+                        'days_worked' => $attendanceRecord->days_worked,
+                        'total_expected_days' => $totalExpectedDays,
+                        'prorated_percentage' => $proratedPercentage,
+                    ];
+
+                    // Calculate payroll using existing engine
+                    $calculation = $engine->calculateMonthlyPayroll(
+                        $employee,
+                        $employee->payGradeStructure,
+                        (object) $attendance, // Convert array to object
+                        $run->year
+                    );
+
+                    // Create payroll item
+                    PayrollItem::create([
+                        'payroll_run_id' => $run->id,
+                        'staff_id' => $employee->id,
+                        'client_id' => $run->client_id,
+                        'pay_grade_structure_id' => $employee->pay_grade_structure_id,
+                        'attendance_id' => $attendanceRecord ? $attendanceRecord->id : null,
+
+                        // Staff snapshot
+                        'staff_name' => $employee->first_name . ' ' . $employee->last_name,
+                        'staff_code' => $employee->employee_code ?? $employee->staff_id,
+                        'bank_name' => null, // Banking info not needed for calculation
+                        'account_number' => null, // Banking info not needed for calculation
+                        'pfa_code' => $employee->pfa_code ?? null,                        // Attendance (from calculation result)
+                        'days_present' => $calculation['days_present'] ?? 0,
+                        'days_absent' => $calculation['days_absent'] ?? 0,
+                        'total_days' => $calculation['total_days'] ?? 0,
+                        'proration_factor' => $calculation['proration_factor'] ?? 1,
+
+                        // Annual amounts
+                        'annual_gross_salary' => $calculation['annual_gross_salary'] ?? 0,
+                        'annual_reimbursables' => $calculation['annual_reimbursables'] ?? 0,
+                        'pensionable_amount' => $calculation['pensionable_amount'] ?? 0,
+
+                        // Monthly amounts
+                        'monthly_gross' => $calculation['monthly_gross'] ?? 0,
+                        'monthly_reimbursables' => $calculation['monthly_reimbursables'] ?? 0,
+
+                        // Tax
+                        'taxable_income' => $calculation['taxable_income'] ?? 0,
+                        'paye_tax' => $calculation['paye_tax'] ?? 0,
+
+                        // Deductions
+                        'pension_deduction' => $calculation['pension_deduction'] ?? 0,
+                        'leave_allowance_deduction' => $calculation['leave_allowance_deduction'] ?? 0,
+                        'thirteenth_month_deduction' => $calculation['thirteenth_month_deduction'] ?? 0,
+                        'other_deductions' => $calculation['other_deductions'] ?? 0,
+                        'total_deductions' => $calculation['total_deductions'] ?? 0,
+
+                        // Final amounts
+                        'net_pay' => $calculation['net_pay'] ?? 0,
+                        'credit_to_bank' => $calculation['credit_to_bank'] ?? 0,
+
+                        // Snapshot
+                        'emoluments_snapshot' => $calculation['emoluments_snapshot'] ?? [],
+                        'calculation_date' => now(),
+                    ]);
+
+                    // Update totals
+                    $totalGross += $calculation['monthly_gross'] ?? 0;
+                    $totalDeductions += $calculation['total_deductions'] ?? 0;
+                    $totalNet += $calculation['net_pay'] ?? 0;
+                    $totalCredit += $calculation['credit_to_bank'] ?? 0;
+                    $processedCount++;
+                } catch (\Exception $e) {
+                    // Collect failed staff with error details
+                    $failedStaff[] = [
+                        'staff_id' => $employee->id,
+                        'staff_name' => $employee->first_name . ' ' . $employee->last_name,
+                        'employee_code' => $employee->employee_code ?? 'N/A',
+                        'error' => $e->getMessage()
+                    ];
+
+                    Log::error('Payroll calculation failed for staff', [
+                        'staff_id' => $employee->id,
+                        'payroll_run_id' => $run->id,
+                        'error' => $e->getMessage()
+                    ]);
+                    // Continue with other staff
+                    continue;
+                }
+            }
+
+            // Update payroll run with totals
+            $run->update([
+                'status' => 'calculated',
+                'total_staff_count' => $processedCount,
+                'total_gross_pay' => $totalGross,
+                'total_deductions' => $totalDeductions,
+                'total_net_pay' => $totalNet,
+                'total_credit_to_bank' => $totalCredit,
+                'calculation_date' => now(),
+            ]);
+
+            DB::commit();
+
+            // Build response message
+            $message = "Payroll calculated successfully for {$processedCount} employee(s)";
+            $warnings = [];
+
+            if (!empty($skippedStaff)) {
+                $warnings[] = count($skippedStaff) . " staff member(s) skipped due to missing attendance records";
+            }
+            if (!empty($failedStaff)) {
+                $warnings[] = count($failedStaff) . " staff member(s) failed calculation due to errors";
+            }
+
+            return [
+                'success' => true,
+                'message' => $message,
+                'warnings' => $warnings,
+                'data' => [
+                    'processed_count' => $processedCount,
+                    'skipped_count' => count($skippedStaff),
+                    'failed_count' => count($failedStaff),
+                    'skipped_staff' => $skippedStaff,
+                    'failed_staff' => $failedStaff,
+                    'total_gross' => $totalGross,
+                    'total_deductions' => $totalDeductions,
+                    'total_net' => $totalNet,
+                ]
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Payroll run calculation failed', [
+                'run_id' => $runId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Payroll calculation failed: ' . $e->getMessage()
+            ];
+        }
     }
 }
