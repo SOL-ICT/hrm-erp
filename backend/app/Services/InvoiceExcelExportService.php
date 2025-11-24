@@ -671,16 +671,14 @@ class InvoiceSummarySheet implements FromCollection, WithHeadings, WithStyles, W
             // Section headers
             '9:9' => ['font' => ['bold' => true, 'size' => 12]],
             '15:15' => ['font' => ['bold' => true, 'size' => 12]],
-            '20:20' => ['font' => ['bold' => true, 'size' => 14, 'color' => ['rgb' => 'FFFFFF']]],
-            '22:22' => ['font' => ['bold' => true, 'size' => 12]],
-
-            // Total row background
             '20:20' => [
+                'font' => ['bold' => true, 'size' => 14, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
                     'startColor' => ['rgb' => '4472C4']
                 ]
             ],
+            '22:22' => ['font' => ['bold' => true, 'size' => 12]],
 
             // Currency amounts alignment
             'B:B' => ['alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT]],

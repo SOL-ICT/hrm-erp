@@ -692,4 +692,328 @@ class EmolumentComponentController extends Controller
             ], 500);
         }
     }
+    
+    // ========================================================================
+    // PAYROLL PROCESSING MODULE - NEW METHODS
+    // Added: November 21, 2025
+    // Purpose: Support client-specific custom components and universal template
+    // Documentation: PAYROLL_PROCESSING_TECHNICAL_SPEC.md section 6.2
+    // ========================================================================
+
+    /**
+     * Get all available components for a client (universal + client-specific)
+     * 
+     * Query Parameters:
+     * - client_id: Required - Get universal + this client's custom components
+     * - payroll_only: true/false - Filter components with payroll_category
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getAllAvailableForClient(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'client_id' => 'required|exists:clients,id',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $clientId = $request->client_id;
+
+            $query = EmolumentComponent::where(function ($q) use ($clientId) {
+                $q->where('is_universal_template', true)->whereNull('client_id') // Universal
+                    ->orWhere('client_id', $clientId); // Client-specific
+            });
+
+            // Filter for payroll components only
+            if ($request->boolean('payroll_only')) {
+                $query->whereNotNull('payroll_category');
+            }
+
+            $query->where('is_active', true)
+                ->orderBy('display_order')
+                ->orderBy('component_name');
+
+            $components = $query->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $components,
+                'total' => $components->count(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching components for client: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching components',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get universal template components (11 standard payroll components)
+     * 
+     * Returns the 11 universal components for payroll:
+     * - BASIC_SALARY, HOUSING, TRANSPORT (pensionable)
+     * - OTHER_ALLOWANCES, MEAL_ALLOWANCE
+     * - LEAVE_ALLOWANCE, THIRTEENTH_MONTH (deductions)
+     * - OTJ_TELEPHONE, OTJ_TRANSPORT, UNIFORM, CLIENT_OP_FUND (reimbursables)
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getUniversalTemplate()
+    {
+        try {
+            $components = EmolumentComponent::where('is_universal_template', true)
+                ->whereNull('client_id')
+                ->where('is_active', true)
+                ->orderBy('display_order')
+                ->orderBy('component_name')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $components,
+                'total' => $components->count(),
+                'message' => 'Universal template components retrieved successfully',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching universal template: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching universal template',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Create a new CLIENT-SPECIFIC custom emolument component
+     * 
+     * Validation:
+     * - component_code: Unique within client scope (checks universal + client's components)
+     * - payroll_category: Required for payroll components
+     * - is_pensionable: Only valid for salary/allowance categories
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function storeCustomComponent(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'client_id' => 'required|exists:clients,id',
+                'component_code' => [
+                    'required',
+                    'max:40',
+                    'regex:/^[A-Z0-9_]+$/', // Uppercase alphanumeric + underscore
+                ],
+                'component_name' => 'required|max:255',
+                'description' => 'nullable|string',
+                'category' => 'required|in:basic,allowance,deduction,benefit',
+                'payroll_category' => 'required|in:salary,allowance,reimbursable,deduction,statutory',
+                'is_pensionable' => 'boolean',
+                'is_taxable' => 'boolean',
+                'display_order' => 'nullable|integer|min:0',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            // Check uniqueness within client scope (universal + client-specific)
+            $componentCode = strtoupper($request->component_code);
+            $exists = EmolumentComponent::where('component_code', $componentCode)
+                ->where(function ($q) use ($request) {
+                    $q->whereNull('client_id') // Universal
+                        ->orWhere('client_id', $request->client_id); // Client-specific
+                })
+                ->exists();
+
+            if ($exists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Component code already exists for this client or as a universal component',
+                ], 422);
+            }
+
+            // Validate pensionable logic
+            if ($request->boolean('is_pensionable')) {
+                if (!in_array($request->payroll_category, ['salary', 'allowance'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Only salary and allowance components can be marked as pensionable',
+                    ], 422);
+                }
+            }
+
+            // Create component
+            $component = EmolumentComponent::create([
+                'client_id' => $request->client_id,
+                'component_code' => $componentCode,
+                'component_name' => $request->component_name,
+                'description' => $request->description,
+                'category' => $request->category,
+                'payroll_category' => $request->payroll_category,
+                'is_universal_template' => false,
+                'is_pensionable' => $request->boolean('is_pensionable', false),
+                'is_taxable' => $request->boolean('is_taxable', true),
+                'is_active' => true,
+                'display_order' => $request->display_order ?? 999,
+                'calculation_method' => 'fixed',
+                'status' => 'regular',
+                'type' => 'fixed_allowance',
+                'class' => 'cash_item',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => $component,
+                'message' => 'Custom emolument component created successfully',
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error('Error creating custom component: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error creating custom component',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update a CLIENT-SPECIFIC custom component
+     * 
+     * Note: Universal components cannot be updated via API
+     * 
+     * @param Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateCustomComponent(Request $request, $id)
+    {
+        try {
+            $component = EmolumentComponent::find($id);
+
+            if (!$component) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Component not found',
+                ], 404);
+            }
+
+            // Prevent updating universal components
+            if ($component->is_universal_template || $component->client_id === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Universal components cannot be updated. Only client-specific components can be modified.',
+                ], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'component_name' => 'sometimes|required|max:255',
+                'description' => 'nullable|string',
+                'payroll_category' => 'sometimes|required|in:salary,allowance,reimbursable,deduction,statutory',
+                'is_pensionable' => 'boolean',
+                'is_taxable' => 'boolean',
+                'is_active' => 'boolean',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            // Validate pensionable logic
+            $payrollCategory = $request->payroll_category ?? $component->payroll_category;
+            if ($request->boolean('is_pensionable')) {
+                if (!in_array($payrollCategory, ['salary', 'allowance'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Only salary and allowance components can be marked as pensionable',
+                    ], 422);
+                }
+            }
+
+            // Update component
+            $component->update($request->only([
+                'component_name',
+                'description',
+                'payroll_category',
+                'is_pensionable',
+                'is_taxable',
+                'is_active'
+            ]));
+
+            return response()->json([
+                'success' => true,
+                'data' => $component->fresh(),
+                'message' => 'Custom component updated successfully',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error updating custom component: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating custom component',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete (soft delete) a CLIENT-SPECIFIC custom component
+     * 
+     * Note: Universal components cannot be deleted
+     * 
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroyCustomComponent($id)
+    {
+        try {
+            $component = EmolumentComponent::find($id);
+
+            if (!$component) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Component not found',
+                ], 404);
+            }
+
+            // Prevent deleting universal components
+            if ($component->is_universal_template || $component->client_id === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Universal components cannot be deleted. Only client-specific components can be removed.',
+                ], 403);
+            }
+
+            // Soft delete
+            $component->update(['is_active' => false]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Custom component deleted successfully',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error deleting custom component: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error deleting custom component',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

@@ -50,8 +50,7 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithStyl
         return [
             $staff->employee_code,
             $staff->full_name,
-            $staff->pay_grade_structure_id,
-            null // days_worked - empty for user to fill
+            null // days_present - empty for user to fill
         ];
     }
 
@@ -61,10 +60,9 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithStyl
     public function headings(): array
     {
         return [
-            'Employee Code',
+            'Employee ID',
             'Employee Name',
-            'Pay Grade Structure ID',
-            'Days Worked'
+            'Days Present'
         ];
     }
 
@@ -74,10 +72,9 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithStyl
     public function columnWidths(): array
     {
         return [
-            'A' => 15, // Employee Code
-            'B' => 30, // Employee Name
-            'C' => 25, // Pay Grade Structure ID
-            'D' => 15, // Days Worked
+            'A' => 20, // Employee ID
+            'B' => 35, // Employee Name
+            'C' => 20, // Days Present
         ];
     }
 
@@ -87,7 +84,7 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithStyl
     public function styles(Worksheet $sheet)
     {
         // Header row styling
-        $sheet->getStyle('A1:D1')->applyFromArray([
+        $sheet->getStyle('A1:C1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF'],
@@ -106,7 +103,7 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithStyl
         // Data rows styling
         $lastRow = $this->staff->count() + 1;
 
-        // Employee Code column (read-only appearance)
+        // Employee ID column (read-only appearance)
         $sheet->getStyle("A2:A{$lastRow}")->applyFromArray([
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
@@ -128,22 +125,8 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithStyl
             ]
         ]);
 
-        // Pay Grade Structure ID column (read-only appearance)
+        // Days Present column (editable appearance)
         $sheet->getStyle("C2:C{$lastRow}")->applyFromArray([
-            'fill' => [
-                'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['rgb' => 'F2F2F2']
-            ],
-            'font' => [
-                'color' => ['rgb' => '666666']
-            ],
-            'alignment' => [
-                'horizontal' => Alignment::HORIZONTAL_CENTER
-            ]
-        ]);
-
-        // Days Worked column (editable appearance)
-        $sheet->getStyle("D2:D{$lastRow}")->applyFromArray([
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'E7F3FF']
@@ -154,7 +137,7 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithStyl
         ]);
 
         // Add borders to all cells
-        $sheet->getStyle("A1:D{$lastRow}")->applyFromArray([
+        $sheet->getStyle("A1:C{$lastRow}")->applyFromArray([
             'borders' => [
                 'allBorders' => [
                     'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
@@ -188,10 +171,10 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithStyl
 
         // Add instructions
         $instructions = [
-            "1. Only fill the 'Days Worked' column (highlighted in blue)",
-            "2. Do NOT modify Employee Code, Employee Name, or Pay Grade Structure ID",
-            "3. Enter the number of days each employee worked (0-31)",
-            "4. Save the file and upload it to the system for invoice generation",
+            "1. Only fill the 'Days Present' column (highlighted in blue)",
+            "2. Do NOT modify Employee ID or Employee Name columns",
+            "3. Enter the number of days each employee was present (0-31)",
+            "4. Save the file and upload it to the system for payroll processing",
             "5. Template generated for: {$this->client->organisation_name}",
             "6. Export date: " . date('Y-m-d H:i:s'),
             "7. Staff count: {$this->staff->count()} employees"
@@ -210,7 +193,7 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithStyl
         // Merge cells for instructions
         foreach ($instructions as $index => $instruction) {
             $row = $instructionRow + 1 + $index;
-            $sheet->mergeCells("A{$row}:D{$row}");
+            $sheet->mergeCells("A{$row}:C{$row}");
         }
 
         // Add template coverage information
@@ -234,7 +217,7 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithStyl
                         'size' => 10
                     ]
                 ]);
-                $sheet->mergeCells("A{$row}:D{$row}");
+                $sheet->mergeCells("A{$row}:C{$row}");
             }
         }
     }

@@ -1,53 +1,149 @@
-﻿# Dependencies
-node_modules/
-vendor/
-
-# Environment files
+﻿# ==========================================
+# Environment Files (NEVER COMMIT CREDENTIALS!)
+# ==========================================
 .env
 .env.local
 .env.production
+backend/.env
+backend/.env.local
+frontend/.env.local
 
-# IDE files
+# ==========================================
+# Local Documentation (Too many MD files)
+# ==========================================
+START_HERE.md
+LOCAL_TO_PRODUCTION_SETUP.md
+DEVELOPMENT_WORKFLOW.md
+QUICK_REFERENCE.md
+YOUR_CURRENT_SETUP_ANALYSIS.md
+setup-local-dev.ps1
+
+# ==========================================
+# Server-Specific Configs (Managed on server)
+# ==========================================
+nginx-proxy.conf
+/etc/nginx/
+docker-compose.override.yml
+docker-compose.prod.yml
+
+# ==========================================
+# Dependencies
+# ==========================================
+node_modules/
+vendor/
+
+# ==========================================
+# IDE Files
+# ==========================================
 .vscode/
 .idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
 
-# OS files
+# ==========================================
+# OS Files
+# ==========================================
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Build outputs
+# ==========================================
+# Build Outputs
+# ==========================================
 .next/
 dist/
 build/
+out/
 
+# ==========================================
 # Logs
+# ==========================================
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# Runtime data
+# ==========================================
+# Runtime Data
+# ==========================================
 pids/
 *.pid
 *.seed
 *.pid.lock
 
-# Cache directories
+# ==========================================
+# Cache Directories
+# ==========================================
 .cache/
 .parcel-cache/
+.turbo/
 
+# ==========================================
 # Docker
+# ==========================================
 .docker/
 
-# Laravel specific
-bootstrap/cache/
-storage/app/
-storage/framework/cache/
-storage/framework/sessions/
-storage/framework/views/
+# ==========================================
+# Laravel Specific
+# ==========================================
+bootstrap/cache/*.php
+!bootstrap/cache/.gitkeep
+
+storage/app/*
+!storage/app/.gitkeep
+!storage/app/public
+
+storage/framework/cache/*
+!storage/framework/cache/.gitkeep
+!storage/framework/cache/data
+storage/framework/cache/data/*
+!storage/framework/cache/data/.gitkeep
+
+storage/framework/sessions/*
+!storage/framework/sessions/.gitkeep
+
+storage/framework/views/*
+!storage/framework/views/.gitkeep
+
+storage/logs/*.log
+!storage/logs/.gitkeep
+
+public/storage
+public/hot
+
+# ==========================================
+# Next.js Specific
+# ==========================================
+.next/
+.swc/
+.vercel
+
+# ==========================================
+# Temporary Files
+# ==========================================
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# ==========================================
+# Deployment Artifacts
+# ==========================================
+deployment/*.tar.gz
+deployment/*.zip
+*.tar.gz
+*.zip
+
+# ==========================================
+# Local Configuration
+# ==========================================
+.local/
+*.local.yml
 storage/logs/
 
 # Next.js specific

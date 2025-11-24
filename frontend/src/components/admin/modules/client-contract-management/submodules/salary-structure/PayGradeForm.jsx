@@ -9,8 +9,13 @@ import {
   Calculator,
   Plus,
   Trash2,
+  Download,
+  Settings,
+  Layers,
 } from "lucide-react";
 import { salaryStructureAPI } from "../../../../../../services/api";
+import EmolumentGridEditor from "./EmolumentGridEditor";
+import ManageEmolumentComponentsModal from "./ManageEmolumentComponentsModal";
 
 const PayGradeForm = ({
   isOpen,
@@ -19,6 +24,7 @@ const PayGradeForm = ({
   onSave,
   jobStructures = [],
   selectedJobStructure = null, // New prop for pre-selecting job structure
+  currentClient = null, // NEW: Current client for custom components modal
 }) => {
   // Debug logging for props
   console.log("🔍 PayGradeForm Props Debug:");
@@ -27,6 +33,7 @@ const PayGradeForm = ({
   console.log("- jobStructures length:", jobStructures.length);
   console.log("- selectedJobStructure:", selectedJobStructure);
   console.log("- editingPayGrade:", editingPayGrade);
+  console.log("- currentClient:", currentClient);
 
   const [formData, setFormData] = useState({
     job_structure_id: "",
@@ -43,6 +50,14 @@ const PayGradeForm = ({
   const [currentJobStructure, setCurrentJobStructure] = useState(null);
   const [totalCompensation, setTotalCompensation] = useState(0);
   const [errors, setErrors] = useState({});
+
+  // New state for Task 20 enhancements
+  const [showManageComponentsModal, setShowManageComponentsModal] =
+    useState(false);
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
+  const [emolumentsArray, setEmolumentsArray] = useState([]); // Array format for EmolumentGridEditor
+
+  // Use currentClient prop directly (no need for state)
 
   // Load data on mount
   useEffect(() => {
@@ -73,7 +88,10 @@ const PayGradeForm = ({
           try {
             if (typeof editingPayGrade.emoluments === "string") {
               parsedEmoluments = JSON.parse(editingPayGrade.emoluments);
-            } else if (typeof editingPayGrade.emoluments === "object") {
+            } else if (
+              typeof editingPayGrade.emoluments === "object" &&
+              !Array.isArray(editingPayGrade.emoluments)
+            ) {
               parsedEmoluments = editingPayGrade.emoluments;
             }
           } catch (error) {
@@ -189,6 +207,11 @@ const PayGradeForm = ({
   // Calculate total compensation when emoluments change
   useEffect(() => {
     calculateTotalCompensation();
+  }, [formData.emoluments, emolumentComponents]);
+
+  // Sync emoluments object with emolumentsArray for EmolumentGridEditor
+  useEffect(() => {
+    syncEmolumentsToArray();
   }, [formData.emoluments, emolumentComponents]);
 
   const loadEmolumentComponents = async () => {
@@ -358,6 +381,117 @@ const PayGradeForm = ({
 
     console.log("🎯 Final total compensation:", total);
     setTotalCompensation(total);
+  };
+
+  // NEW: Sync emoluments object to array for EmolumentGridEditor
+  const syncEmolumentsToArray = () => {
+    if (!formData.emoluments || typeof formData.emoluments !== "object") {
+      setEmolumentsArray([]);
+      return;
+    }
+
+    const array = Object.entries(formData.emoluments).map(
+      ([componentCode, amount]) => {
+        const component = emolumentComponents.find(
+          (ec) => ec.component_code === componentCode
+        );
+
+        return {
+          component_code: componentCode,
+          component_name: component?.component_name || componentCode,
+          category: component?.category || "unknown",
+          is_pensionable: component?.is_pensionable || false,
+          is_taxable: component?.is_taxable || true,
+          amount: parseFloat(amount) || 0,
+        };
+      }
+    );
+
+    setEmolumentsArray(array);
+  };
+
+  // NEW: Load Universal Template (11 components with zero amounts)
+  const handleLoadUniversalTemplate = async () => {
+    setLoadingTemplate(true);
+    try {
+      console.log("🔄 Loading universal template...");
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
+        }/salary-structure/emolument-components/universal`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to load universal template");
+      }
+
+      const result = await response.json();
+      console.log("✅ Universal template response:", result);
+
+      const universalComponents = result.data || result.universal || [];
+
+      if (universalComponents.length === 0) {
+        alert("No universal components found. Please contact administrator.");
+        return;
+      }
+
+      // Create emoluments object with zero amounts
+      const newEmoluments = {};
+      universalComponents.forEach((component) => {
+        newEmoluments[component.component_code] = 0;
+      });
+
+      setFormData((prev) => ({
+        ...prev,
+        emoluments: newEmoluments,
+      }));
+
+      alert(
+        `Loaded ${universalComponents.length} universal components successfully!`
+      );
+    } catch (error) {
+      console.error("❌ Error loading universal template:", error);
+      alert("Failed to load universal template. Please try again.");
+    } finally {
+      setLoadingTemplate(false);
+    }
+  };
+
+  // NEW: Handle emolument grid changes from EmolumentGridEditor
+  const handleEmolumentsGridChange = (updatedArray) => {
+    const newEmoluments = {};
+    updatedArray.forEach((item) => {
+      newEmoluments[item.component_code] = item.amount;
+    });
+
+    setFormData((prev) => ({
+      ...prev,
+      emoluments: newEmoluments,
+    }));
+  };
+
+  // NEW: Handle component removal from grid
+  const handleRemoveFromGrid = (component) => {
+    const newEmoluments = { ...formData.emoluments };
+    delete newEmoluments[component.component_code];
+
+    setFormData((prev) => ({
+      ...prev,
+      emoluments: newEmoluments,
+    }));
+  };
+
+  // NEW: Handle custom component creation callback
+  const handleCustomComponentCreated = () => {
+    // Reload emolument components to include new custom component
+    loadEmolumentComponents();
   };
 
   const getAvailablePayStructureTypes = () => {
@@ -668,9 +802,65 @@ const PayGradeForm = ({
             {/* Right Column - Emolument Components */}
             <div className="space-y-6">
               <div className="p-4 rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50/50 to-transparent">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Emolument Components *
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <Layers className="w-5 h-5 mr-2 text-orange-600" />
+                    Emolument Components *
+                  </h3>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <button
+                    type="button"
+                    onClick={handleLoadUniversalTemplate}
+                    disabled={loadingTemplate}
+                    className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingTemplate ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                        <span>Loading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        <span>Load Universal Template</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowManageComponentsModal(true)}
+                    className="flex items-center justify-center space-x-2 px-4 py-3 rounded-lg border-2 border-purple-300 bg-purple-50 hover:bg-purple-100 text-purple-700 font-medium transition-all duration-200"
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span>Manage Custom Components</span>
+                  </button>
+                </div>
+
+                {/* Info Banner */}
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start">
+                    <AlertCircle className="w-4 h-4 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-blue-800">
+                      <p className="font-medium mb-1">Quick Start:</p>
+                      <ul className="list-disc list-inside space-y-1 text-xs">
+                        <li>
+                          <strong>Load Universal Template:</strong> Loads 11
+                          standard components (Basic Salary, HRA, Transport,
+                          etc.)
+                        </li>
+                        <li>
+                          <strong>Manage Custom Components:</strong> Create
+                          client-specific components (e.g., Car Allowance, Phone
+                          Allowance)
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
 
                 {errors.emoluments && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -683,79 +873,22 @@ const PayGradeForm = ({
                   </div>
                 )}
 
-                {/* Current Emoluments */}
-                <div className="space-y-3 mb-4">
-                  {Object.entries(formData.emoluments).map(
-                    ([componentCode, amount]) => {
-                      const component = emolumentComponents.find(
-                        (ec) => ec.component_code === componentCode
-                      );
-                      if (!component) return null;
+                {/* Emolument Grid Editor */}
+                <EmolumentGridEditor
+                  emoluments={emolumentsArray}
+                  onChange={handleEmolumentsGridChange}
+                  onRemoveComponent={handleRemoveFromGrid}
+                  currentTheme="light"
+                  readOnly={false}
+                  showRemoveButton={true}
+                  className=""
+                />
 
-                      return (
-                        <div
-                          key={componentCode}
-                          className="flex items-center space-x-3 p-3 bg-white border border-gray-200 rounded-lg"
-                        >
-                          <div className="flex-1">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              {component.component_name}
-                            </label>
-                            <div className="relative">
-                              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                                ₦
-                              </span>
-                              <input
-                                type="number"
-                                value={amount}
-                                onChange={(e) =>
-                                  handleEmolumentChange(
-                                    componentCode,
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full pl-8 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="0"
-                                min="0"
-                                step="0.01"
-                              />
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <span
-                              className={`text-xs px-2 py-1 rounded-full ${
-                                component.category === "basic"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : component.category === "allowance"
-                                  ? "bg-green-100 text-green-800"
-                                  : component.category === "benefit"
-                                  ? "bg-purple-100 text-purple-800"
-                                  : "bg-red-100 text-red-800"
-                              }`}
-                            >
-                              {component.category}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                removeEmolumentComponent(componentCode)
-                              }
-                              className="block mt-2 p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    }
-                  )}
-                </div>
-
-                {/* Add Component Dropdown */}
+                {/* Add Custom Component Dropdown (for already created custom components) */}
                 {getAvailableEmolumentComponents().length > 0 && (
-                  <div className="border-t border-gray-200 pt-4">
+                  <div className="mt-4 border-t border-gray-200 pt-4">
                     <h4 className="text-sm font-medium text-gray-700 mb-2">
-                      Add Component
+                      Add Existing Component
                     </h4>
                     <div className="flex space-x-2">
                       <select
@@ -777,16 +910,22 @@ const PayGradeForm = ({
                           </option>
                         ))}
                       </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const select = document.querySelector("select");
+                          if (select && select.value) {
+                            addEmolumentComponent(select.value);
+                            select.value = "";
+                          }
+                        }}
+                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 )}
-
-                {getAvailableEmolumentComponents().length === 0 &&
-                  Object.keys(formData.emoluments).length > 0 && (
-                    <div className="text-center py-4 text-gray-500">
-                      All available components have been added
-                    </div>
-                  )}
               </div>
             </div>
           </div>
@@ -822,6 +961,17 @@ const PayGradeForm = ({
           </div>
         </form>
       </div>
+
+      {/* Manage Custom Components Modal */}
+      {showManageComponentsModal && (
+        <ManageEmolumentComponentsModal
+          isOpen={showManageComponentsModal}
+          onClose={() => setShowManageComponentsModal(false)}
+          currentClient={currentClient}
+          currentTheme="light"
+          onComponentCreated={handleCustomComponentCreated}
+        />
+      )}
     </div>
   );
 };

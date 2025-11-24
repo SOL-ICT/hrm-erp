@@ -315,6 +315,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // HR & Payroll Management Module
     require __DIR__ . '/modules/hr-payroll-management/employee-record.php';
     require __DIR__ . '/modules/hr-payroll-management/calculation-templates.php';
+    require __DIR__ . '/modules/hr-payroll-management/payroll-processing.php';
+
+    // Employee Management Module (HR Extension)
+    require __DIR__ . '/modules/employee-management/employee-actions.php';
 
     // Invoicing Module - HR & Payroll Management Extension
     require __DIR__ . '/modules/invoicing/invoicing-routes.php';
@@ -439,3 +443,10 @@ Route::get('/health/services', function () {
         ], 503);
     }
 });
+
+// ============================================================================
+// PAYROLL PROCESSING ROUTES
+// ============================================================================
+// NOTE: Payroll routes are now defined in:
+// routes/modules/hr-payroll-management/payroll-processing.php
+// These routes use App\Http\Controllers\Api\PayrollRunController

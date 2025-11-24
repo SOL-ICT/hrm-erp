@@ -34,6 +34,48 @@ class AttendanceExportService
     }
 
     /**
+     * Match staff from attendance data using employee_code (exact) or name (fuzzy)
+     * Uses same advanced matching logic as EmployeeManagementBulkUploadService
+     * 
+     * @param array $attendanceRow ['employee_code' => 'EMP001', 'employee_name' => 'John Doe']
+     * @param int $clientId
+     * @return Staff|null
+     */
+    private function matchStaffFromAttendance(array $attendanceRow, int $clientId): ?Staff
+    {
+        $employeeCode = $attendanceRow['employee_code'] ?? $attendanceRow['Employee ID'] ?? null;
+        $employeeName = $attendanceRow['employee_name'] ?? $attendanceRow['Employee Name'] ?? null;
+
+        $staff = null;
+
+        // Try exact match by employee_code first (highest priority)
+        if ($employeeCode) {
+            $staff = Staff::where('employee_code', $employeeCode)
+                ->where('client_id', $clientId)
+                ->first();
+        }
+
+        // If not found, try fuzzy name match
+        if (!$staff && $employeeName) {
+            $cleanName = trim($employeeName);
+
+            // Try matching as "First Last" or "Last First"
+            $staff = Staff::where('client_id', $clientId)
+                ->where(function ($query) use ($cleanName) {
+                    // Match "FirstName LastName" pattern
+                    $query->whereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$cleanName}%"])
+                        // Match "LastName FirstName" pattern
+                        ->orWhereRaw("CONCAT(last_name, ' ', first_name) LIKE ?", ["%{$cleanName}%"])
+                        // Match "FirstName MiddleName LastName" pattern
+                        ->orWhereRaw("CONCAT(first_name, ' ', COALESCE(middle_name, ''), ' ', last_name) LIKE ?", ["%{$cleanName}%"]);
+                })
+                ->first();
+        }
+
+        return $staff;
+    }
+
+    /**
      * Get total days for pay calculation basis
      * 
      * @param string $payBasis
@@ -65,6 +107,8 @@ class AttendanceExportService
 
     /**
      * Export attendance template for a client
+     * Exports ALL active staff - user fills in Days Present only
+     * No longer filters by template coverage - simplified approach
      * 
      * @param int $clientId
      * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
@@ -80,94 +124,36 @@ class AttendanceExportService
             // 1. Validate client exists
             $client = Client::findOrFail($clientId);
 
-            // 2. Get template coverage for client
-            $coverage = $this->templateService->getTemplateCoverage($clientId);
-            $coveredPayGrades = collect($coverage)
-                ->where('has_template', true)
-                ->pluck('pay_grade_structure_id')
-                ->toArray();
-
-            if (empty($coveredPayGrades)) {
-                // If no templates exist, we'll create a basic template with common pay grades
-                Log::info("No templates found for client, creating basic template", [
-                    'client_id' => $clientId,
-                    'client_name' => $client->organisation_name
-                ]);
-
-                // Get any pay grade structures that exist for this client's staff
-                $clientPayGrades = Staff::where('client_id', $clientId)
-                    ->whereNotNull('pay_grade_structure_id')
-                    ->distinct()
-                    ->pluck('pay_grade_structure_id')
-                    ->toArray();
-
-                // If no staff pay grades exist either, use some common ones
-                if (empty($clientPayGrades)) {
-                    $clientPayGrades = [1, 2, 3]; // Default pay grade IDs
-                }
-
-                $coveredPayGrades = $clientPayGrades;
-            }
-
-            // 3. Get all active staff for client with template coverage
+            // 2. Get ALL active staff for client (no template filtering)
             $staff = Staff::where('client_id', $clientId)
                 ->where('status', 'active')
-                ->whereNotNull('pay_grade_structure_id')
-                ->whereIn('pay_grade_structure_id', $coveredPayGrades)
                 ->orderBy('employee_code')
                 ->get();
 
-            // If no staff found, create a sample template with available pay grades
             if ($staff->isEmpty()) {
-                Log::info("No staff found for client, creating sample template", [
-                    'client_id' => $clientId,
-                    'client_name' => $client->organisation_name,
-                    'covered_pay_grades' => $coveredPayGrades
-                ]);
-
-                // Create sample staff entries for each covered pay grade
-                $staff = collect($coveredPayGrades)->map(function ($payGradeId, $index) use ($clientId) {
-                    $payGrade = \App\Models\PayGradeStructure::find($payGradeId);
-
-                    // Create a mock staff object for template generation
-                    return (object) [
-                        'id' => 'sample_' . ($index + 1),
-                        'employee_code' => 'EMP' . str_pad($index + 1, 3, '0', STR_PAD_LEFT),
-                        'full_name' => 'Sample Employee ' . ($index + 1), // Use full_name to match export expectations
-                        'pay_grade_structure_id' => $payGradeId,
-                        'pay_grade_name' => $payGrade ? $payGrade->grade_name : "Pay Grade {$payGradeId}",
-                        'client_id' => $clientId,
-                        'status' => 'active',
-                        'is_sample' => true // Flag to indicate this is sample data
-                    ];
-                });
+                throw new \Exception("No active staff found for client: {$client->organisation_name}");
             }
 
-            // 4. Validate template completeness for all staff
-            $templateValidation = $this->validateStaffTemplates($clientId);
-            if (!$templateValidation['validation_passed']) {
-                Log::warning("Template validation failed, but proceeding with available templates", [
-                    'client_id' => $clientId,
-                    'missing_templates' => $templateValidation['missing_templates']
-                ]);
-                // Don't throw error - proceed with available templates
-            }
+            Log::info("Exporting attendance template", [
+                'client_id' => $clientId,
+                'client_name' => $client->organisation_name,
+                'total_staff' => $staff->count()
+            ]);
 
-            // 5. Generate filename
+            // 3. Get template coverage for informational purposes only
+            $coverage = $this->templateService->getTemplateCoverage($clientId);
+
+            // 4. Generate filename
             $filename = $this->generateFilename($client);
 
-            // 6. Export to Excel
+            // 5. Export to Excel
             $export = new AttendanceTemplateExport($staff, $client, $coverage);
 
             Log::info("Attendance template export completed successfully", [
                 'client_id' => $clientId,
                 'client_name' => $client->organisation_name,
-                'staff_count' => is_object($staff) ? $staff->count() : count($staff),
-                'filename' => $filename,
-                'has_real_staff' => $staff->every(function ($s) {
-                    return !isset($s->is_sample);
-                }),
-                'covered_pay_grades' => $coveredPayGrades
+                'staff_count' => $staff->count(),
+                'filename' => $filename
             ]);
 
             return Excel::download($export, $filename);
@@ -374,8 +360,12 @@ class AttendanceExportService
      * @param string|null $payrollMonth
      * @return array
      */
-    public function processUploadedAttendanceWithSave(int $clientId, $file, ?string $payrollMonth = null): array
-    {
+    public function processUploadedAttendanceWithSave(
+        int $clientId,
+        $file,
+        ?string $payrollMonth = null,
+        bool $isForPayroll = true // PAYROLL PROCESSING FLAG
+    ): array {
         // Process the file first
         $processedResult = $this->processUploadedAttendance($clientId, $file);
 
@@ -400,6 +390,29 @@ class AttendanceExportService
             'processing_errors' => json_encode($processedResult['errors']),
             'payroll_month' => $payrollMonth,
             'uploaded_by' => 1, // Default user ID
+            'is_for_payroll' => $isForPayroll, // PAYROLL FLAG
+            // Auto-confirm validation results
+            'successfully_matched' => $processedResult['valid_records'],
+            'failed_matches' => count($processedResult['unmatched_staff'] ?? []),
+            'match_percentage' => $processedResult['total_rows'] > 0
+                ? ($processedResult['valid_records'] / $processedResult['total_rows']) * 100
+                : 0,
+            'validation_status' => $processedResult['processing_successful'] ? 'validated' : 'failed',
+            'ready_for_processing' => $processedResult['processing_successful'], // AUTO-CONFIRM
+            'validation_completed_at' => now(),
+            // Store validation results for display
+            'format_validation_results' => json_encode([
+                'headers_valid' => true,
+                'rows_processed' => $processedResult['total_rows']
+            ]),
+            'matching_validation_results' => json_encode([
+                'matched_staff' => $processedResult['processed_data'] ?? [],
+                'unmatched_staff' => $processedResult['unmatched_staff'] ?? []
+            ]),
+            'template_coverage_results' => json_encode([
+                'covered_pay_grades' => $processedResult['pay_grades_covered'] ?? 0,
+                'coverage_percentage' => $processedResult['coverage_percentage'] ?? 100
+            ]),
         ]);
 
         // Create individual attendance records for valid entries
@@ -447,8 +460,8 @@ class AttendanceExportService
             // Remove header row
             $headers = array_shift($data);
 
-            // Validate headers
-            $expectedHeaders = ['Employee Code', 'Employee Name', 'Pay Grade Structure ID', 'Days Worked'];
+            // Validate headers (3-column format after simplification)
+            $expectedHeaders = ['Employee ID', 'Employee Name', 'Days Present'];
             if ($headers !== $expectedHeaders) {
                 throw new \Exception('Invalid file format. Expected headers: ' . implode(', ', $expectedHeaders));
             }
@@ -460,43 +473,41 @@ class AttendanceExportService
             foreach ($data as $rowIndex => $row) {
                 $rowNumber = $rowIndex + 2; // +2 because we removed header and arrays are 0-indexed
 
-                // Validate row structure
-                if (count($row) < 4) {
+                // Validate row structure (now only 3 columns)
+                if (count($row) < 3) {
                     $errors[] = "Row {$rowNumber}: Insufficient columns";
                     continue;
                 }
 
-                [$employeeCode, $employeeName, $payGradeStructureId, $daysWorked] = $row;
+                [$employeeCode, $employeeName, $daysPresent] = $row;
 
-                // Validate days worked
-                if (!is_numeric($daysWorked) || $daysWorked < 0 || $daysWorked > 31) {
-                    $errors[] = "Row {$rowNumber}: Invalid days worked ({$daysWorked}). Must be between 0 and 31.";
+                // Validate days present
+                if (!is_numeric($daysPresent) || $daysPresent < 0 || $daysPresent > 31) {
+                    $errors[] = "Row {$rowNumber}: Invalid days present ({$daysPresent}). Must be between 0 and 31.";
                     continue;
                 }
 
-                // Find staff member
-                $staff = Staff::where('client_id', $clientId)
-                    ->where('employee_code', $employeeCode)
-                    ->where('pay_grade_structure_id', $payGradeStructureId)
-                    ->first();
+                // Use advanced fuzzy matching to find staff member
+                $staff = $this->matchStaffFromAttendance([
+                    'employee_code' => $employeeCode,
+                    'employee_name' => $employeeName
+                ], $clientId);
 
                 if (!$staff) {
-                    $errors[] = "Row {$rowNumber}: Staff member not found (Code: {$employeeCode}, Pay Grade: {$payGradeStructureId})";
+                    $errors[] = "Row {$rowNumber}: Staff not found (Code: {$employeeCode}, Name: {$employeeName}). Please check employee code or name.";
                     continue;
                 }
 
-                // Verify employee name matches
-                if (trim(strtolower($staff->full_name)) !== trim(strtolower($employeeName))) {
-                    $errors[] = "Row {$rowNumber}: Employee name mismatch. Expected: {$staff->full_name}, Got: {$employeeName}";
-                    continue;
-                }
+                // Track match confidence (exact employee_code match vs fuzzy name match)
+                $matchType = (trim($staff->employee_code) === trim($employeeCode)) ? 'exact' : 'fuzzy';
 
                 $processedData[] = [
                     'staff_id' => $staff->id,
-                    'employee_code' => $employeeCode,
-                    'employee_name' => $staff->full_name,
-                    'pay_grade_structure_id' => $payGradeStructureId,
-                    'days_worked' => (float) $daysWorked,
+                    'employee_code' => $staff->employee_code, // Use actual staff employee_code
+                    'employee_name' => $staff->full_name,       // Use actual staff name
+                    'pay_grade_structure_id' => $staff->pay_grade_structure_id, // Get from matched staff
+                    'days_worked' => (float) $daysPresent, // Changed variable name
+                    'match_type' => $matchType, // Track whether exact or fuzzy match
                     'row_number' => $rowNumber
                 ];
 

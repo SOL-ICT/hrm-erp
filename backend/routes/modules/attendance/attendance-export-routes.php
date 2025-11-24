@@ -73,6 +73,10 @@ Route::middleware(['auth:sanctum'])->prefix('attendance')->group(function () {
     Route::get('/uploads', [AttendanceExportController::class, 'getAttendanceUploads'])
         ->name('attendance.uploads.list');
 
+    // Get attendance uploads for payroll processing (is_for_payroll = true)
+    Route::get('/uploads/payroll', [AttendanceExportController::class, 'getAttendanceForPayroll'])
+        ->name('attendance.uploads.payroll');
+
     // Delete an attendance upload
     Route::delete('/uploads/{uploadId}', [AttendanceExportController::class, 'deleteUpload'])
         ->name('attendance.uploads.delete');

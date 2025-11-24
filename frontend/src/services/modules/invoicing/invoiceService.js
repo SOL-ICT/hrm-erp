@@ -420,14 +420,23 @@ class InvoiceApiService {
 
   /**
    * Phase 1.3: Upload with direct pay_grade_structure_id matching
+   * Phase 2.1: Supports is_for_payroll flag to distinguish payroll vs invoicing uploads
    */
-  async uploadWithDirectMatching(file, clientId, payrollMonth) {
+  async uploadWithDirectMatching(
+    file,
+    clientId,
+    payrollMonth,
+    isForPayroll = false
+  ) {
     try {
       const formData = new FormData();
       formData.append("attendance_file", file);
       formData.append("client_id", clientId);
       if (payrollMonth) {
         formData.append("payroll_month", payrollMonth);
+      }
+      if (isForPayroll !== undefined) {
+        formData.append("is_for_payroll", isForPayroll ? "1" : "0");
       }
 
       const response = await apiService.post(
@@ -501,6 +510,33 @@ class InvoiceApiService {
       return response.data;
     } catch (error) {
       console.error("Error fetching attendance uploads:", error);
+      throw this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Get attendance uploads for payroll (is_for_payroll = true)
+   */
+  async getPayrollAttendanceUploads(params = {}) {
+    try {
+      const queryParams = new URLSearchParams();
+
+      // Add pagination params
+      if (params.page) queryParams.append("page", params.page);
+      if (params.per_page) queryParams.append("per_page", params.per_page);
+
+      // Add filter params
+      if (params.client_id) queryParams.append("client_id", params.client_id);
+      if (params.status) queryParams.append("status", params.status);
+
+      const url = queryParams.toString()
+        ? `/attendance/uploads/payroll?${queryParams.toString()}`
+        : "/attendance/uploads/payroll";
+
+      const response = await apiService.get(url);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching payroll attendance uploads:", error);
       throw this.handleApiError(error);
     }
   }

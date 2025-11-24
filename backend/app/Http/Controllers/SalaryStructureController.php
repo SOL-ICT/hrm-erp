@@ -735,4 +735,239 @@ class SalaryStructureController extends Controller
             ], 500);
         }
     }
+
+    // ============================================================================
+    // PAYROLL PROCESSING MODULE - PAY GRADE BULK UPLOAD
+    // ============================================================================
+
+    /**
+     * Download bulk emolument template for a job structure
+     * 
+     * Generates Excel file with pay grades as rows and components as columns
+     * Users fill in amounts and upload back for bulk processing
+     * 
+     * @param Request $request (job_structure_id, client_id)
+     * @return \Illuminate\Http\Response Excel file download
+     */
+    public function downloadBulkTemplate(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'job_structure_id' => 'required|exists:job_structures,id',
+                'client_id' => 'required|exists:clients,id',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Use PayGradeExcelService to generate template
+            $excelService = new \App\Services\PayGradeExcelService();
+            $result = $excelService->generateTemplate(
+                $request->job_structure_id,
+                $request->client_id
+            );
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message']
+                ], 400);
+            }
+
+            // Return file download
+            return response()->download(
+                $result['file_path'],
+                $result['file_name'],
+                [
+                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ]
+            )->deleteFileAfterSend();
+        } catch (\Exception $e) {
+            Log::error('SalaryStructureController::downloadBulkTemplate error: ' . $e->getMessage(), [
+                'request' => $request->all(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error generating template: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Upload and process bulk emolument file
+     * 
+     * Accepts Excel file, parses data, validates, and returns preview
+     * User can review preview before confirming save
+     * 
+     * @param Request $request (file, job_structure_id, client_id)
+     * @return \Illuminate\Http\JsonResponse Preview data with validation errors
+     */
+    public function uploadBulkEmoluments(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'file' => 'required|mimes:xlsx,xls|max:5120', // 5MB max
+                'job_structure_id' => 'required|exists:job_structures,id',
+                'client_id' => 'required|exists:clients,id',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Parse uploaded file
+            $excelService = new \App\Services\PayGradeExcelService();
+            $parseResult = $excelService->parseUploadedFile(
+                $request->file('file'),
+                $request->job_structure_id,
+                $request->client_id
+            );
+
+            if (!$parseResult['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $parseResult['message'],
+                    'errors' => $parseResult['errors'] ?? []
+                ], 400);
+            }
+
+            // Return preview data (don't save yet - wait for confirmation)
+            return response()->json([
+                'success' => true,
+                'data' => $parseResult['data'],
+                'errors' => $parseResult['errors'] ?? [],
+                'rows_processed' => $parseResult['rows_processed'],
+                'message' => $parseResult['message'] . '. Review and confirm to save.',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('SalaryStructureController::uploadBulkEmoluments error: ' . $e->getMessage(), [
+                'request' => $request->except('file'),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error processing file: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Confirm and save bulk emoluments
+     * 
+     * Receives validated data from preview and saves to database
+     * This is called after user reviews and confirms the upload
+     * 
+     * @param Request $request (data: array of pay grade emoluments)
+     * @return \Illuminate\Http\JsonResponse Success/failure response
+     */
+    public function confirmBulkEmoluments(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'preview_data' => 'required|array',
+                'preview_data.*.pay_grade_id' => 'required|exists:pay_grade_structures,id',
+                'preview_data.*.emoluments' => 'required|array',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Save emoluments
+            $excelService = new \App\Services\PayGradeExcelService();
+            $result = $excelService->saveEmoluments($request->preview_data);
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message']
+                ], 400);
+            }
+
+            return response()->json([
+                'success' => true,
+                'updated_count' => $result['updated_count'],
+                'message' => $result['message']
+            ]);
+        } catch (\Exception $e) {
+            Log::error('SalaryStructureController::confirmBulkEmoluments error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error saving emoluments: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Load universal template into a specific pay grade
+     * 
+     * Loads the 11 universal payroll components with zero amounts
+     * User can then edit amounts manually
+     * 
+     * @param int $id Pay Grade ID
+     * @return \Illuminate\Http\JsonResponse Success/failure response
+     */
+    public function loadUniversalTemplate($id)
+    {
+        try {
+            $payGrade = PayGradeStructure::find($id);
+
+            if (!$payGrade) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pay grade not found'
+                ], 404);
+            }
+
+            // Load universal template
+            $excelService = new \App\Services\PayGradeExcelService();
+            $result = $excelService->loadUniversalTemplate($id);
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message']
+                ], 400);
+            }
+
+            // Reload pay grade with updated emoluments
+            $payGrade->refresh();
+
+            return response()->json([
+                'success' => true,
+                'data' => $payGrade,
+                'components_loaded' => $result['components_loaded'],
+                'message' => $result['message']
+            ]);
+        } catch (\Exception $e) {
+            Log::error('SalaryStructureController::loadUniversalTemplate error: ' . $e->getMessage(), [
+                'pay_grade_id' => $id,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error loading template: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
