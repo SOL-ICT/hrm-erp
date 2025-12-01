@@ -136,7 +136,7 @@ const recruitmentRequestAPI = {
     try {
       const payload = { reason: reason };
       console.log(`Closing request ${id} with payload:`, payload);
-      
+
       const response = await apiService.makeRequest(
         `/recruitment-requests/${id}/close`,
         {
@@ -160,8 +160,8 @@ const recruitmentRequestAPI = {
         `/recruitment-requests/${id}/reopen`,
         {
           method: "POST",
-          body: JSON.stringify({ 
-            reason: reason
+          body: JSON.stringify({
+            reason: reason,
           }),
         }
       );
@@ -417,6 +417,66 @@ const recruitmentRequestAPI = {
       return { success: true };
     } catch (error) {
       console.error("Failed to export recruitment requests:", error);
+      throw error;
+    }
+  },
+
+  // ========================================
+  // ASSIGNMENT & PERMISSIONS (Task 3.2)
+  // ========================================
+
+  /**
+   * Get list of users that can be assigned recruitment tickets
+   */
+  getAssignableUsers: async () => {
+    try {
+      const response = await apiService.makeRequest(
+        "/recruitment-requests/assignable-users",
+        {
+          method: "GET",
+        }
+      );
+      return response;
+    } catch (error) {
+      console.error("Failed to fetch assignable users:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get current user's recruitment permissions
+   */
+  getMyPermissions: async () => {
+    try {
+      const response = await apiService.makeRequest(
+        "/recruitment-hierarchy/my-permissions",
+        {
+          method: "GET",
+        }
+      );
+      return response;
+    } catch (error) {
+      console.error("Failed to fetch my permissions:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Assign or reassign a recruitment ticket to a user
+   * Task 3.3: TicketAssignmentModal
+   */
+  assignTicket: async (requestId, data) => {
+    try {
+      const response = await apiService.makeRequest(
+        `/recruitment-requests/${requestId}/assign`,
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+        }
+      );
+      return response;
+    } catch (error) {
+      console.error(`Failed to assign ticket ${requestId}:`, error);
       throw error;
     }
   },

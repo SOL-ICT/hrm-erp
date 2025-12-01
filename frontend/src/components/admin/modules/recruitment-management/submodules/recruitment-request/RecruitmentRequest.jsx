@@ -16,10 +16,14 @@ import {
   X,
   Save,
   RefreshCw,
+  UserPlus,
+  Info,
+  UserCheck,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import recruitmentRequestAPI from "@/services/modules/recruitment-management/recruitmentRequestAPI";
 import clientMasterAPI from "@/services/modules/client-contract-management/clientMasterAPI";
+import TicketAssignmentModal from "./modals/TicketAssignmentModal";
 
 const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
   const { user } = useAuth();
@@ -63,6 +67,10 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
     description: "",
     special_requirements: "",
     priority_level: "medium",
+
+    // Task 3.2: Assignment fields
+    assigned_to: "",
+    assignment_notes: "",
   });
 
   // Data state
@@ -76,22 +84,38 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
     sol_office_code: "",
   });
 
+  // Task 3.2: Assignment & Permissions
+  const [assignableUsers, setAssignableUsers] = useState([]);
+  const [userPermissions, setUserPermissions] = useState({
+    can_create_request: false,
+    can_approve_request: false,
+    can_assign_ticket: false,
+    can_board_without_approval: false,
+    can_approve_boarding: false,
+  });
+
   // UI state
   const [nextTicketId, setNextTicketId] = useState("");
   const [errors, setErrors] = useState({});
   const [activeTab, setActiveTab] = useState("form");
   const [editingRequest, setEditingRequest] = useState(null);
   const [closeModalOpen, setCloseModalOpen] = useState(false);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [selectedRequestForAssignment, setSelectedRequestForAssignment] =
+    useState(null);
   const [closeReason, setCloseReason] = useState("");
   const [customCloseReason, setCustomCloseReason] = useState("");
   const [requestToClose, setRequestToClose] = useState(null);
-  
+
   // Reopen functionality states
   const [reopenModalOpen, setReopenModalOpen] = useState(false);
   const [reopenReason, setReopenReason] = useState("");
   const [customReopenReason, setCustomReopenReason] = useState("");
   const [requestToReopen, setRequestToReopen] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Filter state
+  const [showAssignedToMe, setShowAssignedToMe] = useState(false);
 
   // ========================================
   // LIFECYCLE & DATA FETCHING
@@ -102,6 +126,8 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
     fetchNextTicketId();
     fetchDashboardData();
     fetchRecruitmentRequests();
+    fetchUserPermissions(); // Task 3.2
+    fetchAssignableUsers(); // Task 3.2
 
     // Cleanup function to cancel pending requests
     return () => {
@@ -180,6 +206,31 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
     }
   };
 
+  // Task 3.2: Fetch user permissions
+  const fetchUserPermissions = async () => {
+    try {
+      const response = await recruitmentRequestAPI.getMyPermissions();
+      if (response.success && response.data) {
+        setUserPermissions(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch user permissions:", error);
+    }
+  };
+
+  // Task 3.2: Fetch assignable users
+  const fetchAssignableUsers = async () => {
+    try {
+      const response = await recruitmentRequestAPI.getAssignableUsers();
+      if (response.success && response.data) {
+        setAssignableUsers(Array.isArray(response.data) ? response.data : []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch assignable users:", error);
+      setAssignableUsers([]);
+    }
+  };
+
   const fetchJobStructures = async (clientId) => {
     try {
       const response = await recruitmentRequestAPI.getJobStructuresByClient(
@@ -225,7 +276,7 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
       setLoading(true);
       const response = await recruitmentRequestAPI.getDashboard({
         year: new Date().getFullYear(),
-        _t: Date.now() // Cache buster
+        _t: Date.now(), // Cache buster
       });
 
       if (response.success && response.data?.stats) {
@@ -249,7 +300,7 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
         limit: 10,
         sort: "created_at",
         order: "desc",
-        _t: Date.now() // Cache buster
+        _t: Date.now(), // Cache buster
       });
 
       if (response.success && response.data) {
@@ -273,8 +324,15 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
   // ========================================
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type } = e.target;
+
+    // Parse numeric inputs to integers to avoid off-by-one issues
+    let parsedValue = value;
+    if (type === "number") {
+      parsedValue = value === "" ? "" : parseInt(value, 10);
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: parsedValue }));
 
     // Clear specific error when user starts typing
     if (errors[name]) {
@@ -399,6 +457,8 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
           description: "",
           special_requirements: "",
           priority_level: "medium",
+          assigned_to: "", // Task 3.2
+          assignment_notes: "", // Task 3.2
         });
 
         // Clear editing state
@@ -525,14 +585,14 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
   // Handle close request
   const handleCloseRequest = async (request) => {
     console.log("🔴 handleCloseRequest called with:", request);
-    
+
     // If called from the close button in dashboard, show modal
     if (request) {
       setRequestToClose(request);
       setCloseModalOpen(true);
       return;
     }
-    
+
     // If called from the modal confirm button, actually close the request
     if (!requestToClose || !closeReason.trim()) {
       console.log("Validation failed:", { requestToClose, closeReason });
@@ -543,18 +603,19 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
     console.log("About to close request:", {
       requestToClose: requestToClose,
       closeReason: closeReason,
-      customCloseReason: customCloseReason
+      customCloseReason: customCloseReason,
     });
 
     try {
       setActionLoading(true);
-      const finalReason = closeReason === "other" ? customCloseReason : closeReason;
-      
+      const finalReason =
+        closeReason === "other" ? customCloseReason : closeReason;
+
       console.log("Sending close request with data:", {
         id: requestToClose.id,
-        reason: finalReason
+        reason: finalReason,
       });
-      
+
       const response = await recruitmentRequestAPI.close(
         requestToClose.id,
         finalReason
@@ -568,8 +629,8 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
         setRequestToClose(null);
         setCloseReason("");
         setCustomCloseReason("");
-        
-        // Force refresh the data  
+
+        // Force refresh the data
         console.log("Refreshing data after close...");
         await fetchRecruitmentRequests(); // Refresh the list
         await fetchDashboardData(); // Refresh stats
@@ -596,7 +657,7 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
       setReopenModalOpen(true);
       return;
     }
-    
+
     // If called from the modal confirm button, actually reopen the request
     if (!requestToReopen || !reopenReason.trim()) {
       alert("Please provide a reason for reopening this request.");
@@ -605,8 +666,9 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
 
     try {
       setActionLoading(true);
-      const finalReason = reopenReason === "other" ? customReopenReason : reopenReason;
-      
+      const finalReason =
+        reopenReason === "other" ? customReopenReason : reopenReason;
+
       const response = await recruitmentRequestAPI.reopen(
         requestToReopen.id,
         finalReason
@@ -620,12 +682,12 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
         setRequestToReopen(null);
         setReopenReason("");
         setCustomReopenReason("");
-        
+
         // Force refresh the data
         console.log("Refreshing data after reopen...");
         try {
           await fetchRecruitmentRequests(); // Refresh the list
-          await fetchDashboardData(); // Refresh stats  
+          await fetchDashboardData(); // Refresh stats
           console.log("Data refreshed successfully after reopen");
         } catch (refreshError) {
           console.error("Error refreshing data after reopen:", refreshError);
@@ -642,6 +704,20 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  // Handle assign ticket
+  const handleAssignTicket = (request) => {
+    setSelectedRequestForAssignment(request);
+    setAssignModalOpen(true);
+  };
+
+  const handleAssignmentSuccess = async () => {
+    setAssignModalOpen(false);
+    setSelectedRequestForAssignment(null);
+    // Refresh the data
+    await fetchRecruitmentRequests();
+    await fetchDashboardData();
   };
 
   // ========================================
@@ -703,7 +779,9 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
               ))}
           </select>
           {errors.job_structure_id && (
-            <p className="text-red-500 text-sm mt-1">{errors.job_structure_id}</p>
+            <p className="text-red-500 text-sm mt-1">
+              {errors.job_structure_id}
+            </p>
           )}
         </div>
       </div>
@@ -1081,6 +1159,145 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
   );
 
   // ========================================
+  // TASK 3.2: ASSIGNMENT SECTION
+  // ========================================
+
+  const renderUserPermissions = () => {
+    const permissions = [
+      {
+        key: "can_create_request",
+        label: "Create Requests",
+        enabled: userPermissions.can_create_request,
+      },
+      {
+        key: "can_approve_request",
+        label: "Approve Requests",
+        enabled: userPermissions.can_approve_request,
+      },
+      {
+        key: "can_assign_ticket",
+        label: "Assign Tickets",
+        enabled: userPermissions.can_assign_ticket,
+      },
+      {
+        key: "can_board_without_approval",
+        label: "Board Without Approval",
+        enabled: userPermissions.can_board_without_approval,
+      },
+      {
+        key: "can_approve_boarding",
+        label: "Approve Boarding",
+        enabled: userPermissions.can_approve_boarding,
+      },
+    ];
+
+    const enabledPermissions = permissions.filter((p) => p.enabled);
+
+    if (enabledPermissions.length === 0) {
+      return null; // Don't show if no permissions
+    }
+
+    return (
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="flex items-start space-x-3">
+          <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="font-medium text-blue-900 mb-2">
+              Your Recruitment Permissions:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {enabledPermissions.map((perm) => (
+                <span
+                  key={perm.key}
+                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                >
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  {perm.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderFormSection4 = () => {
+    // Only show assignment section if user has permission to assign tickets
+    if (!userPermissions.can_assign_ticket) {
+      return null;
+    }
+
+    return (
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
+        <div className="flex items-center space-x-2 mb-4 border-b pb-2">
+          <UserPlus className="w-5 h-5 text-blue-600" />
+          <h3 className="text-lg font-semibold text-gray-800">
+            Section 4: Ticket Assignment (Optional)
+          </h3>
+        </div>
+
+        {/* Info banner */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 flex items-start space-x-3">
+          <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-blue-800">
+            <p className="font-medium mb-1">Assignment Feature</p>
+            <p>
+              You can assign this recruitment ticket to another user who will be
+              responsible for boarding the staff. The assigned user will need
+              your approval before staff can be marked as active.
+            </p>
+          </div>
+        </div>
+
+        {/* Assign To */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Assign Ticket To
+          </label>
+          <select
+            name="assigned_to"
+            value={formData.assigned_to}
+            onChange={handleInputChange}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">-- Leave Unassigned --</option>
+            {assignableUsers.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.first_name} {user.last_name} ({user.role_name})
+                {user.department && ` - ${user.department}`}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Optional: Select a user to assign this recruitment ticket to
+          </p>
+        </div>
+
+        {/* Assignment Notes (only show if user selected) */}
+        {formData.assigned_to && (
+          <div className="mb-4 animate-fadeIn">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Assignment Notes
+            </label>
+            <textarea
+              name="assignment_notes"
+              value={formData.assignment_notes}
+              onChange={handleInputChange}
+              rows="3"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Add any instructions or notes for the assigned user..."
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Provide context or instructions for the assigned user
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ========================================
   // RENDER DASHBOARD VIEW
   // ========================================
 
@@ -1219,9 +1436,31 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
                   <Search className="w-5 h-5" />
                 </button>
                 <button
-                  className={`p-2 ${currentTheme.hover} rounded-lg ${currentTheme.textSecondary}`}
+                  onClick={() => setShowAssignedToMe(!showAssignedToMe)}
+                  className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
+                    showAssignedToMe
+                      ? "bg-purple-600 text-white hover:bg-purple-700"
+                      : `${currentTheme.hover} ${currentTheme.textSecondary}`
+                  }`}
+                  title={
+                    showAssignedToMe
+                      ? "Show All Tickets"
+                      : "Show My Assigned Tickets"
+                  }
                 >
-                  <Filter className="w-5 h-5" />
+                  <UserCheck className="w-5 h-5" />
+                  <span className="text-sm font-medium">
+                    {showAssignedToMe ? "My Tickets" : "All Tickets"}
+                  </span>
+                  {showAssignedToMe && (
+                    <span className="ml-1 bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full">
+                      {
+                        recruitmentRequests.filter(
+                          (r) => r.assigned_to === user?.id
+                        ).length
+                      }
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
@@ -1252,128 +1491,179 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className={`border-b ${currentTheme.border}`}>
-                      <th
-                        className={`text-left py-3 px-4 font-medium ${currentTheme.textSecondary}`}
-                      >
-                        Request ID
-                      </th>
-                      <th
-                        className={`text-left py-3 px-4 font-medium ${currentTheme.textSecondary}`}
-                      >
-                        Client
-                      </th>
-                      <th
-                        className={`text-left py-3 px-4 font-medium ${currentTheme.textSecondary}`}
-                      >
-                        Position
-                      </th>
-                      <th
-                        className={`text-left py-3 px-4 font-medium ${currentTheme.textSecondary}`}
-                      >
-                        Vacancies
-                      </th>
-                      <th
-                        className={`text-left py-3 px-4 font-medium ${currentTheme.textSecondary}`}
-                      >
-                        Status
-                      </th>
-                      <th
-                        className={`text-left py-3 px-4 font-medium ${currentTheme.textSecondary}`}
-                      >
-                        Created
-                      </th>
-                      <th
-                        className={`text-left py-3 px-4 font-medium ${currentTheme.textSecondary}`}
-                      >
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recruitmentRequests.map((request) => (
-                      <tr
-                        key={request.id}
-                        className={`border-b ${currentTheme.border} hover:${currentTheme.hover}`}
-                      >
-                        <td
-                          className={`py-3 px-4 ${currentTheme.textPrimary} font-mono text-sm`}
+                {(() => {
+                  // Apply filter
+                  const displayedRequests = showAssignedToMe
+                    ? recruitmentRequests.filter(
+                        (r) => r.assigned_to === user?.id
+                      )
+                    : recruitmentRequests;
+
+                  // Show empty state if filter results in no tickets
+                  if (displayedRequests.length === 0) {
+                    return (
+                      <div className="text-center py-8">
+                        <UserCheck
+                          className={`w-12 h-12 ${currentTheme.textMuted} mx-auto mb-4`}
+                        />
+                        <p className={`${currentTheme.textSecondary} mb-2`}>
+                          No tickets assigned to you yet
+                        </p>
+                        <button
+                          onClick={() => setShowAssignedToMe(false)}
+                          className="text-blue-600 hover:text-blue-700 text-sm"
                         >
-                          {request.ticket_id || `RR-${request.id}`}
-                        </td>
-                        <td className={`py-3 px-4 ${currentTheme.textPrimary}`}>
-                          {request.client?.organisation_name || "N/A"}
-                        </td>
-                        <td className={`py-3 px-4 ${currentTheme.textPrimary}`}>
-                          {request.job_structure?.job_title || "N/A"}
-                        </td>
-                        <td className={`py-3 px-4 ${currentTheme.textPrimary}`}>
-                          {request.number_of_vacancies || 1}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              request.status === "active"
-                                ? "bg-green-100 text-green-800"
-                                : request.status === "closed"
-                                ? "bg-gray-100 text-gray-800"
-                                : "bg-yellow-100 text-yellow-800"
-                            }`}
+                          View all tickets
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <table className="w-full">
+                      <thead>
+                        <tr className={`border-b ${currentTheme.border}`}>
+                          <th
+                            className={`text-left py-3 px-4 font-medium ${currentTheme.textSecondary}`}
                           >
-                            {request.status || "pending"}
-                          </span>
-                        </td>
-                        <td
-                          className={`py-3 px-4 ${currentTheme.textSecondary} text-sm`}
-                        >
-                          {request.created_at
-                            ? new Date(request.created_at).toLocaleDateString()
-                            : "N/A"}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditRequest(request);
-                              }}
-                              className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
-                              title="Edit Request"
+                            Request ID
+                          </th>
+                          <th
+                            className={`text-left py-3 px-4 font-medium ${currentTheme.textSecondary}`}
+                          >
+                            Client
+                          </th>
+                          <th
+                            className={`text-left py-3 px-4 font-medium ${currentTheme.textSecondary}`}
+                          >
+                            Position
+                          </th>
+                          <th
+                            className={`text-left py-3 px-4 font-medium ${currentTheme.textSecondary}`}
+                          >
+                            Vacancies
+                          </th>
+                          <th
+                            className={`text-left py-3 px-4 font-medium ${currentTheme.textSecondary}`}
+                          >
+                            Status
+                          </th>
+                          <th
+                            className={`text-left py-3 px-4 font-medium ${currentTheme.textSecondary}`}
+                          >
+                            Created
+                          </th>
+                          <th
+                            className={`text-left py-3 px-4 font-medium ${currentTheme.textSecondary}`}
+                          >
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayedRequests.map((request) => (
+                          <tr
+                            key={request.id}
+                            className={`border-b ${currentTheme.border} hover:${currentTheme.hover}`}
+                          >
+                            <td
+                              className={`py-3 px-4 ${currentTheme.textPrimary} font-mono text-sm`}
                             >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            {request.status === "active" && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCloseRequest(request);
-                                }}
-                                className="p-1 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors"
-                                title="Close Request"
+                              {request.ticket_id || `RR-${request.id}`}
+                            </td>
+                            <td
+                              className={`py-3 px-4 ${currentTheme.textPrimary}`}
+                            >
+                              {request.client?.organisation_name || "N/A"}
+                            </td>
+                            <td
+                              className={`py-3 px-4 ${currentTheme.textPrimary}`}
+                            >
+                              {request.job_structure?.job_title || "N/A"}
+                            </td>
+                            <td
+                              className={`py-3 px-4 ${currentTheme.textPrimary}`}
+                            >
+                              {request.number_of_vacancies || 1}
+                            </td>
+                            <td className="py-3 px-4">
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                  request.status === "active"
+                                    ? "bg-green-100 text-green-800"
+                                    : request.status === "closed"
+                                    ? "bg-gray-100 text-gray-800"
+                                    : "bg-yellow-100 text-yellow-800"
+                                }`}
                               >
-                                <X className="w-4 h-4" />
-                              </button>
-                            )}
-                            {request.status === "closed" && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleReopenRequest(request);
-                                }}
-                                className="p-1 text-green-600 hover:text-green-800 hover:bg-green-100 rounded transition-colors"
-                                title="Reopen Request"
-                              >
-                                <RefreshCw className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                                {request.status || "pending"}
+                              </span>
+                            </td>
+                            <td
+                              className={`py-3 px-4 ${currentTheme.textSecondary} text-sm`}
+                            >
+                              {request.created_at
+                                ? new Date(
+                                    request.created_at
+                                  ).toLocaleDateString()
+                                : "N/A"}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditRequest(request);
+                                  }}
+                                  className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
+                                  title="Edit Request"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                {request.status === "active" && (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleAssignTicket(request);
+                                      }}
+                                      className="p-1 text-purple-600 hover:text-purple-800 hover:bg-purple-100 rounded transition-colors"
+                                      title="Assign Ticket"
+                                    >
+                                      <UserCheck className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCloseRequest(request);
+                                      }}
+                                      className="p-1 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors"
+                                      title="Close Request"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                )}
+                                {request.status === "closed" && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleReopenRequest(request);
+                                    }}
+                                    className="p-1 text-green-600 hover:text-green-800 hover:bg-green-100 rounded transition-colors"
+                                    title="Reopen Request"
+                                  >
+                                    <RefreshCw className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -1385,20 +1675,20 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
   // ========================================
   // CLOSE MODAL COMPONENT
   // ========================================
-  
+
   const renderCloseModal = () => {
     if (!closeModalOpen) {
       return null;
     }
-    
+
     const closeReasons = [
       { value: "expired", label: "Expired recruitment period" },
       { value: "fulfilled", label: "Position fulfilled" },
       { value: "cancelled", label: "Recruitment cancelled" },
       { value: "budget_constraints", label: "Budget constraints" },
-      { value: "other", label: "Other (specify below)" }
+      { value: "other", label: "Other (specify below)" },
     ];
-    
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 shadow-xl">
@@ -1417,23 +1707,28 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
               <X className="w-5 h-5" />
             </button>
           </div>
-          
+
           <div className="mb-6">
             <p className="text-gray-600 mb-4">
               Are you sure you want to close this recruitment request?
             </p>
-            
+
             {requestToClose && (
               <div className="bg-gray-50 p-3 rounded-md mb-4">
                 <p className="text-sm font-medium text-gray-900">
-                  Request: {requestToClose.position_title || requestToClose.job_structure?.job_title || "Unknown Position"}
+                  Request:{" "}
+                  {requestToClose.position_title ||
+                    requestToClose.job_structure?.job_title ||
+                    "Unknown Position"}
                 </p>
                 <p className="text-sm text-gray-600">
-                  Ticket ID: {requestToClose.ticket_id || (requestToClose.id ? `RR-${requestToClose.id}` : "Unknown")}
+                  Ticket ID:{" "}
+                  {requestToClose.ticket_id ||
+                    (requestToClose.id ? `RR-${requestToClose.id}` : "Unknown")}
                 </p>
               </div>
             )}
-            
+
             {/* Close Reason Selection */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1450,17 +1745,20 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
                       onChange={(e) => setCloseReason(e.target.value)}
                       className="mr-2 text-blue-600"
                     />
-                    <span className="text-sm text-gray-700">{reason.label}</span>
+                    <span className="text-sm text-gray-700">
+                      {reason.label}
+                    </span>
                   </label>
                 ))}
               </div>
             </div>
-            
+
             {/* Custom Reason Input */}
             {closeReason === "other" && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Please specify the reason <span className="text-red-500">*</span>
+                  Please specify the reason{" "}
+                  <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={customCloseReason}
@@ -1471,12 +1769,13 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
                 />
               </div>
             )}
-            
+
             <p className="text-sm text-red-600">
-              This action will close the request but it can be reopened later if needed.
+              This action will close the request but it can be reopened later if
+              needed.
             </p>
           </div>
-          
+
           <div className="flex items-center justify-end space-x-3">
             <button
               onClick={() => {
@@ -1491,13 +1790,33 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
             </button>
             <button
               onClick={() => handleCloseRequest()}
-              disabled={actionLoading || !closeReason || (closeReason === "other" && !customCloseReason.trim())}
+              disabled={
+                actionLoading ||
+                !closeReason ||
+                (closeReason === "other" && !customCloseReason.trim())
+              }
               className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
               {actionLoading && (
-                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <svg
+                  className="animate-spin h-4 w-4"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
                 </svg>
               )}
               <span>{actionLoading ? "Closing..." : "Close Request"}</span>
@@ -1511,21 +1830,24 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
   // ========================================
   // REOPEN MODAL COMPONENT
   // ========================================
-  
+
   const renderReopenModal = () => {
     if (!reopenModalOpen) {
       return null;
     }
-    
+
     const reopenReasons = [
       { value: "additional_positions", label: "Additional positions needed" },
       { value: "candidate_declined", label: "Selected candidate declined" },
-      { value: "candidate_unsuitable", label: "Selected candidate proved unsuitable" },
+      {
+        value: "candidate_unsuitable",
+        label: "Selected candidate proved unsuitable",
+      },
       { value: "business_expansion", label: "Business expansion requirements" },
       { value: "urgent_requirement", label: "Urgent business requirement" },
-      { value: "other", label: "Other (specify below)" }
+      { value: "other", label: "Other (specify below)" },
     ];
-    
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 shadow-xl">
@@ -1544,26 +1866,31 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
               <X className="w-5 h-5" />
             </button>
           </div>
-          
+
           <div className="mb-6">
             <p className="text-gray-600 mb-4">
               Are you sure you want to reopen this recruitment request?
             </p>
-            
+
             {requestToReopen && (
               <div className="bg-gray-50 p-3 rounded-md mb-4">
                 <p className="text-sm font-medium text-gray-900">
-                  Request: {requestToReopen.position_title || requestToReopen.job_structure?.job_title || "Unknown Position"}
+                  Request:{" "}
+                  {requestToReopen.position_title ||
+                    requestToReopen.job_structure?.job_title ||
+                    "Unknown Position"}
                 </p>
                 <p className="text-sm text-gray-600">
-                  Ticket ID: {requestToReopen.ticket_id || (requestToReopen.id ? `RR-${requestToReopen.id}` : "Unknown")}
+                  Ticket ID:{" "}
+                  {requestToReopen.ticket_id ||
+                    (requestToReopen.id
+                      ? `RR-${requestToReopen.id}`
+                      : "Unknown")}
                 </p>
-                <p className="text-sm text-red-600">
-                  Current Status: Closed
-                </p>
+                <p className="text-sm text-red-600">Current Status: Closed</p>
               </div>
             )}
-            
+
             {/* Reopen Reason Selection */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1580,17 +1907,20 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
                       onChange={(e) => setReopenReason(e.target.value)}
                       className="mr-2 text-green-600"
                     />
-                    <span className="text-sm text-gray-700">{reason.label}</span>
+                    <span className="text-sm text-gray-700">
+                      {reason.label}
+                    </span>
                   </label>
                 ))}
               </div>
             </div>
-            
+
             {/* Custom Reason Input */}
             {reopenReason === "other" && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Please specify the reason <span className="text-red-500">*</span>
+                  Please specify the reason{" "}
+                  <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={customReopenReason}
@@ -1601,12 +1931,13 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
                 />
               </div>
             )}
-            
+
             <p className="text-sm text-green-600">
-              This will reactivate the recruitment request and make it available for new applications.
+              This will reactivate the recruitment request and make it available
+              for new applications.
             </p>
           </div>
-          
+
           <div className="flex items-center justify-end space-x-3">
             <button
               onClick={() => {
@@ -1621,13 +1952,33 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
             </button>
             <button
               onClick={() => handleReopenRequest()}
-              disabled={actionLoading || !reopenReason || (reopenReason === "other" && !customReopenReason.trim())}
+              disabled={
+                actionLoading ||
+                !reopenReason ||
+                (reopenReason === "other" && !customReopenReason.trim())
+              }
               className="px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
               {actionLoading && (
-                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <svg
+                  className="animate-spin h-4 w-4"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
                 </svg>
               )}
               <span>{actionLoading ? "Reopening..." : "Reopen Request"}</span>
@@ -1646,7 +1997,7 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
     <>
       {/* Dashboard View */}
       {currentView === "dashboard" && renderDashboardView()}
-      
+
       {/* Form View */}
       {currentView === "form" && (
         <div className={`p-6 ${currentTheme.bg} min-h-screen`}>
@@ -1657,10 +2008,14 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
                 onClick={handleCancel}
                 className={`p-2 ${currentTheme.hover} rounded-lg transition-colors ${currentTheme.textSecondary}`}
               >
-                <ArrowLeft className={`w-5 h-5 ${currentTheme.textSecondary}`} />
+                <ArrowLeft
+                  className={`w-5 h-5 ${currentTheme.textSecondary}`}
+                />
               </button>
               <div>
-                <h1 className={`text-2xl font-bold ${currentTheme.textPrimary}`}>
+                <h1
+                  className={`text-2xl font-bold ${currentTheme.textPrimary}`}
+                >
                   {editingRequest
                     ? "Edit Recruitment Request"
                     : "Create Recruitment Request"}
@@ -1686,12 +2041,15 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
             </div>
           </div>
 
+          {/* Task 3.2: User Permissions Display */}
+          {renderUserPermissions()}
+
           {/* Form Content */}
           <form onSubmit={handleSubmit} className="max-w-6xl mx-auto">
             {renderFormSection1()}
             {renderFormSection2()}
             {renderFormSection3()}
-
+            {renderFormSection4()} {/* Task 3.2: Assignment section */}
             {/* Submit Button */}
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
               <div className="flex items-center justify-end space-x-4">
@@ -1749,9 +2107,22 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
 
       {/* Close Modal - Always render regardless of view */}
       {renderCloseModal()}
-      
+
       {/* Reopen Modal - Always render regardless of view */}
       {renderReopenModal()}
+
+      {/* Ticket Assignment Modal */}
+      {assignModalOpen && selectedRequestForAssignment && (
+        <TicketAssignmentModal
+          isOpen={assignModalOpen}
+          onClose={() => {
+            setAssignModalOpen(false);
+            setSelectedRequestForAssignment(null);
+          }}
+          recruitmentRequest={selectedRequestForAssignment}
+          onSuccess={handleAssignmentSuccess}
+        />
+      )}
     </>
   );
 };

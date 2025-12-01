@@ -13,25 +13,24 @@ class StaffPersonalInfo extends Model
 
     protected $fillable = [
         'staff_id',
-        'date_of_birth',
-        'gender',
+        'middle_name',
         'marital_status',
         'nationality',
         'state_of_origin',
-        'lga_of_origin',
-        'residential_address',
+        'local_government_of_origin',
+        'current_address',
         'permanent_address',
-        'next_of_kin_name',
-        'next_of_kin_phone',
-        'next_of_kin_relationship',
-        'emergency_contact_name',
-        'emergency_contact_phone',
+        'nearby_landmark',
+        'mobile_phone',
+        'personal_email',
         'blood_group',
-        'genotype'
+        'state_of_residence',
+        'lga_of_residence',
+        'country'
     ];
 
     protected $casts = [
-        'date_of_birth' => 'date',
+        // date_of_birth removed - it's in staff table, not here
     ];
 
     /**

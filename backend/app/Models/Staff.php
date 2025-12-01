@@ -51,13 +51,26 @@ class Staff extends Model
         'designation',
         'position',
         'hire_date',
-        'salary'
+        'salary',
+        // Recruitment Boarding Enhancement
+        'recruitment_request_id',
+        'boarding_approval_status',
+        'approved_by',
+        'approved_at',
+        'control_approved_by',
+        'control_approved_at',
+        'offer_letter_sent_at',
+        'offer_already_accepted'
     ];
 
     protected $casts = [
         'hire_date' => 'date',
         'salary' => 'decimal:2',
-        'salary_effective_date' => 'datetime' // Phase 3.1
+        'salary_effective_date' => 'datetime', // Phase 3.1
+        'approved_at' => 'datetime',
+        'control_approved_at' => 'datetime',
+        'offer_letter_sent_at' => 'datetime',
+        'offer_already_accepted' => 'boolean'
     ];
 
     // Note to self - This can be expanded later
@@ -119,6 +132,27 @@ class Staff extends Model
     public function references()
     {
         return $this->hasMany(StaffReference::class);
+    }
+
+    // Recruitment Boarding Enhancement Relationships
+    public function recruitmentRequest()
+    {
+        return $this->belongsTo(RecruitmentRequest::class);
+    }
+
+    public function approvedBy()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function controlApprovedBy()
+    {
+        return $this->belongsTo(User::class, 'control_approved_by');
+    }
+
+    public function onboardedBy()
+    {
+        return $this->belongsTo(User::class, 'onboarded_by');
     }
 
     /**

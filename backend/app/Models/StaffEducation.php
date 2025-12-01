@@ -13,17 +13,22 @@ class StaffEducation extends Model
 
     protected $fillable = [
         'staff_id',
-        'institution',
-        'qualification',
-        'field_of_study',
+        'institution_name',
+        'certificate_type',
+        'specialization',
         'start_year',
         'end_year',
-        'grade'
+        'graduation_year',
+        'score_class',
+        'year_obtained',
+        'education_order'
     ];
 
     protected $casts = [
         'start_year' => 'integer',
         'end_year' => 'integer',
+        'graduation_year' => 'integer',
+        'year_obtained' => 'integer'
     ];
 
     /**

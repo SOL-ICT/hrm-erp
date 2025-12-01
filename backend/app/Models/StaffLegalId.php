@@ -13,12 +13,12 @@ class StaffLegalId extends Model
 
     protected $fillable = [
         'staff_id',
-        'nin',
-        'drivers_license',
-        'international_passport',
-        'voters_card',
-        'other_id_type',
-        'other_id_number'
+        'national_id_no',
+        'tax_id_no',
+        'pension_pin',
+        'pfa_name',
+        'bank_verification_no',
+        'nhf_account_no'
     ];
 
     /**

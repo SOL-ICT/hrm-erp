@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\TaxBracket;
 use App\Models\PayrollCalculationFormula;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Payroll Calculation Engine
@@ -22,16 +23,17 @@ use Illuminate\Support\Facades\DB;
  * 1. ANNUAL_GROSS - Sum of salary components
  * 2. ANNUAL_REIMBURSABLES - Sum of reimbursable components
  * 3. PENSIONABLE_AMOUNT - Sum of pensionable components
- * 4. MONTHLY_GROSS - (ANNUAL_GROSS / 12) × proration
- * 5. MONTHLY_REIMBURSABLES - (ANNUAL_REIMBURSABLES / 12) × proration
- * 6. CRA - Consolidated Relief Allowance (higher of 1% + ₦200k or 20% of gross, capped at ₦840k)
- * 7. TAXABLE_INCOME - (ANNUAL_GROSS × 0.95) - (PENSIONABLE × 0.08) - CRA
- * 8. PAYE - Progressive tax on taxable income
- * 9. PENSION - (PENSIONABLE / 12) × 0.08 × proration
- * 10. LEAVE_ALLOWANCE_DEDUCTION - (LEAVE / 12) × proration
- * 11. THIRTEENTH_MONTH_DEDUCTION - (13TH / 12) × proration
- * 12. NET_PAY - MONTHLY_GROSS - total_deductions
- * 13. CREDIT_TO_BANK - NET_PAY + MONTHLY_REIMBURSABLES
+ * 4. MONTHLY_GROSS - ANNUAL_GROSS / 12 (FULL monthly entitlement, NO proration)
+ * 5. MONTHLY_REIMBURSABLES - ANNUAL_REIMBURSABLES / 12 (FULL monthly, NO proration)
+ * 6. PRORATED_MONTHLY_GROSS - MONTHLY_GROSS × proration (for net pay calculation)
+ * 7. CRA - Consolidated Relief Allowance (NOT USED - removed from tax law)
+ * 8. TAXABLE_INCOME - (ANNUAL_GROSS × 0.95) - (PENSIONABLE × 0.08)
+ * 9. PAYE - Progressive tax on taxable income (monthly amount prorated)
+ * 10. PENSION - (PENSIONABLE / 12) × 0.08 × proration
+ * 11. LEAVE_ALLOWANCE_DEDUCTION - (LEAVE / 12) × proration
+ * 12. THIRTEENTH_MONTH_DEDUCTION - (13TH / 12) × proration
+ * 13. NET_PAY - PRORATED_MONTHLY_GROSS - total_deductions
+ * 14. CREDIT_TO_BANK - NET_PAY + PRORATED_MONTHLY_REIMBURSABLES
  */
 class PayrollCalculationEngine
 {
@@ -62,37 +64,56 @@ class PayrollCalculationEngine
         $annualReimbursables = $categorized['annual_reimbursables'];
         $pensionableAmount = $categorized['pensionable_amount'];
 
-        // Step 5: Calculate monthly amounts (prorated)
-        $monthlyGross = ($annualGross / 12) * $prorationFactor;
-        $monthlyReimbursables = ($annualReimbursables / 12) * $prorationFactor;
+        // Step 5: Calculate monthly amounts
+        // IMPORTANT: monthly_gross is the FULL monthly salary (not prorated)
+        // This is the staff's entitled monthly gross regardless of attendance
+        $monthlyGross = $annualGross / 12;
+        $monthlyReimbursables = $annualReimbursables / 12;
 
-        // Step 6: Calculate CRA (Consolidated Relief Allowance)
-        $cra = $this->calculateCRA($annualGross);
+        // Step 5b: Calculate PRORATED amounts for actual payment calculation
+        // These are used for deductions and net pay only
+        $proratedMonthlyGross = $monthlyGross * $prorationFactor;
+        $proratedMonthlyReimbursables = $monthlyReimbursables * $prorationFactor;
+
+        // Step 6: Calculate Rent Relief (replaces CRA under Nigeria Tax Act 2025)
+        // Formula: Lower of (20% × Annual Rent Paid) or NGN 500,000
+        // Get rates from payroll_settings (not hardcoded)
+        $annualRentPaid = $staff->annual_rent_paid ?? 0;
+        $rentReliefRate = $this->getPayrollSetting('RENT_RELIEF_RATE', 0.20, true); // Default 20%, stored as 20
+        $rentReliefCap = $this->getPayrollSetting('RENT_RELIEF_CAP', 500000, false); // Default NGN 500,000, not a percentage
+        $rentRelief = min(($annualRentPaid * $rentReliefRate), $rentReliefCap);
 
         // Step 7: Calculate taxable income (annual)
-        // Formula: (Annual Gross × 95%) - (Pensionable × 8%) - CRA
-        // Reference: payroll_settings.TAXABLE_INCOME_FORMULA
-        $grossIncome = $annualGross * 0.95; // 95% of gross (CRA relief)
-        $pensionRelief = $pensionableAmount * 0.08; // Pension contribution relief
-        $taxableIncome = $grossIncome - $pensionRelief - $cra;
+        // Formula (Nigeria Tax Act 2025): Annual Gross - Pension Relief - Rent Relief
+        // NO 5% gross income relief (does not exist in new act)
+        // Reference: Nigeria Tax Act 2025, Section on Chargeable Income
+        $pensionRate = $this->getPayrollSetting('PENSION_RATE', 0.08, true); // Default 8%, stored as 8
+        $pensionRelief = $pensionableAmount * $pensionRate; // Pension contribution relief
+        $taxableIncome = $annualGross - $pensionRelief - $rentRelief;
 
-        // Step 8: Calculate PAYE (progressive tax)
+        // Step 8: Calculate PAYE (progressive tax using 2025 brackets)
         $payeTax = $this->calculateProgressiveTax($taxableIncome, $year);
         $monthlyPaye = ($payeTax / 12) * $prorationFactor;
 
-        // Step 8: Calculate deductions (all prorated)
-        $pensionDeduction = ($pensionableAmount / 12) * 0.08 * $prorationFactor;
-        $leaveAllowanceDeduction = ($categorized['leave_allowance'] / 12) * $prorationFactor;
-        $thirteenthMonthDeduction = ($categorized['thirteenth_month'] / 12) * $prorationFactor;
-        $otherDeductions = 0.00; // Placeholder for future: loans, advances, etc.
+        // Step 9: Calculate deductions (all prorated)
+        // Use the same pension rate from settings (consistency is key)
+        // IMPORTANT: Round each deduction BEFORE summing to avoid cumulative rounding errors
+        $monthlyPayeRounded = round($monthlyPaye, 2);
+        $pensionDeductionRounded = round(($pensionableAmount / 12) * $pensionRate * $prorationFactor, 2);
+        $leaveAllowanceDeductionRounded = round(($categorized['leave_allowance'] / 12) * $prorationFactor, 2);
+        $thirteenthMonthDeductionRounded = round(($categorized['thirteenth_month'] / 12) * $prorationFactor, 2);
+        $otherDeductionsRounded = 0.00; // Placeholder for future: loans, advances, etc.
 
-        $totalDeductions = $monthlyPaye + $pensionDeduction + $leaveAllowanceDeduction + $thirteenthMonthDeduction + $otherDeductions;
+        // Calculate total deductions by summing ROUNDED values (avoids rounding errors)
+        $totalDeductions = $monthlyPayeRounded + $pensionDeductionRounded + $leaveAllowanceDeductionRounded + $thirteenthMonthDeductionRounded + $otherDeductionsRounded;
 
-        // Step 9: Calculate net pay
-        $netPay = $monthlyGross - $totalDeductions;
+        // Step 10: Calculate net pay using rounded values
+        // Net pay uses PRORATED gross (because if staff worked 20/30 days, they get prorated pay)
+        // Formula: Prorated Gross - Total Deductions (both already rounded to 2 decimals)
+        $netPay = round($proratedMonthlyGross, 2) - $totalDeductions;
 
-        // Step 10: Calculate credit to bank (net + reimbursables)
-        $creditToBank = $netPay + $monthlyReimbursables;
+        // Step 11: Calculate credit to bank (net + reimbursables)
+        $creditToBank = $netPay + $proratedMonthlyReimbursables;
 
         // Return complete calculation
         return [
@@ -116,21 +137,27 @@ class PayrollCalculationEngine
             'annual_reimbursables' => round($annualReimbursables, 2),
             'pensionable_amount' => round($pensionableAmount, 2),
 
-            // Monthly amounts (prorated)
-            'monthly_gross' => round($monthlyGross, 2),
+            // Monthly amounts (FULL - not prorated)
+            // This shows what the staff is entitled to for a full month
+            'monthly_gross' => round($monthlyGross, 2), // ← This is the FULL monthly gross
             'monthly_reimbursables' => round($monthlyReimbursables, 2),
 
-            // Tax calculation components
-            'consolidated_relief_allowance' => round($cra, 2), // CRA for audit trail
-            'taxable_income' => round($taxableIncome, 2),
-            'paye_tax' => round($monthlyPaye, 2),
+            // Prorated amounts (for actual payment calculation)
+            'prorated_monthly_gross' => round($proratedMonthlyGross, 2), // ← This is reduced by attendance
+            'prorated_monthly_reimbursables' => round($proratedMonthlyReimbursables, 2),
 
-            // Deductions
-            'pension_deduction' => round($pensionDeduction, 2),
-            'leave_allowance_deduction' => round($leaveAllowanceDeduction, 2),
-            'thirteenth_month_deduction' => round($thirteenthMonthDeduction, 2),
-            'other_deductions' => round($otherDeductions, 2),
-            'total_deductions' => round($totalDeductions, 2),
+            // Tax calculation components
+            'rent_relief' => round($rentRelief, 2), // Rent relief (replaces CRA)
+            'pension_relief' => round($pensionRelief, 2), // Pension relief
+            'taxable_income' => round($taxableIncome, 2),
+            'paye_tax' => $monthlyPayeRounded,
+
+            // Deductions (already rounded)
+            'pension_deduction' => $pensionDeductionRounded,
+            'leave_allowance_deduction' => $leaveAllowanceDeductionRounded,
+            'thirteenth_month_deduction' => $thirteenthMonthDeductionRounded,
+            'other_deductions' => $otherDeductionsRounded,
+            'total_deductions' => round($totalDeductions, 2), // Round final sum
 
             // Final amounts
             'net_pay' => round($netPay, 2),
@@ -153,9 +180,52 @@ class PayrollCalculationEngine
      * @param int $year - Tax year
      * @return float - Total PAYE tax
      */
+    /**
+     * Calculate progressive tax on taxable income
+     * 
+     * Nigerian PAYE Tax Calculation - Nigeria Tax Act 2025
+     * 
+     * Method:
+     * 1. Apply progressive tax brackets directly to full chargeable income
+     * 2. First NGN 800,000 is tax-free (0% band)
+     * 3. Excess taxed at marginal rates (15%, 18%, 21%, 23%, 25%)
+     * 
+     * IMPORTANT: This calculation is DYNAMIC and works for ANY income level
+     * - No hardcoded limits
+     * - Fetches tax brackets from database (configurable)
+     * - Works for salaries from ₦0 to ₦100,000,000+ monthly
+     * 
+     * Example (Low Income):
+     * - Chargeable Income: ₦600,000 → PAYE: ₦0 (fully within 0% band)
+     * 
+     * Example (Medium Income):
+     * - Chargeable Income: ₦1,356,227.32
+     * - Band 1 (0-800k @ 0%): ₦800,000 × 0% = ₦0
+     * - Band 2 (800k-3m @ 15%): ₦556,227.32 × 15% = ₦83,434.10
+     * - Total Annual PAYE: ₦83,434.10
+     * 
+     * Example (High Income):
+     * - Chargeable Income: ₦60,000,000 (₦5M/month)
+     * - Band 1 (0-800k @ 0%): ₦0
+     * - Band 2 (800k-3m @ 15%): ₦330,000
+     * - Band 3 (3m-12m @ 18%): ₦1,620,000
+     * - Band 4 (12m-25m @ 21%): ₦2,730,000
+     * - Band 5 (25m-50m @ 23%): ₦5,750,000
+     * - Band 6 (50m-60m @ 25%): ₦2,500,000
+     * - Total Annual PAYE: ₦12,930,000 (₦1,077,500/month)
+     * 
+     * @param float $taxableIncome Annual taxable (chargeable) income
+     * @param int|null $year Tax year (for bracket lookup)
+     * @return float Annual tax amount
+     */
     public function calculateProgressiveTax($taxableIncome, $year = null)
     {
         $year = $year ?? date('Y');
+
+        // If income is zero or negative, no tax
+        if ($taxableIncome <= 0) {
+            return 0;
+        }
 
         // Get active tax brackets for the year
         $brackets = TaxBracket::where('effective_from', '<=', "{$year}-12-31")
@@ -175,7 +245,7 @@ class PayrollCalculationEngine
         }
 
         $totalTax = 0;
-        $remainingIncome = $taxableIncome;
+        $remainingIncome = $taxableIncome; // Apply tax to FULL taxable income (no pre-deduction)
 
         foreach ($brackets as $bracket) {
             if ($remainingIncome <= 0) {
@@ -270,13 +340,13 @@ class PayrollCalculationEngine
             $allEmoluments[$code] = $amount;
 
             // Categorize by payroll_category
+            // CRITICAL: salary and allowance components count toward annual gross
+            // Reimbursables are separate (transport, meals paid after salary processing)
+            // Deductions tracked separately but STILL count toward gross (Leave/13th Month are paid but spread)
             switch ($emolument->payroll_category) {
                 case 'salary':
                 case 'allowance':
-                    // Add to annual gross (excludes reimbursables and deductions)
-                    if ($emolument->payroll_category !== 'reimbursable' && $emolument->payroll_category !== 'deduction') {
-                        $annualGross += $amount;
-                    }
+                    $annualGross += $amount;
                     break;
 
                 case 'reimbursable':
@@ -284,7 +354,11 @@ class PayrollCalculationEngine
                     break;
 
                 case 'deduction':
-                    // Track specific deductions
+                    // Deductions like Leave Allowance and 13th Month are PART OF GROSS
+                    // but are deducted monthly and paid back at specific times
+                    $annualGross += $amount;
+
+                    // Track specific deductions for monthly deduction calculation
                     if ($code === 'LEAVE_ALLOWANCE') {
                         $leaveAllowance = $amount;
                     } elseif ($code === 'THIRTEENTH_MONTH') {
@@ -425,7 +499,8 @@ class PayrollCalculationEngine
         }
 
         // Verify net pay calculation
-        $expectedNetPay = $calculation['monthly_gross'] - $calculation['total_deductions'];
+        // Net pay should be calculated from PRORATED gross (not full monthly gross)
+        $expectedNetPay = $calculation['prorated_monthly_gross'] - $calculation['total_deductions'];
 
         if (abs($expectedNetPay - $calculation['net_pay']) > 0.01) {
             $errors[] = 'Net pay calculation mismatch';
@@ -435,5 +510,73 @@ class PayrollCalculationEngine
             'valid' => empty($errors),
             'errors' => $errors,
         ];
+    }
+
+    /**
+     * Get payroll setting value from database
+     * 
+     * Helper method to fetch configurable rates/values from payroll_settings table
+     * This prevents hardcoding and allows system-wide configuration changes
+     * 
+     * @param string $key Setting key (e.g., 'PENSION_RATE', 'RENT_RELIEF_CAP')
+     * @param mixed $default Default value if setting not found
+     * @param bool $asPercentage If true, converts percentage values (e.g., 8 → 0.08)
+     * @return mixed Setting value or default
+     */
+    private function getPayrollSetting($key, $default = null, $asPercentage = false)
+    {
+        static $cache = [];
+
+        // Cache key includes the percentage flag
+        $cacheKey = $key . ($asPercentage ? '_pct' : '');
+
+        // Check cache first to avoid repeated DB queries
+        if (isset($cache[$cacheKey])) {
+            return $cache[$cacheKey];
+        }
+
+        try {
+            $setting = DB::table('payroll_settings')
+                ->where('setting_key', $key)
+                ->where('is_active', true)
+                ->first();
+
+            if ($setting) {
+                $value = json_decode($setting->setting_value, true);
+                $extractedValue = null;
+
+                // Handle different value formats
+                if (is_array($value)) {
+                    // Try common keys for rate/value
+                    if (isset($value['rate'])) {
+                        $extractedValue = (float) $value['rate'];
+                    } elseif (isset($value['employee_rate'])) {
+                        $extractedValue = (float) $value['employee_rate'];
+                    } elseif (isset($value['value'])) {
+                        $extractedValue = (float) $value['value'];
+                    } else {
+                        // If array has no recognizable key, use default
+                        $extractedValue = $default;
+                    }
+                } else {
+                    // Simple scalar value
+                    $extractedValue = is_numeric($value) ? (float) $value : $default;
+                }
+
+                // Convert percentage values if needed (8 → 0.08)
+                if ($asPercentage && $extractedValue !== null && $extractedValue > 1) {
+                    $extractedValue = $extractedValue / 100;
+                }
+
+                $cache[$cacheKey] = $extractedValue;
+                return $extractedValue;
+            }
+        } catch (\Exception $e) {
+            // If table doesn't exist or query fails, use default
+            Log::warning("PayrollSetting not found: {$key}, using default: {$default}");
+        }
+
+        $cache[$cacheKey] = $default;
+        return $default;
     }
 }

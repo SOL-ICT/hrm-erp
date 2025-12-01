@@ -1,0 +1,245 @@
+=============================================================================
+                    TAX CALCULATION BREAKDOWN REPORT
+                    FOR ACCOUNTING DEPARTMENT REVIEW
+=============================================================================
+
+Generated: November 25, 2025
+System: HRM Payroll Calculation Engine
+Purpose: Confirm tax calculation methodology with Accounting Department
+
+=============================================================================
+SECTION 1: TAX BRACKETS (CURRENTLY IN DATABASE)
+=============================================================================
+
+The system uses 6 progressive tax tiers:
+
+Tier 1: NGN 0 - NGN 300,000           = 0%   (Tax-free)
+Tier 2: NGN 300,000 - NGN 600,000     = 15%
+Tier 3: NGN 600,000 - NGN 1,100,000   = 18%
+Tier 4: NGN 1,100,000 - NGN 1,600,000 = 21%
+Tier 5: NGN 1,600,000 - NGN 3,200,000 = 23%
+Tier 6: NGN 3,200,000 and above       = 25%
+
+Effective Date: January 1, 2025
+
+NOTE: These brackets apply to the TAXABLE BALANCE after the NGN 840,000
+      tax relief (see Step 4 below).
+
+=============================================================================
+SECTION 2: TAX CALCULATION METHOD (STEP-BY-STEP)
+=============================================================================
+
+File Location: backend/app/Services/PayrollCalculationEngine.php
+Method: calculateProgressiveTax() - Lines 172-254
+
+STEP 1: Calculate Gross Income (5% Relief)
+────────────────────────────────────────────────────────────────
+Formula:    Gross Income = Annual Gross Salary × 95%
+Purpose:    Standard 5% gross income relief
+Example:    NGN 1,427,646.08 × 0.95 = NGN 1,356,263.78
+
+
+STEP 2: Calculate Pension Relief (8%)
+────────────────────────────────────────────────────────────────
+Formula:    Pension Relief = Pensionable Amount × 8%
+Purpose:    Employee pension contribution relief
+Example:    NGN 1,427,646.08 × 0.08 = NGN 71,418.76
+
+
+STEP 3: Calculate Taxable Income
+────────────────────────────────────────────────────────────────
+Formula:    Taxable Income = Gross Income - Pension Relief
+Note:       CRA (Consolidated Relief Allowance) is NOT used
+Reason:     CRA was removed from Nigerian tax law
+Example:    NGN 1,356,263.78 - NGN 71,418.76 = NGN 1,284,845.02
+
+
+STEP 4: Apply NGN 840,000 Tax Relief  ★ KEY STEP ★
+────────────────────────────────────────────────────────────────
+Formula:    Taxable Balance = Taxable Income - NGN 840,000
+Purpose:    Flat tax-free allowance of NGN 840,000 annually
+Rule:       If Taxable Income ≤ NGN 840,000 → No PAYE tax
+           If Taxable Income > NGN 840,000 → Tax on balance only
+Example:    NGN 1,284,845.02 - NGN 840,000 = NGN 444,845.02
+
+           ★ ONLY NGN 444,845.02 IS SUBJECT TO TAX ★
+
+
+STEP 5: Apply Progressive Tax Brackets
+────────────────────────────────────────────────────────────────
+The taxable balance (NGN 444,845.02) is now taxed progressively:
+
+Bracket 1: NGN 0 - 300,000 @ 0%
+   Taxable:  NGN 300,000.00
+   Tax:      NGN 0.00
+
+Bracket 2: NGN 300,000 - 600,000 @ 15%
+   Taxable:  NGN 144,845.02  (only the amount within this bracket)
+   Tax:      NGN 144,845.02 × 15% = NGN 21,726.75
+
+────────────────────────────────────────────────────────────────
+Total Annual PAYE Tax:  NGN 21,726.75
+
+
+STEP 6: Calculate Monthly PAYE
+────────────────────────────────────────────────────────────────
+Formula:    Monthly PAYE = Annual PAYE ÷ 12
+Example:    NGN 21,726.75 ÷ 12 = NGN 1,810.56
+
+For Prorated Months:
+Formula:    Prorated PAYE = Monthly PAYE × (Days Worked ÷ Total Days)
+Example:    NGN 1,810.56 × (21 ÷ 30) = NGN 1,267.39
+
+=============================================================================
+SECTION 3: WORKED EXAMPLE - FIDUCIA DRIVER GRADE
+=============================================================================
+
+Pay Grade: FIDUCIA DRIVER1
+Client: FIDUCIA MICROFINANCE BANK
+
+Annual Salary Components:
+────────────────────────────────────────────────────────────────
+BASIC_SALARY                    NGN   430,911.52
+HOUSING                         NGN   210,911.52
+TRANSPORT                       NGN   250,911.52
+OTHER_ALLOWANCES                NGN   484,911.52
+LEAVE_ALLOWANCE                 NGN    30,000.00
+THIRTEENTH_MONTH                NGN    20,000.00
+────────────────────────────────────────────────────────────────
+TOTAL ANNUAL GROSS:             NGN 1,427,646.08
+MONTHLY GROSS (÷12):           NGN   118,970.51
+
+
+Full Month Tax Calculation (30/30 days):
+────────────────────────────────────────────────────────────────
+Step 1: Gross Income (95%)      = NGN 1,356,263.78
+Step 2: Pension Relief (8%)     = NGN    71,418.76
+Step 3: Taxable Income          = NGN 1,284,845.02
+Step 4: Less Tax Relief         = NGN   840,000.00
+        Taxable Balance         = NGN   444,845.02
+Step 5: Progressive Tax:
+        - Tier 1 (0-300k @ 0%)  = NGN         0.00
+        - Tier 2 (144k @ 15%)   = NGN    21,726.75
+        Annual PAYE             = NGN    21,726.75
+Step 6: Monthly PAYE (÷12)      = NGN     1,810.56
+
+
+Monthly Deductions Summary:
+────────────────────────────────────────────────────────────────
+PAYE Tax                        NGN     1,810.56
+Pension (8%)                    NGN     5,951.56
+Leave Allowance                 NGN     2,500.00
+13th Month                      NGN     1,666.67
+────────────────────────────────────────────────────────────────
+Total Monthly Deductions:       NGN    11,928.79
+
+NET PAY (Full Month):           NGN   107,041.71
+
+=============================================================================
+SECTION 4: CRITICAL QUESTIONS FOR ACCOUNTING DEPARTMENT
+=============================================================================
+
+Please review and confirm or correct the following:
+
+1. ★ NGN 840,000 TAX RELIEF ★
+   ─────────────────────────────────────────────────────────────
+   Current System Interpretation:
+   - NGN 840,000 is deducted from taxable income BEFORE applying
+     progressive tax brackets
+   - This creates a flat NGN 840,000 tax-free allowance
+   - Only income ABOVE NGN 840,000 is taxed
+   
+   Question: Is this interpretation CORRECT?
+   
+   Expected Monthly PAYE based on this method: NGN 1,810.56
+   Your calculated PAYE: NGN _______________
+   
+   If different, please provide:
+   □ Correct interpretation of NGN 840,000
+   □ Step-by-step calculation showing expected PAYE
+
+
+2. TAX BRACKETS
+   ─────────────────────────────────────────────────────────────
+   Current rates: 0%, 15%, 18%, 21%, 23%, 25%
+   
+   Question: Are these the correct rates for 2025/2026?
+   □ Yes, correct
+   □ No, please provide correct bracket rates
+
+
+3. GROSS INCOME RELIEF (5%)
+   ─────────────────────────────────────────────────────────────
+   Current: Annual Gross × 95% (5% relief)
+   
+   Question: Is this still applicable?
+   □ Yes
+   □ No, should be: ____%
+
+
+4. PENSION RELIEF (8%)
+   ─────────────────────────────────────────────────────────────
+   Current: Pensionable Amount × 8%
+   
+   Question: Is 8% correct?
+   □ Yes
+   □ No, should be: ____%
+
+
+5. CRA (Consolidated Relief Allowance)
+   ─────────────────────────────────────────────────────────────
+   Current System: CRA is NOT used (set to 0)
+   
+   Question: Confirm CRA has been removed?
+   □ Yes, CRA removed from tax law
+   □ No, CRA should still be applied
+
+
+6. EXPECTED VALUES FOR FIDUCIA DRIVER
+   ─────────────────────────────────────────────────────────────
+   Please provide the CORRECT values you expect:
+   
+   Annual Gross:        NGN _______________ (Current: 1,427,646.08)
+   Monthly Gross:       NGN _______________ (Current: 118,970.51)
+   Annual Taxable:      NGN _______________ (Current: 1,284,845.02)
+   Annual PAYE:         NGN _______________ (Current: 21,726.75)
+   Monthly PAYE:        NGN _______________ (Current: 1,810.56)
+   Monthly Net Pay:     NGN _______________ (Current: 107,041.71)
+
+=============================================================================
+SECTION 5: SUPPORTING DOCUMENTATION
+=============================================================================
+
+Database Tables:
+────────────────────────────────────────────────────────────────
+1. tax_brackets          - Progressive tax tier definitions
+2. payroll_settings      - Tax formulas and configuration
+3. pay_grade_structures  - Salary grade definitions
+4. payroll_items         - Individual employee PAYE calculations
+
+Code Files:
+────────────────────────────────────────────────────────────────
+1. app/Services/PayrollCalculationEngine.php
+   - calculateProgressiveTax() method (Lines 172-254)
+   - Main tax calculation logic
+
+2. database/migrations/2025_11_21_000003_create_tax_brackets_table.php
+   - Tax brackets table structure
+
+3. database/seeds/TaxBracketSeeder.php
+   - Initial tax bracket data
+
+=============================================================================
+ACTION REQUIRED
+=============================================================================
+
+Please complete the questionnaire above and return to:
+Development Team
+
+If changes are needed:
+1. Mark corrections directly on this document
+2. Provide supporting documentation (tax law references, circulars, etc.)
+3. Indicate effective date for any rate/formula changes
+
+Report Generated: November 25, 2025
+System Version: 1.0

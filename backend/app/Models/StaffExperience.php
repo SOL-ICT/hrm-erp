@@ -13,21 +13,20 @@ class StaffExperience extends Model
 
     protected $fillable = [
         'staff_id',
-        'company_name',
-        'position',
+        'employer_name',
+        'designation',
         'start_date',
         'end_date',
-        'is_current',
         'job_description',
-        'salary',
-        'reason_for_leaving'
+        'reason_for_leaving',
+        'last_salary',
+        'experience_order'
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
-        'is_current' => 'boolean',
-        'salary' => 'decimal:2'
+        'last_salary' => 'decimal:2'
     ];
 
     /**

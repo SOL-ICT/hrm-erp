@@ -294,6 +294,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     require __DIR__ . '/modules/recruitment-management/applicants-profile.php';
     require __DIR__ . '/modules/recruitment-management/boarding.php';
     require __DIR__ . '/modules/recruitment-management/manual-boarding.php';
+    require __DIR__ . '/modules/recruitment-management/boarding-approvals.php'; // Staff boarding approvals & hierarchy
+    require __DIR__ . '/modules/recruitment-management/bulk-staff-upload.php'; // Bulk Excel upload
 
     // Administration Module
     require __DIR__ . '/modules/administration/sol-master.php';

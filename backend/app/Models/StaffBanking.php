@@ -13,11 +13,14 @@ class StaffBanking extends Model
 
     protected $fillable = [
         'staff_id',
+        'payment_mode',
         'bank_name',
         'account_number',
-        'account_name',
-        'bvn',
-        'sort_code'
+        'wages_type',
+        'weekday_ot_rate',
+        'holiday_ot_rate',
+        'entitled_to_ot',
+        'pension_deduction'
     ];
 
     /**

@@ -112,6 +112,13 @@ const Boarding = lazy(() =>
   import("./modules/recruitment-management/submodules/boarding/Boarding")
 );
 
+// Recruitment Hierarchy Management (NEW)
+const RecruitmentHierarchyManagement = lazy(() =>
+  import(
+    "./modules/recruitment-management/submodules/hierarchy/RecruitmentHierarchyManagement"
+  )
+);
+
 const AdminRouter = ({
   activeModule,
   activeSubmodule,
@@ -253,6 +260,16 @@ const AdminRouter = ({
         case "boarding":
           return (
             <Boarding
+              {...commonProps}
+              onBack={() => {
+                window.history.back();
+              }}
+            />
+          );
+
+        case "hierarchy":
+          return (
+            <RecruitmentHierarchyManagement
               {...commonProps}
               onBack={() => {
                 window.history.back();

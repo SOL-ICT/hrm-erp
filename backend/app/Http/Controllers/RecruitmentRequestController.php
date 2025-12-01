@@ -1156,10 +1156,9 @@ class RecruitmentRequestController extends Controller
                 'success' => true,
                 'message' => 'Recruitment request deleted successfully'
             ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             Log::error('Recruitment Request Deletion Failed', [
                 'request_id' => $id,
                 'error' => $e->getMessage(),
@@ -1170,6 +1169,167 @@ class RecruitmentRequestController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete recruitment request',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ========================================
+    // TICKET DELEGATION
+    // ========================================
+
+    /**
+     * Assign/Delegate a recruitment request to another user
+     * POST /api/recruitment-requests/{id}/assign
+     */
+    public function assignTicket(Request $request, $id)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'assigned_to' => 'required|exists:users,id',
+                'assignment_notes' => 'nullable|string|max:500'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $ticket = RecruitmentRequest::findOrFail($id);
+            $assignee = User::findOrFail($request->assigned_to);
+
+            // Check if user has permission to assign tickets
+            $currentUser = Auth::user();
+
+            // Get user's role_id from staff_roles table
+            $userRoleId = DB::table('staff_roles')
+                ->where('staff_id', $currentUser->staff_profile_id)
+                ->value('role_id');
+
+            // Check recruitment hierarchy permissions
+            $canAssign = DB::table('recruitment_hierarchy')
+                ->where('role_id', $userRoleId)
+                ->where('can_assign_ticket', 1)
+                ->exists();
+
+            if (!$canAssign) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You do not have permission to assign tickets'
+                ], 403);
+            }
+
+            DB::beginTransaction();
+
+            // Update ticket assignment
+            $ticket->update([
+                'assigned_to' => $request->assigned_to,
+                'delegated_by' => Auth::id(),
+                'delegated_at' => now(),
+                'delegation_notes' => $request->assignment_notes,  // Map from assignment_notes
+                'requires_approval' => false  // Simplified for now
+            ]);
+
+            // Load relationships
+            $ticket->load([
+                'assignedTo:id,name,email',
+                'delegatedBy:id,name,email',
+                'client:id,organisation_name',
+                'jobStructure:id,job_title,job_code'
+            ]);
+
+            DB::commit();
+
+            // Invalidate caches
+            CacheService::invalidateTag('recruitment');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Ticket assigned successfully',
+                'data' => $ticket
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Ticket assignment failed', [
+                'error' => $e->getMessage(),
+                'ticket_id' => $id,
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to assign ticket',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get list of users who can be assigned tickets
+     * GET /api/recruitment-requests/assignable-users
+     */
+    public function getAssignableUsers(Request $request)
+    {
+        try {
+            $cacheKey = CacheService::generateKey('assignable_users', $request->all());
+
+            return CacheService::rememberApiResponse($cacheKey, 'recruitment', function () use ($request) {
+                // Get active Strategic Outsourcing Limited staff (user_type = 'admin')
+                // with recruitment-related roles only
+                // Roles: HR(3), Recruitment(7), Regional Manager(8), Implant Manager(9), 
+                //        Recruitment Assistant(10), Implant Assistant(11), Regional Technician(15)
+
+                $recruitmentRoleIds = [3, 7, 8, 9, 10, 11, 15];
+
+                $query = User::select('users.id', 'users.name', 'users.email', 'users.user_type', 'users.staff_profile_id')
+                    ->join('staff_roles', 'users.staff_profile_id', '=', 'staff_roles.staff_id')
+                    ->join('roles', 'staff_roles.role_id', '=', 'roles.id')
+                    ->where('users.is_active', true)
+                    ->where('users.user_type', 'admin') // Only Strategic Outsourcing Limited staff
+                    ->whereIn('staff_roles.role_id', $recruitmentRoleIds)
+                    ->addSelect('roles.id as role_id', 'roles.name as role_name');
+
+                // Filter by specific role if requested
+                if ($request->filled('role_id')) {
+                    $query->where('staff_roles.role_id', $request->role_id);
+                }
+
+                $users = $query->orderBy('users.name')->get();
+
+                // Format users for the TicketAssignmentModal
+                // Modal expects: id, first_name, last_name, role_name, department (optional)
+                $formattedUsers = $users->map(function ($user) {
+                    // Split name into first and last (simple approach)
+                    $nameParts = explode(' ', trim($user->name), 2);
+
+                    return [
+                        'id' => $user->id,
+                        'first_name' => $nameParts[0] ?? '',
+                        'last_name' => $nameParts[1] ?? '',
+                        'role_name' => $user->role_name,  // From roles table
+                        'department' => null,  // Not available in current schema
+                        'email' => $user->email,
+                        'user_type' => $user->user_type
+                    ];
+                });
+
+                // Return array directly (not nested in 'all_users')
+                return response()->json([
+                    'success' => true,
+                    'data' => $formattedUsers
+                ], 200);
+            });
+        } catch (\Exception $e) {
+            Log::error('Failed to get assignable users', [
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get assignable users',
                 'error' => $e->getMessage()
             ], 500);
         }

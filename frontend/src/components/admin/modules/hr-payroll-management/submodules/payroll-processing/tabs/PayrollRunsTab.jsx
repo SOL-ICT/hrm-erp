@@ -130,7 +130,6 @@ export default function PayrollRunsTab({
       }
 
       setMessage({ type: "success", text: "Payroll run created successfully" });
-      setShowCreateModal(false);
       resetForm();
       fetchPayrollRuns();
     } catch (error) {

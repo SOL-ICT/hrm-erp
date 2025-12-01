@@ -13,15 +13,21 @@ class StaffEmergencyContact extends Model
 
     protected $fillable = [
         'staff_id',
+        'contact_type',
         'name',
-        'phone',
         'relationship',
+        'phone_number',
+        'email',
         'address',
-        'is_primary'
+        'gender',
+        'date_of_birth',
+        'is_primary',
+        'contact_order'
     ];
 
     protected $casts = [
-        'is_primary' => 'boolean'
+        'is_primary' => 'boolean',
+        'date_of_birth' => 'date'
     ];
 
     /**
