@@ -3,289 +3,389 @@
 namespace App\Services;
 
 use App\Models\Staff;
-use App\Models\Client;
-use App\Models\RecruitmentRequest;
-use App\Models\PayGradeStructure;
-use App\Models\ClientStaffType;
-use App\Models\BoardingTimeline;
+use App\Models\User;
+use App\Models\Recruitment\RecruitmentRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
 
 class StaffBoardingService
 {
-    /**
-     * Validate if staff can be created for a recruitment request
-     */
-    public function validateStaffCreation(array $data): array
+    private RecruitmentHierarchyService $hierarchyService;
+
+    public function __construct()
     {
-        $errors = [];
-
-        // Check recruitment request capacity
-        $ticket = RecruitmentRequest::find($data['recruitment_request_id']);
-        if (!$ticket) {
-            $errors[] = 'Recruitment request not found';
-            return $errors;
-        }
-
-        $availablePositions = $ticket->number_of_vacancies - ($ticket->staff_accepted_offer ?? 0);
-        if ($availablePositions <= 0) {
-            $errors[] = 'No available positions for this recruitment request';
-        }
-
-        // Validate pay grade belongs to job structure
-        if (!empty($data['pay_grade_structure_id'])) {
-            $payGrade = PayGradeStructure::find($data['pay_grade_structure_id']);
-            if (!$payGrade) {
-                $errors[] = 'Pay grade structure not found';
-            } elseif ($payGrade->job_structure_id !== $ticket->job_structure_id) {
-                $errors[] = 'Selected pay grade does not match the job structure';
-            }
-        }
-
-        // Check if email is unique (if provided)
-        if (!empty($data['email'])) {
-            $existingStaff = Staff::where('email', $data['email'])->first();
-            if ($existingStaff) {
-                $errors[] = 'Email address already exists for another staff member';
-            }
-        }
-
-        return $errors;
+        $this->hierarchyService = new RecruitmentHierarchyService();
     }
 
     /**
-     * Create staff member with all necessary relationships and logging
+     * Board staff with automatic approval determination
+     * 
+     * UPDATED WORKFLOW (Nov 26, 2025):
+     * - If user has can_board_without_approval → status: pending_control_approval
+     * - If user needs approval → status: pending (needs supervisor approval first)
+     * - All boarding requires FINAL Control approval for compliance/audit
      */
-    public function createStaffMember(array $data): Staff
+    public function boardStaff(array $staffData, User $boardingUser, RecruitmentRequest $ticket): Staff
     {
         DB::beginTransaction();
-
         try {
-            // Get required related models
-            $client = Client::findOrFail($data['client_id']);
-            $ticket = RecruitmentRequest::findOrFail($data['recruitment_request_id']);
+            $approvalStatus = $this->determineApprovalStatus($boardingUser, $ticket);
+            $offerAlreadyAccepted = $staffData['offer_already_accepted'] ?? false;
+            $offerStatus = $offerAlreadyAccepted ? 'accepted' : 'pending';
 
-            // Get default staff type for client
-            $staffType = ClientStaffType::where('client_id', $data['client_id'])
-                ->where('is_active', true)
-                ->first();
+            $staff = Staff::create(array_merge($staffData, [
+                'recruitment_request_id' => $ticket->id,
+                'onboarded_by' => $boardingUser->id,
+                'boarding_approval_status' => $approvalStatus,
+                'offer_acceptance_status' => $offerStatus,
+                'offer_already_accepted' => $offerAlreadyAccepted,
+                'status' => 'inactive', // Always inactive until Control approves
+            ]));
 
-            if (!$staffType) {
-                throw new \Exception('No active staff type found for this client');
+            // If auto-approved, mark as pending Control approval
+            if ($approvalStatus === 'auto_approved') {
+                $staff->update([
+                    'boarding_approval_status' => 'pending_control_approval',
+                    'approved_by' => $boardingUser->id,
+                    'approved_at' => now(),
+                    'approval_notes' => 'Initial approval - awaiting Control compliance review',
+                ]);
             }
 
-            // Generate unique codes
-            $employeeCode = $this->generateEmployeeCode($client);
-            $staffId = $this->generateStaffId($employeeCode);
-
-            // Create staff record
-            $staff = Staff::create([
-                'candidate_id' => null, // Manual entry has no candidate
-                'client_id' => $data['client_id'],
-                'staff_type_id' => $staffType->id,
-                'employee_code' => $employeeCode,
-                'staff_id' => $staffId,
-                'email' => $data['email'] ?? null,
-                'first_name' => $data['first_name'],
-                'last_name' => $data['last_name'],
-                'gender' => $data['gender'] ?? null,
-                'entry_date' => $data['entry_date'],
-                'appointment_status' => $data['appointment_status'] ?? 'probation',
-                'employment_type' => $data['employment_type'] ?? 'full_time',
-                'status' => 'active',
-                'pay_grade_structure_id' => $data['pay_grade_structure_id'] ?? null,
-                'salary_effective_date' => $data['entry_date'],
-                'job_title' => $data['job_title'] ?? $ticket->jobStructure->job_title ?? 'Staff Member',
-                'department' => $data['department'] ?? null,
-                'service_location_id' => $ticket->service_location_id,
-                'onboarding_method' => $data['onboarding_method'] ?? 'manual_entry',
-                'onboarded_by' => Auth::id() ?? 1,
-                'custom_fields' => $data['custom_fields'] ?? null
-            ]);
-
-            // Update recruitment request counter
-            $ticket->increment('staff_accepted_offer');
-
-            // Log the manual boarding action
-            $this->logBoardingAction($staff, $ticket, $data['onboarding_method'] ?? 'manual_entry');
+            if (!$offerAlreadyAccepted && $approvalStatus === 'auto_approved') {
+                $this->sendOffer($staff);
+            }
 
             DB::commit();
-
-            Log::info('Manual staff boarding successful', [
-                'staff_id' => $staff->id,
-                'employee_code' => $staff->employee_code,
-                'client_id' => $data['client_id'],
-                'ticket_id' => $data['recruitment_request_id']
-            ]);
-
-            return $staff;
+            return $staff->fresh();
         } catch (\Exception $e) {
-            DB::rollback();
-            Log::error('Manual staff boarding failed: ' . $e->getMessage(), [
-                'data' => $data,
-                'trace' => $e->getTraceAsString()
-            ]);
+            DB::rollBack();
             throw $e;
         }
     }
 
     /**
-     * Generate unique employee code for client
+     * Approve boarding (supervisor level)
+     * Moves from 'pending' to 'pending_control_approval'
      */
-    public function generateEmployeeCode(Client $client): string
+    public function approveBoarding(Staff $staff, User $approvingUser, ?string $notes = null): Staff
     {
-        $prefix = $client->prefix ?? substr(strtoupper($client->organisation_name), 0, 3);
+        if (!$this->canApproveStaff($staff, $approvingUser)) {
+            throw new \Exception('You do not have permission to approve this staff boarding');
+        }
 
-        // Get the last staff member for this client
-        $lastStaff = Staff::where('client_id', $client->id)
-            ->where('employee_code', 'like', "SOL-{$prefix}-%")
-            ->orderBy('id', 'desc')
-            ->first();
+        if ($staff->boarding_approval_status !== 'pending') {
+            throw new \Exception("Staff is not in pending approval state");
+        }
 
-        if ($lastStaff && preg_match('/SOL-' . preg_quote($prefix) . '-(\d+)/', $lastStaff->employee_code, $matches)) {
-            $sequence = intval($matches[1]) + 1;
+        DB::beginTransaction();
+        try {
+            $staff->update([
+                'boarding_approval_status' => 'pending_control_approval',
+                'approved_by' => $approvingUser->id,
+                'approved_at' => now(),
+                'approval_notes' => $notes,
+                'status' => 'inactive', // Still inactive until Control approves
+            ]);
+
+            if ($staff->offer_acceptance_status === 'pending') {
+                $this->sendOffer($staff);
+            }
+
+            DB::commit();
+            return $staff->fresh();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Control Department final approval (compliance/audit gate)
+     * This is the FINAL step - activates staff for payroll
+     * ALSO creates user account automatically
+     */
+    public function controlApprove(Staff $staff, User $controlUser, ?string $notes = null): Staff
+    {
+        // Verify user is from Control department
+        if (!$this->hierarchyService->canApproveBoarding($controlUser)) {
+            throw new \Exception('Only Control department can provide final approval');
+        }
+
+        if ($staff->boarding_approval_status !== 'pending_control_approval') {
+            throw new \Exception("Staff must be in 'pending_control_approval' state");
+        }
+
+        DB::beginTransaction();
+        try {
+            $staff->update([
+                'boarding_approval_status' => 'control_approved',
+                'control_approved_by' => $controlUser->id,
+                'control_approved_at' => now(),
+                'control_approval_notes' => $notes,
+                'status' => $staff->offer_already_accepted ? 'active' : 'inactive',
+            ]);
+
+            // Create user account automatically when staff is approved
+            $this->createUserAccountForStaff($staff);
+
+            // Only increment counter when Control finally approves
+            $ticket = $staff->recruitmentRequest;
+            if ($ticket && $staff->offer_already_accepted) {
+                $ticket->staff_accepted_offer = ($ticket->staff_accepted_offer ?? 0) + 1;
+                $ticket->save();
+            }
+
+            DB::commit();
+            return $staff->fresh();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Control Department rejection (compliance issues found)
+     */
+    public function controlReject(Staff $staff, User $controlUser, string $reason): Staff
+    {
+        if (!$this->hierarchyService->canApproveBoarding($controlUser)) {
+            throw new \Exception('Only Control department can reject at this stage');
+        }
+
+        if ($staff->boarding_approval_status !== 'pending_control_approval') {
+            throw new \Exception("Staff must be in 'pending_control_approval' state");
+        }
+
+        $staff->update([
+            'boarding_approval_status' => 'control_rejected',
+            'control_rejection_reason' => $reason,
+            'control_rejected_by' => $controlUser->id,
+            'control_rejected_at' => now(),
+            'status' => 'inactive',
+        ]);
+
+        return $staff->fresh();
+    }
+
+    public function rejectBoarding(Staff $staff, User $rejectingUser, string $reason): Staff
+    {
+        if (!$this->canApproveStaff($staff, $rejectingUser)) {
+            throw new \Exception('You do not have permission to reject this staff boarding');
+        }
+
+        if ($staff->boarding_approval_status !== 'pending') {
+            throw new \Exception("Staff is not in pending approval state");
+        }
+
+        $staff->update([
+            'boarding_approval_status' => 'rejected',
+            'rejection_reason' => $reason,
+            'status' => 'inactive',
+        ]);
+
+        return $staff->fresh();
+    }
+
+    private function sendOffer(Staff $staff): void
+    {
+        $expiryDate = now()->addDays(30);
+
+        $staff->update([
+            'offer_acceptance_status' => 'sent',
+            'offer_sent_at' => now(),
+            'offer_expires_at' => $expiryDate,
+        ]);
+
+        DB::table('staff_offer_acceptance_log')->insert([
+            'staff_id' => $staff->id,
+            'action' => 'sent',
+            'actioned_at' => now(),
+            'actioned_by' => null,
+            'notes' => 'Offer letter sent automatically after boarding approval',
+            'metadata' => json_encode([
+                'expires_at' => $expiryDate->toDateTimeString(),
+                'sent_via' => 'automatic',
+            ]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function completeAutoApproval(Staff $staff, User $boardingUser, RecruitmentRequest $ticket): void
+    {
+        $staff->update([
+            'approved_by' => $boardingUser->id,
+            'approved_at' => now(),
+            'approval_notes' => 'Auto-approved based on user permissions',
+        ]);
+
+        if ($staff->offer_already_accepted) {
+            $ticket->increment('staff_accepted_offer');
+        }
+    }
+
+    private function determineApprovalStatus(User $boardingUser, RecruitmentRequest $ticket): string
+    {
+        if ($this->hierarchyService->canBoardWithoutApproval($boardingUser)) {
+            return 'auto_approved';
+        }
+
+        if ($ticket->created_by === $boardingUser->id) {
+            return 'auto_approved';
+        }
+
+        if (!$ticket->requires_approval) {
+            return 'auto_approved';
+        }
+
+        if ($ticket->assigned_to === $boardingUser->id) {
+            return 'pending';
+        }
+
+        return 'pending';
+    }
+
+    private function canApproveStaff(Staff $staff, User $user): bool
+    {
+        $ticket = $staff->recruitmentRequest;
+
+        if ($ticket && $ticket->created_by === $user->id) {
+            return true;
+        }
+
+        if ($this->hierarchyService->canApproveBoarding($user)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function getPendingStaffForUser(User $user)
+    {
+        $createdTicketIds = RecruitmentRequest::where('created_by', $user->id)->pluck('id');
+        $query = Staff::where('boarding_approval_status', 'pending');
+
+        if ($this->hierarchyService->canApproveBoarding($user)) {
+            // Can approve all pending staff
         } else {
-            $sequence = 1;
+            $query->whereIn('recruitment_request_id', $createdTicketIds);
         }
 
-        return "SOL-{$prefix}-" . str_pad($sequence, 3, '0', STR_PAD_LEFT);
+        return $query->with([
+            'client',
+            'recruitmentRequest',
+            'onboardedBy:id,name,email',
+            'payGradeStructure'
+        ])
+            ->orderBy('created_at', 'desc')
+            ->get();
     }
 
     /**
-     * Generate staff ID from employee code
+     * Automatically create user account for approved staff
+     * 
+     * Business Rules:
+     * - Username: staff_id (unique)
+     * - Email: staff email or generated from staff_id
+     * - Password: mysolc3ntfi3ld@ (default for all staff)
+     * - Role: Based on staff position or default to general staff
+     * - Links staff_profile_id to staff record
+     * 
+     * @param Staff $staff
+     * @return User|null
      */
-    public function generateStaffId(string $employeeCode): string
-    {
-        return str_replace('-', '', $employeeCode);
-    }
-
-    /**
-     * Get available positions for a recruitment request
-     */
-    public function getAvailablePositions(int $recruitmentRequestId): int
-    {
-        $ticket = RecruitmentRequest::find($recruitmentRequestId);
-        if (!$ticket) {
-            return 0;
-        }
-
-        return max(0, $ticket->number_of_vacancies - ($ticket->staff_accepted_offer ?? 0));
-    }
-
-    /**
-     * Validate bulk staff creation data
-     */
-    public function validateBulkStaffData(array $staffData, int $recruitmentRequestId): array
-    {
-        $errors = [];
-        $availablePositions = $this->getAvailablePositions($recruitmentRequestId);
-
-        // Check total capacity
-        if (count($staffData) > $availablePositions) {
-            $errors[] = [
-                'field' => 'capacity',
-                'message' => "Cannot create {count($staffData)} staff. Only {$availablePositions} positions available."
-            ];
-        }
-
-        // Validate each staff record
-        foreach ($staffData as $index => $staff) {
-            $staffErrors = $this->validateStaffCreation(array_merge($staff, [
-                'recruitment_request_id' => $recruitmentRequestId
-            ]));
-
-            foreach ($staffErrors as $error) {
-                $errors[] = [
-                    'row' => $index + 1,
-                    'field' => 'validation',
-                    'message' => $error
-                ];
-            }
-        }
-
-        // Check for duplicate emails in the batch
-        $emails = array_filter(array_column($staffData, 'email'));
-        $duplicates = array_diff_assoc($emails, array_unique($emails));
-
-        foreach ($duplicates as $index => $email) {
-            $errors[] = [
-                'row' => $index + 1,
-                'field' => 'email',
-                'message' => "Duplicate email address: {$email}"
-            ];
-        }
-
-        return $errors;
-    }
-
-    /**
-     * Create multiple staff members from bulk data
-     */
-    public function createBulkStaff(array $staffData, int $recruitmentRequestId): array
-    {
-        $results = [
-            'created' => [],
-            'failed' => [],
-            'total_created' => 0,
-            'total_failed' => 0
-        ];
-
-        foreach ($staffData as $index => $staffInfo) {
-            try {
-                $staff = $this->createStaffMember(array_merge($staffInfo, [
-                    'recruitment_request_id' => $recruitmentRequestId,
-                    'onboarding_method' => 'bulk_upload'
-                ]));
-
-                $results['created'][] = [
-                    'row' => $index + 1,
-                    'staff_id' => $staff->id,
-                    'employee_code' => $staff->employee_code,
-                    'name' => $staff->first_name . ' ' . $staff->last_name
-                ];
-                $results['total_created']++;
-            } catch (\Exception $e) {
-                $results['failed'][] = [
-                    'row' => $index + 1,
-                    'name' => ($staffInfo['first_name'] ?? '') . ' ' . ($staffInfo['last_name'] ?? ''),
-                    'reason' => $e->getMessage()
-                ];
-                $results['total_failed']++;
-            }
-        }
-
-        return $results;
-    }
-
-    /**
-     * Log boarding action for audit trail
-     */
-    private function logBoardingAction(Staff $staff, RecruitmentRequest $ticket, string $method): void
+    private function createUserAccountForStaff(Staff $staff): ?User
     {
         try {
-            // Create a timeline entry for manual boarding
-            BoardingTimeline::create([
-                'boarding_request_id' => null, // No boarding request for manual entry
-                'action' => 'manual_staff_created',
-                'description' => "Staff {$staff->employee_code} manually boarded for ticket {$ticket->ticket_id}",
-                'details' => [
+            // Check if user already exists for this staff
+            $existingUser = User::where('staff_profile_id', $staff->id)->first();
+            if ($existingUser) {
+                Log::info('User account already exists for staff', [
                     'staff_id' => $staff->id,
-                    'employee_code' => $staff->employee_code,
-                    'staff_name' => $staff->first_name . ' ' . $staff->last_name,
-                    'ticket_id' => $ticket->id,
-                    'ticket_code' => $ticket->ticket_id,
-                    'client_id' => $staff->client_id,
-                    'pay_grade_id' => $staff->pay_grade_structure_id,
-                    'onboarding_method' => $method,
-                    'entry_date' => $staff->entry_date
-                ],
-                'performed_by' => Auth::id() ?? 1,
-                'performed_at' => now()
+                    'user_id' => $existingUser->id
+                ]);
+                return $existingUser;
+            }
+
+            // Generate username from staff_id (ensure uniqueness)
+            $username = $staff->staff_id;
+            $counter = 1;
+            while (User::where('username', $username)->exists()) {
+                $username = $staff->staff_id . '_' . $counter;
+                $counter++;
+            }
+
+            // Use staff email or generate one
+            $email = $staff->email;
+            if (empty($email)) {
+                $email = strtolower($staff->staff_id) . '@solnigeria.com';
+            }
+
+            // Ensure email uniqueness
+            $originalEmail = $email;
+            $emailCounter = 1;
+            while (User::where('email', $email)->exists()) {
+                $email = str_replace('@', "+{$emailCounter}@", $originalEmail);
+                $emailCounter++;
+            }
+
+            // Determine role_id based on staff position or default
+            // You can customize this logic based on your role structure
+            $roleId = $this->determineStaffRole($staff);
+
+            // Create user account
+            $user = User::create([
+                'name' => trim($staff->first_name . ' ' . $staff->last_name),
+                'email' => $email,
+                'username' => $username,
+                'password' => bcrypt('mysolc3ntfi3ld@'), // Default password
+                'role_id' => $roleId,
+                'user_type' => 'staff',
+                'staff_profile_id' => $staff->id,
+                'is_active' => $staff->status === 'active',
             ]);
+
+            Log::info('User account created for staff', [
+                'staff_id' => $staff->id,
+                'user_id' => $user->id,
+                'username' => $username,
+                'email' => $email,
+            ]);
+
+            return $user;
         } catch (\Exception $e) {
-            // Log error but don't fail the main process
-            Log::warning('Failed to create boarding timeline entry: ' . $e->getMessage());
+            Log::error('Failed to create user account for staff', [
+                'staff_id' => $staff->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            // Don't throw exception - user creation failure shouldn't block boarding
+            return null;
         }
+    }
+
+    /**
+     * Determine appropriate role_id for staff based on their position
+     * 
+     * @param Staff $staff
+     * @return int
+     */
+    private function determineStaffRole(Staff $staff): int
+    {
+        // Default role for general staff
+        // You can customize this based on staff.appointment_status, department, etc.
+
+        // Example logic (customize as needed):
+        // - If staff has 'Manager' in job title → Manager role (role_id = 5)
+        // - If staff has 'HR' in department → HR role (role_id = 3)
+        // - Default → General Staff role (role_id = 9)
+
+        $defaultStaffRoleId = 9; // Adjust based on your roles table
+
+        // You can add more sophisticated logic here
+        // For now, return default staff role
+        return $defaultStaffRoleId;
     }
 }

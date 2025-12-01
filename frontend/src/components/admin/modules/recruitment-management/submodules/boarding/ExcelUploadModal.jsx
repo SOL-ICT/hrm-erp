@@ -11,6 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import { manualBoardingAPI } from "@/services/modules/recruitment-management/manualBoardingAPI";
+import { bulkStaffUploadAPI } from "@/services/modules/recruitment-management/bulkStaffUploadAPI";
 import { FORM_FIELDS, EXCEL_HEADERS } from "@/constants/databaseFields";
 
 const ExcelUploadModal = ({ isOpen, onClose, onSuccess, currentTheme }) => {
@@ -109,24 +110,25 @@ const ExcelUploadModal = ({ isOpen, onClose, onSuccess, currentTheme }) => {
 
     try {
       setLoadingTemplate(true);
+      setErrors({});
 
-      // Create form data for the API request
-      const formData = new FormData();
-      formData.append("client_id", selectedClient);
-      formData.append("recruitment_request_id", selectedTicket);
-
-      const response = await manualBoardingAPI.generateExcelTemplate(formData);
+      // Use the new bulk staff upload API
+      const response = await bulkStaffUploadAPI.downloadTemplate(
+        selectedClient,
+        selectedTicket
+      );
 
       if (response.success) {
-        // The backend now returns an actual Excel file for download
-        // The manualBoardingAPI should handle the file download
-        setTemplateData({ downloaded: true });
+        setTemplateData({ downloaded: true, filename: response.filename });
       } else {
-        setErrors({ template: "Failed to generate template" });
+        setErrors({
+          template: response.message || "Failed to download template",
+          details: response.errors,
+        });
       }
     } catch (error) {
-      console.error("Error generating template:", error);
-      setErrors({ template: "Error generating template" });
+      console.error("Error downloading template:", error);
+      setErrors({ template: "Error downloading template" });
     } finally {
       setLoadingTemplate(false);
     }
@@ -135,23 +137,11 @@ const ExcelUploadModal = ({ isOpen, onClose, onSuccess, currentTheme }) => {
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
-      // Validate file type
-      const allowedTypes = [
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
-        "application/vnd.ms-excel", // .xls
-        "text/csv", // .csv
-      ];
+      // Validate file using the API service
+      const validation = bulkStaffUploadAPI.validateFile(file);
 
-      if (!allowedTypes.includes(file.type)) {
-        setErrors({
-          file: "Please select a valid Excel (.xlsx, .xls) or CSV file",
-        });
-        return;
-      }
-
-      // Validate file size (10MB max)
-      if (file.size > 10 * 1024 * 1024) {
-        setErrors({ file: "File size must be less than 10MB" });
+      if (!validation.isValid) {
+        setErrors({ file: validation.error });
         return;
       }
 
@@ -168,19 +158,23 @@ const ExcelUploadModal = ({ isOpen, onClose, onSuccess, currentTheme }) => {
 
     try {
       setLoading(true);
+      setErrors({});
 
       const formData = new FormData();
       formData.append("excel_file", uploadFile);
       formData.append("client_id", selectedClient);
       formData.append("recruitment_request_id", selectedTicket);
 
-      const response = await manualBoardingAPI.previewExcelUpload(formData);
+      const response = await bulkStaffUploadAPI.previewUpload(formData);
 
       if (response.success) {
         setPreviewData(response.data);
         setStep(3);
       } else {
-        setErrors({ preview: response.message || "Failed to preview upload" });
+        setErrors({
+          preview: response.message || "Failed to preview upload",
+          details: response.errors,
+        });
       }
     } catch (error) {
       console.error("Error previewing upload:", error);
@@ -198,13 +192,14 @@ const ExcelUploadModal = ({ isOpen, onClose, onSuccess, currentTheme }) => {
 
     try {
       setProcessingUpload(true);
+      setErrors({});
 
       const formData = new FormData();
       formData.append("excel_file", uploadFile);
       formData.append("client_id", selectedClient);
       formData.append("recruitment_request_id", selectedTicket);
 
-      const response = await manualBoardingAPI.processBulkUpload(formData);
+      const response = await bulkStaffUploadAPI.processUpload(formData);
 
       if (response.success) {
         setUploadResults(response.data);
@@ -214,7 +209,10 @@ const ExcelUploadModal = ({ isOpen, onClose, onSuccess, currentTheme }) => {
           onSuccess(response.data);
         }
       } else {
-        setErrors({ upload: response.message || "Failed to process upload" });
+        setErrors({
+          upload: response.message || "Failed to process upload",
+          details: response.errors,
+        });
       }
     } catch (error) {
       console.error("Error processing upload:", error);

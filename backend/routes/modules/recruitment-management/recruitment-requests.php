@@ -13,8 +13,7 @@ use App\Http\Controllers\RecruitmentRequestController;
 |
 */
 
-// Main CRUD operations
-Route::apiResource('recruitment-requests', RecruitmentRequestController::class);
+// IMPORTANT: Define specific routes BEFORE apiResource to avoid route conflicts
 
 // Dashboard and statistics endpoints
 Route::get('recruitment-requests-dashboard', [RecruitmentRequestController::class, 'dashboard'])
@@ -26,7 +25,14 @@ Route::get('recruitment-requests/statistics/summary', [RecruitmentRequestControl
 Route::get('recruitment-requests/tickets/next-id', [RecruitmentRequestController::class, 'getNextTicketId'])
     ->name('recruitment-requests.next-ticket');
 
-// Status management endpoints
+// Delegation endpoints (must be before apiResource)
+Route::get('recruitment-requests/assignable-users', [RecruitmentRequestController::class, 'getAssignableUsers'])
+    ->name('recruitment-requests.assignable-users');
+
+Route::post('recruitment-requests/{id}/assign', [RecruitmentRequestController::class, 'assignTicket'])
+    ->name('recruitment-requests.assign');
+
+// Status management endpoints (must be before apiResource)
 Route::post('recruitment-requests/{id}/close', [RecruitmentRequestController::class, 'close'])
     ->name('recruitment-requests.close');
 
@@ -35,6 +41,9 @@ Route::post('recruitment-requests/{id}/reopen', [RecruitmentRequestController::c
 
 Route::post('recruitment-requests/{id}/approve', [RecruitmentRequestController::class, 'approve'])
     ->name('recruitment-requests.approve');
+
+// Main CRUD operations (must be AFTER specific routes)
+Route::apiResource('recruitment-requests', RecruitmentRequestController::class);
 
 // Helper endpoints for form data population
 Route::get('recruitment-requests/job-structures/client/{clientId}', [RecruitmentRequestController::class, 'getJobStructuresByClient'])

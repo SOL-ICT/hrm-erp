@@ -12,6 +12,7 @@ import {
   Clock,
   ArrowLeft,
   AlertTriangle,
+  Shield,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import recruitmentRequestAPI from "@/services/modules/recruitment-management/recruitmentRequestAPI";
@@ -71,6 +72,16 @@ const RecruitmentDashboard = ({ currentTheme, preferences, onBack }) => {
       stats: { label: "Scheduled", value: "18" },
       component: null, // Placeholder for future implementation
     },
+    {
+      id: "hierarchy",
+      title: "Recruitment Hierarchy",
+      description: "Manage role-based permissions for recruitment & boarding",
+      icon: Shield,
+      color: "bg-red-500",
+      stats: { label: "Roles", value: "6" },
+      component: null, // Will navigate via AdminRouter
+      requiresAdmin: true, // Super Admin only
+    },
   ];
 
   // ========================================
@@ -109,7 +120,10 @@ const RecruitmentDashboard = ({ currentTheme, preferences, onBack }) => {
   // ========================================
 
   const handleModuleClick = (module) => {
-    if (module.component) {
+    if (module.id === "hierarchy") {
+      // Navigate to hierarchy management via URL
+      window.location.hash = "#/recruitment-management/hierarchy";
+    } else if (module.component) {
       setSelectedModule(module);
     } else {
       // For modules not yet implemented, show a coming soon message

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Candidate\CandidateJobApplication;
+use App\Models\Staff;
 
 class RecruitmentRequest extends Model
 {
@@ -47,7 +48,13 @@ class RecruitmentRequest extends Model
         'closure_reason',
         'closure_comments',
         'staff_accepted_offer',
-        'closed_by'
+        'closed_by',
+        // Delegation & Boarding Enhancement fields
+        'assigned_to',
+        'requires_approval',
+        'delegated_by',
+        'delegated_at',
+        'delegation_notes',
     ];
 
     protected $casts = [
@@ -57,6 +64,8 @@ class RecruitmentRequest extends Model
         'compensation' => 'decimal:2',
         'approved_at' => 'datetime',
         'closed_at' => 'datetime',
+        'delegated_at' => 'datetime',
+        'requires_approval' => 'boolean',
         'staff_accepted_offer' => 'integer',
         'number_of_vacancies' => 'integer'
     ];
@@ -99,6 +108,42 @@ class RecruitmentRequest extends Model
     public function closedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'closed_by');
+    }
+
+    // Delegation & Boarding Enhancement Relationships
+    public function assignedTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function delegatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'delegated_by');
+    }
+
+    public function staffBoarded(): HasMany
+    {
+        return $this->hasMany(Staff::class, 'recruitment_request_id');
+    }
+
+    public function pendingApprovals(): HasMany
+    {
+        return $this->staffBoarded()->where('boarding_approval_status', 'pending');
+    }
+
+    public function pendingControlApprovals(): HasMany
+    {
+        return $this->staffBoarded()->where('boarding_approval_status', 'pending_control_approval');
+    }
+
+    public function approvedStaff(): HasMany
+    {
+        return $this->staffBoarded()->where('boarding_approval_status', 'control_approved');
+    }
+
+    public function activeStaff(): HasMany
+    {
+        return $this->staffBoarded()->where('status', 'active');
     }
 
     public function jobApplications(): HasMany

@@ -14,11 +14,18 @@ class StaffGuarantor extends Model
     protected $fillable = [
         'staff_id',
         'name',
-        'phone',
-        'email',
         'address',
-        'occupation',
-        'relationship'
+        'date_of_birth',
+        'phone_number',
+        'email',
+        'bank_details',
+        'employer_details',
+        'relationship_to_applicant',
+        'guarantor_order'
+    ];
+
+    protected $casts = [
+        'date_of_birth' => 'date'
     ];
 
     /**

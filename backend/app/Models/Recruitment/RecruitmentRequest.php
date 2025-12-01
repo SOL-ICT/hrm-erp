@@ -102,6 +102,22 @@ class RecruitmentRequest extends Model
     }
 
     /**
+     * Get the user this request is assigned to
+     */
+    public function assignedTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    /**
+     * Get the user who delegated this request
+     */
+    public function delegatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'delegated_by');
+    }
+
+    /**
      * Get the recruitment applications for this request
      */
     public function recruitmentApplications(): HasMany

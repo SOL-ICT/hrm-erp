@@ -9,14 +9,28 @@ backend/.env.local
 frontend/.env.local
 
 # ==========================================
-# Local Documentation (Too many MD files)
+# Local Documentation (Development Notes - Not for Production)
 # ==========================================
+# Exclude all .md files except essential ones
+*.md
+!README.md
+!CHANGELOG.md
+!LICENSE.md
+!CONTRIBUTING.md
+
+# Specific exclusions (already covered by *.md but listed for clarity)
 START_HERE.md
 LOCAL_TO_PRODUCTION_SETUP.md
 DEVELOPMENT_WORKFLOW.md
 QUICK_REFERENCE.md
 YOUR_CURRENT_SETUP_ANALYSIS.md
+DEPLOYMENT_REPORT.md
+DEPLOYMENT_CHECKLIST.md
+COMPREHENSIVE_DEPLOYMENT_GUIDE.md
+
+# Local setup scripts
 setup-local-dev.ps1
+*.ps1
 
 # ==========================================
 # Server-Specific Configs (Managed on server)
@@ -114,6 +128,42 @@ storage/logs/*.log
 
 public/storage
 public/hot
+
+# ==========================================
+# Test & Debug Scripts (Development Only)
+# ==========================================
+backend/test_*.php
+backend/debug_*.php
+backend/check_*.php
+backend/verify_*.php
+backend/fix_*.php
+backend/show_*.php
+backend/delete_*.php
+backend/analyze_*.php
+backend/list_*.php
+backend/get_*.php
+backend/update_*.php
+backend/generate_*.php
+backend/compare_*.php
+backend/demonstrate_*.php
+backend/explain_*.php
+backend/final_*.php
+backend/assign_*.php
+backend/full_*.php
+backend/manual_*.php
+backend/*.txt
+!backend/certificate.txt
+backend/reports/
+backend/tests/Manual/
+backend/.env.testing
+backend/run_*.ps1
+backend/run_*.php
+backend/automated_*.ps1
+backend/*_OLD.php
+backend/*_backup.php
+run_tests_safely.ps1
+test-*.ps1
+database_backups/
 
 # ==========================================
 # Next.js Specific

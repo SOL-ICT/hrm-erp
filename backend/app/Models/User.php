@@ -19,6 +19,7 @@ class User extends Authenticatable
         'username',
         'password',
         'role',
+        'role_id',
         'user_type',
         'staff_profile_id',
         'candidate_profile_id',
@@ -58,6 +59,63 @@ class User extends Authenticatable
     {
         return $this->belongsTo(\App\Models\Candidate::class, 'candidate_profile_id')
             ->when($this->user_type === 'candidate');
+    }
+
+    // Recruitment Boarding Enhancement Relationships
+    /**
+     * Get the recruitment hierarchy permissions for this user's role
+     */
+    public function recruitmentHierarchy()
+    {
+        return $this->hasOne(RecruitmentHierarchy::class, 'role_id', 'role_id');
+    }
+
+    /**
+     * Get recruitment requests created by this user
+     */
+    public function createdRecruitmentRequests()
+    {
+        return $this->hasMany(RecruitmentRequest::class, 'created_by');
+    }
+
+    /**
+     * Get recruitment requests assigned to this user
+     */
+    public function assignedRecruitmentRequests()
+    {
+        return $this->hasMany(RecruitmentRequest::class, 'assigned_to');
+    }
+
+    /**
+     * Get recruitment requests delegated by this user
+     */
+    public function delegatedRecruitmentRequests()
+    {
+        return $this->hasMany(RecruitmentRequest::class, 'delegated_by');
+    }
+
+    /**
+     * Get staff boarding approvals done by this user (supervisor level)
+     */
+    public function approvedStaff()
+    {
+        return $this->hasMany(Staff::class, 'approved_by');
+    }
+
+    /**
+     * Get staff boarding approvals done by this user (Control Department)
+     */
+    public function controlApprovedStaff()
+    {
+        return $this->hasMany(Staff::class, 'control_approved_by');
+    }
+
+    /**
+     * Get staff onboarded by this user
+     */
+    public function onboardedStaff()
+    {
+        return $this->hasMany(Staff::class, 'onboarded_by');
     }
 
     /**
