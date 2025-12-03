@@ -30,18 +30,19 @@ class UtilityController extends Controller
     public function getClientCategories()
     {
         try {
-            // Standard business entity types for client categories
+            // Nigerian business entity types for client categories
             $categories = [
-                'Corporate',
-                'SME',
-                'Government',
-                'NGO',
-                'International',
-                'Startup',
-                'Enterprise',
-                'Public Sector',
-                'Private Sector',
-                'Multinational'
+                'Business Name (Sole Proprietorship)',
+                'Business Name (Partnership)',
+                'Private Limited Company (Ltd)',
+                'Public Limited Company (PLC)',
+                'Company Limited by Guarantee (Ltd/Gte)',
+                'Unlimited Company',
+                'Limited Liability Partnership (LLP)',
+                'Limited Partnership (LP)',
+                'Incorporated Trustees (NGO / Association / Religious Body)',
+                'Foreign Company (Branch / Subsidiary)',
+                'Cooperative Society'
             ];
 
             return response()->json([
