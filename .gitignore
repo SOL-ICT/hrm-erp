@@ -17,6 +17,7 @@ frontend/.env.local
 !CHANGELOG.md
 !LICENSE.md
 !CONTRIBUTING.md
+!DEPLOYMENT_SCRIPTS_README.md
 
 # Specific exclusions (already covered by *.md but listed for clarity)
 START_HERE.md
