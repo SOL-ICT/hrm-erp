@@ -1,5 +1,5 @@
 // Core API Configuration and Base Service
-class APIService {
+export class APIService {
   constructor() {
     this.baseURL =
       process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
@@ -206,6 +206,9 @@ class APIService {
     }
   }
 }
+
+// Export the class for extension by other API services
+export { APIService };
 
 // Create singleton instance
 export const apiService = new APIService();
