@@ -207,9 +207,6 @@ export class APIService {
   }
 }
 
-// Export the class for extension by other API services
-export { APIService };
-
 // Create singleton instance
 export const apiService = new APIService();
 
