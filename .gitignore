@@ -35,10 +35,18 @@ setup-local-dev.ps1
 # ==========================================
 # Server-Specific Configs (Managed on server)
 # ==========================================
+# Docker configuration (managed on production server)
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile*
+backend/Dockerfile*
+frontend/Dockerfile*
+
+# Nginx configuration (managed on production server)
 nginx-proxy.conf
+nginx.conf
+*.nginx
 /etc/nginx/
-docker-compose.override.yml
-docker-compose.prod.yml
 
 # ==========================================
 # Dependencies

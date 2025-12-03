@@ -13,9 +13,9 @@ import { useNavigationTracker } from '@/hooks/useNavigationTracker';
 // Routes that should be cached
 const CACHEABLE_ROUTES = [
   'client-master',           // Master Setup
-  'salary-structure',        // Job Function Setup  
-  'client-service-location', // Service Location
-  'recruitment-request',     // Vacancy Declaration
+  'job-function-setup',      // Job Function Setup  
+  'service-location',        // Service Location
+  'vacancy-declaration',     // Vacancy Declaration
   'dashboard',              // Dashboard
   'employee-record',        // Employee Record
   'current-vacancies'       // Current Vacancy Invites

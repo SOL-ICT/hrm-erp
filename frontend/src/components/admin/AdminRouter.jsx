@@ -12,6 +12,9 @@ const SOLMaster = lazy(() => import("./modules/administration/SOLMaster"));
 const RBACManagement = lazy(() =>
   import("./modules/administration/RBACManagementClean")
 );
+const UserManagementPage = lazy(() =>
+  import("./modules/administration/user-management/UserManagementPage")
+);
 const AdministrationDashboard = lazy(() =>
   import("./modules/administration/AdministrationDashboard")
 );
@@ -199,9 +202,10 @@ const AdminRouter = ({
             </SmartRouteCache>
           );
 
+        case "service-location":
         case "client-service-location":
           return (
-            <SmartRouteCache routeKey="client-service-location">
+            <SmartRouteCache routeKey="service-location">
               <ClientServiceLocation
                 {...commonProps}
                 onBack={() => {
@@ -210,9 +214,10 @@ const AdminRouter = ({
               />
             </SmartRouteCache>
           );
+        case "job-function-setup":
         case "salary-structure":
           return (
-            <SmartRouteCache routeKey="salary-structure">
+            <SmartRouteCache routeKey="job-function-setup">
               <SalaryStructure
                 {...commonProps}
                 onBack={() => {
@@ -223,9 +228,10 @@ const AdminRouter = ({
           );
 
         // RECRUITMENT MANAGEMENT SUBMODULES
+        case "vacancy-declaration":
         case "recruitment-request":
           return (
-            <SmartRouteCache routeKey="recruitment-request">
+            <SmartRouteCache routeKey="vacancy-declaration">
               <RecruitmentRequest
                 {...commonProps}
                 onBack={() => {
@@ -412,6 +418,16 @@ const AdminRouter = ({
         case "rbac-management":
           return (
             <RBACManagement
+              {...commonProps}
+              onBack={() => {
+                window.history.back();
+              }}
+            />
+          );
+
+        case "user-management":
+          return (
+            <UserManagementPage
               {...commonProps}
               onBack={() => {
                 window.history.back();

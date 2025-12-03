@@ -53,6 +53,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Alias for staffProfile (used in user management)
+     */
+    public function staff()
+    {
+        return $this->belongsTo(\App\Models\Staff::class, 'staff_profile_id');
+    }
+
+    /**
      * Get the candidate profile if user is candidate
      */
     public function candidateProfile()
