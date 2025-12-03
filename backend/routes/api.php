@@ -304,6 +304,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     require __DIR__ . '/modules/administration/audit-logs.php';
     require __DIR__ . '/modules/administration/utilities.php';
     require __DIR__ . '/modules/administration/rbac.php';
+    require __DIR__ . '/modules/administration/user-management.php';
 
     // Candidate Staff Management Module
     require __DIR__ . '/modules/candidate-staff-management/candidates.php';
