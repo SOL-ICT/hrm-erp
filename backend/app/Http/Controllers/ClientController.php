@@ -160,6 +160,11 @@ class ClientController extends Controller
                 'contracts.*.contract_end_date' => 'required|date|after_or_equal:contracts.*.contract_start_date',
                 'contracts.*.status' => 'required|in:active,inactive,expired,terminated',
                 'contracts.*.notes' => 'nullable|string',
+                // Invoice & Payment Information validation rules
+                'payment_terms' => 'nullable|string|max:500',
+                'contact_person_name' => 'nullable|string|max:255',
+                'contact_person_position' => 'nullable|string|max:255',
+                'contact_person_address' => 'nullable|string',
                 // FIRS e-invoicing validation rules
                 'firs_tin' => 'nullable|string|max:20',
                 'firs_business_description' => 'nullable|string|max:255',
@@ -195,6 +200,11 @@ class ClientController extends Controller
                 'head_office_address' => $validatedData['head_office_address'],
                 'pay_calculation_basis' => $validatedData['pay_calculation_basis'],
                 'status' => $validatedData['status'],
+                // Invoice & Payment Information fields
+                'payment_terms' => $validatedData['payment_terms'] ?? null,
+                'contact_person_name' => $validatedData['contact_person_name'] ?? null,
+                'contact_person_position' => $validatedData['contact_person_position'] ?? null,
+                'contact_person_address' => $validatedData['contact_person_address'] ?? null,
                 // FIRS e-invoicing fields
                 'firs_tin' => $validatedData['firs_tin'] ?? null,
                 'firs_business_description' => $validatedData['firs_business_description'] ?? null,
@@ -298,6 +308,11 @@ class ClientController extends Controller
                 'contracts.*.contract_end_date' => 'required|date|after_or_equal:contracts.*.contract_start_date',
                 'contracts.*.status' => 'required|in:active,inactive,expired,terminated',
                 'contracts.*.notes' => 'nullable|string',
+                // Invoice & Payment Information validation rules
+                'payment_terms' => 'nullable|string|max:500',
+                'contact_person_name' => 'nullable|string|max:255',
+                'contact_person_position' => 'nullable|string|max:255',
+                'contact_person_address' => 'nullable|string',
                 // FIRS e-invoicing validation rules
                 'firs_tin' => 'nullable|string|max:20',
                 'firs_business_description' => 'nullable|string|max:255',
@@ -320,6 +335,11 @@ class ClientController extends Controller
                 'head_office_address' => $validatedData['head_office_address'],
                 'pay_calculation_basis' => $validatedData['pay_calculation_basis'],
                 'status' => $validatedData['status'],
+                // Invoice & Payment Information fields
+                'payment_terms' => $validatedData['payment_terms'] ?? null,
+                'contact_person_name' => $validatedData['contact_person_name'] ?? null,
+                'contact_person_position' => $validatedData['contact_person_position'] ?? null,
+                'contact_person_address' => $validatedData['contact_person_address'] ?? null,
                 // FIRS e-invoicing fields
                 'firs_tin' => $validatedData['firs_tin'] ?? null,
                 'firs_business_description' => $validatedData['firs_business_description'] ?? null,
