@@ -8,8 +8,10 @@ Route::prefix('service-locations')->name('service-locations.')->group(function (
     Route::get('/regions/list', [ServiceLocationController::class, 'getRegions'])->name('regions');
     Route::get('/zones/list', [ServiceLocationController::class, 'getZones'])->name('zones');
     Route::get('/bulk-template', [ServiceLocationController::class, 'downloadTemplate'])->name('bulk-template');
+    Route::post('/bulk-import', [ServiceLocationController::class, 'bulkImport'])->name('bulk-import');
     Route::get('/grouped-by-client', [ServiceLocationController::class, 'getGroupedByClient'])->name('grouped-by-client');
     Route::get('/by-client/{clientId}', [ServiceLocationController::class, 'getByClient'])->name('by-client');
+    Route::get('/client/{clientId}/contact-details', [ServiceLocationController::class, 'getClientContactDetails'])->name('client-contact-details');
     Route::post('/test-auto-assignment', [ServiceLocationController::class, 'testAutoAssignment'])->name('test-auto-assignment');
 
     // Generic routes LAST

@@ -481,24 +481,35 @@ class ServiceLocationController extends Controller
                     // Generate location code
                     $locationCode = $data['unique_id'] ?? $this->generateLocationCode($client->prefix, $city);
 
+                    // Get state from SOL office if assigned
+                    $state = null;
+                    if ($solOfficeId && isset($autoAssignment['office'])) {
+                        $state = $autoAssignment['office']->state_name ?? null;
+                    }
+
                     // Insert service location
-                    DB::table('service_locations')->insert([
+                    $inserted = DB::table('service_locations')->insert([
                         'client_id' => $clientId,
                         'sol_office_id' => $solOfficeId,
                         'location_name' => $locationName,
                         'location_code' => $locationCode,
                         'city' => $city,
+                        'state' => $state,
                         'unique_id' => $data['unique_id'] ?? null,
                         'short_name' => $data['short_name'] ?? null,
                         'full_address' => $data['full_address'] ?? null,
-                        'contact_person' => $data['contact_person'] ?? null,
-                        'contact_phone' => $data['contact_phone'] ?? null,
-                        'contact_email' => $data['contact_email'] ?? null,
+                        'contact_person_name' => $data['contact_person_name'] ?? null,
+                        'contact_person_phone' => $data['contact_person_phone'] ?? null,
+                        'contact_person_email' => $data['contact_person_email'] ?? null,
                         'is_active' => true,
                         'created_by' => Auth::id(),
                         'created_at' => now(),
                         'updated_at' => now()
                     ]);
+
+                    if (!$inserted) {
+                        throw new Exception('Failed to insert location into database');
+                    }
 
                     $successCount++;
                 } catch (Exception $e) {
@@ -571,50 +582,69 @@ class ServiceLocationController extends Controller
     /**
      * ✅ NEW: Download CSV template for bulk upload
      */
-    public function downloadTemplate()
+    public function downloadTemplate(Request $request)
     {
         try {
             $headers = [
                 'unique_id',
                 'location_name',
-                'city',
                 'short_name',
+                'city',
                 'full_address',
-                'contact_person',
-                'contact_phone',
-                'contact_email'
+                'contact_person_name',
+                'contact_person_phone',
+                'contact_person_email'
             ];
 
+            // Get client contact details if client_id is provided
+            $contactPersonName = '';
+            $contactPersonPhone = '';
+            $contactPersonEmail = '';
+
+            if ($request->has('client_id')) {
+                $client = DB::table('clients')
+                    ->where('id', $request->client_id)
+                    ->select('contact_person_name', 'phone', 'firs_contact_email', 'organisation_name')
+                    ->first();
+
+                if ($client) {
+                    $contactPersonName = $client->contact_person_name ?? '';
+                    $contactPersonPhone = $client->phone ?? '';
+                    $contactPersonEmail = $client->firs_contact_email ?? '';
+                }
+            }
+
+            // Sample data with pre-filled contact details from client
             $sampleData = [
                 [
                     'LOC001',
                     'Lagos Main Office',
-                    'Ikeja',
                     'LMO',
+                    'Ikeja',
                     '123 Allen Avenue, Ikeja, Lagos',
-                    'John Doe',
-                    '08012345678',
-                    'john.doe@example.com'
+                    $contactPersonName ?: 'John Doe',
+                    $contactPersonPhone ?: '08012345678',
+                    $contactPersonEmail ?: 'john.doe@example.com'
                 ],
                 [
                     'LOC002',
                     'Abuja Branch',
-                    'Abuja',
                     'ABB',
+                    'Abuja',
                     '456 Central Business District, Abuja',
-                    'Jane Smith',
-                    '08087654321',
-                    'jane.smith@example.com'
+                    $contactPersonName ?: 'Jane Smith',
+                    $contactPersonPhone ?: '08087654321',
+                    $contactPersonEmail ?: 'jane.smith@example.com'
                 ],
                 [
                     'LOC003',
                     'Port Harcourt Office',
-                    'Port Harcourt',
                     'PHO',
+                    'Port Harcourt',
                     '789 Aba Road, Port Harcourt, Rivers',
-                    'Mike Johnson',
-                    '08011223344',
-                    'mike.johnson@example.com'
+                    $contactPersonName ?: 'Mike Johnson',
+                    $contactPersonPhone ?: '08011223344',
+                    $contactPersonEmail ?: 'mike.johnson@example.com'
                 ]
             ];
 
@@ -640,6 +670,41 @@ class ServiceLocationController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error generating template: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ NEW: Get client contact details for auto-fill
+     */
+    public function getClientContactDetails($clientId)
+    {
+        try {
+            $client = DB::table('clients')
+                ->where('id', $clientId)
+                ->select('contact_person_name', 'phone', 'firs_contact_email')
+                ->first();
+
+            if (!$client) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Client not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'contact_person_name' => $client->contact_person_name ?? '',
+                    'contact_person_phone' => $client->phone ?? '',
+                    'contact_person_email' => $client->firs_contact_email ?? ''
+                ],
+                'message' => 'Client contact details retrieved successfully'
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching client contact details: ' . $e->getMessage()
             ], 500);
         }
     }

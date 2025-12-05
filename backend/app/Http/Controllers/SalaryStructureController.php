@@ -496,7 +496,7 @@ class SalaryStructureController extends Controller
                 'grade_name' => 'required|string|max:100',
                 'grade_code' => 'required|string|max:20|unique:pay_grade_structures,grade_code',
                 'pay_structure_type' => 'required|string',
-                'emoluments' => 'required|array',
+                'emoluments' => 'nullable|array', // Changed from 'required' to 'nullable' - can add emoluments later via bulk upload
                 'currency' => 'nullable|string|max:3'
             ]);
 
@@ -512,7 +512,10 @@ class SalaryStructureController extends Controller
 
             // Calculate total compensation from emoluments
             $totalCompensation = 0;
-            foreach ($request->emoluments as $component => $amount) {
+            // Calculate total compensation from emoluments (if provided)
+            $totalCompensation = 0;
+            $emoluments = $request->emoluments ?? [];
+            foreach ($emoluments as $component => $amount) {
                 if (is_numeric($amount) && $amount > 0) {
                     $totalCompensation += $amount;
                 }
@@ -523,7 +526,7 @@ class SalaryStructureController extends Controller
                 'grade_name' => $request->grade_name,
                 'grade_code' => strtoupper($request->grade_code),
                 'pay_structure_type' => $request->pay_structure_type,
-                'emoluments' => json_encode($request->emoluments),
+                'emoluments' => json_encode($emoluments), // Use the null-safe $emoluments variable
                 'total_compensation' => $totalCompensation,
                 'currency' => $request->get('currency', 'NGN'),
                 'is_active' => $request->get('is_active', 1),
@@ -533,7 +536,7 @@ class SalaryStructureController extends Controller
             DB::commit();
 
             $payGrade->load(['jobStructure']);
-            $payGrade->emolument_breakdown = $request->emoluments;
+            $payGrade->emolument_breakdown = $emoluments; // Use the null-safe variable
             $payGrade->formatted_total_compensation = '₦' . number_format($payGrade->total_compensation, 2);
 
             return response()->json([
@@ -565,7 +568,7 @@ class SalaryStructureController extends Controller
                 'grade_name' => 'required|string|max:100',
                 'grade_code' => 'required|string|max:20|unique:pay_grade_structures,grade_code,' . $id,
                 'pay_structure_type' => 'required|string',
-                'emoluments' => 'required|array',
+                'emoluments' => 'nullable|array', // Changed from 'required' to 'nullable' - can add emoluments later via bulk upload
                 'currency' => 'nullable|string|max:3'
             ]);
 
@@ -579,9 +582,10 @@ class SalaryStructureController extends Controller
 
             DB::beginTransaction();
 
-            // Calculate total compensation from emoluments
+            // Calculate total compensation from emoluments (if provided)
             $totalCompensation = 0;
-            foreach ($request->emoluments as $component => $amount) {
+            $emoluments = $request->emoluments ?? [];
+            foreach ($emoluments as $component => $amount) {
                 if (is_numeric($amount) && $amount > 0) {
                     $totalCompensation += $amount;
                 }
@@ -592,7 +596,7 @@ class SalaryStructureController extends Controller
                 'grade_name' => $request->grade_name,
                 'grade_code' => strtoupper($request->grade_code),
                 'pay_structure_type' => $request->pay_structure_type,
-                'emoluments' => json_encode($request->emoluments),
+                'emoluments' => json_encode($emoluments), // Use the null-safe $emoluments variable
                 'total_compensation' => $totalCompensation,
                 'currency' => $request->get('currency', $payGrade->currency),
                 'is_active' => $request->get('is_active', $payGrade->is_active),
@@ -602,7 +606,7 @@ class SalaryStructureController extends Controller
             DB::commit();
 
             $payGrade->load(['jobStructure']);
-            $payGrade->emolument_breakdown = $request->emoluments;
+            $payGrade->emolument_breakdown = $emoluments; // Use the null-safe variable
             $payGrade->formatted_total_compensation = '₦' . number_format($payGrade->total_compensation, 2);
 
             return response()->json([
