@@ -146,7 +146,7 @@ export default function WarningTab({ currentTheme, preferences }) {
       )}
 
       {/* Client Selector */}
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+      <div className={`${currentTheme.card} border ${currentTheme.border} rounded-lg p-3 shadow-sm`}>
         <ClientSelector
           value={selectedClient}
           onChange={setSelectedClient}
@@ -160,9 +160,9 @@ export default function WarningTab({ currentTheme, preferences }) {
           {/* Two Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* LEFT - Single Entry Form */}
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-              <div className="px-4 py-3 bg-gradient-to-r from-red-50 to-red-100 border-b border-gray-200 rounded-t-lg">
-                <h3 className="text-sm font-bold text-red-900 flex items-center gap-2">
+            <div className={`${currentTheme.card} border ${currentTheme.border} rounded-lg shadow-sm`}>
+              <div className={`px-4 py-3 bg-gradient-to-r from-red-50 to-red-100 border-b ${currentTheme.border} rounded-t-lg`}>
+                <h3 className={`text-sm font-bold ${currentTheme.text} flex items-center gap-2`}>
                   <span>⚡</span> Single Warning Entry
                 </h3>
               </div>
@@ -178,7 +178,7 @@ export default function WarningTab({ currentTheme, preferences }) {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme.textMuted} uppercase tracking-wide mb-1.5`}>
                         Warning Level <span className="text-red-500">*</span>
                       </label>
                       <select
@@ -199,7 +199,7 @@ export default function WarningTab({ currentTheme, preferences }) {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme.textMuted} uppercase tracking-wide mb-1.5`}>
                         Warning Date <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -217,7 +217,7 @@ export default function WarningTab({ currentTheme, preferences }) {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme.textMuted} uppercase tracking-wide mb-1.5`}>
                         Status
                       </label>
                       <select
@@ -235,7 +235,7 @@ export default function WarningTab({ currentTheme, preferences }) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme.textMuted} uppercase tracking-wide mb-1.5`}>
                       Reason <span className="text-red-500">*</span>
                     </label>
                     <textarea
@@ -262,9 +262,9 @@ export default function WarningTab({ currentTheme, preferences }) {
             </div>
 
             {/* RIGHT - Bulk Upload */}
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-              <div className="px-4 py-3 bg-gradient-to-r from-green-50 to-green-100 border-b border-gray-200 rounded-t-lg">
-                <h3 className="text-sm font-bold text-green-900 flex items-center gap-2">
+            <div className={`${currentTheme.card} border ${currentTheme.border} rounded-lg shadow-sm`}>
+              <div className={`px-4 py-3 bg-gradient-to-r from-green-50 to-green-100 border-b ${currentTheme.border} rounded-t-lg`}>
+                <h3 className={`text-sm font-bold ${currentTheme.text} flex items-center gap-2`}>
                   <span>📤</span> Bulk Upload Warnings
                 </h3>
               </div>
@@ -278,7 +278,7 @@ export default function WarningTab({ currentTheme, preferences }) {
 
                 <form onSubmit={handleBulkUpload} className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme.textMuted} uppercase tracking-wide mb-1.5`}>
                       Upload Excel File
                     </label>
                     <input
@@ -308,9 +308,9 @@ export default function WarningTab({ currentTheme, preferences }) {
           </div>
 
           {/* Warnings Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-            <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 rounded-t-lg flex items-center justify-between">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <div className={`${currentTheme.card} border ${currentTheme.border} rounded-lg shadow-sm`}>
+            <div className={`px-4 py-3 ${currentTheme.cardHeader} border-b ${currentTheme.border} rounded-t-lg flex items-center justify-between`}>
+              <h3 className={`text-sm font-bold ${currentTheme.text} flex items-center gap-2`}>
                 <span>📋</span> Warning Records
               </h3>
               <span className="px-2.5 py-1 bg-red-100 text-red-800 text-xs font-bold rounded-full">
@@ -319,34 +319,34 @@ export default function WarningTab({ currentTheme, preferences }) {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className={`${currentTheme.cardHeader} border-b ${currentTheme.border}`}>
                   <tr>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.textMuted} uppercase tracking-wider`}>
                       Staff ID
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.textMuted} uppercase tracking-wider`}>
                       Name
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.textMuted} uppercase tracking-wider`}>
                       Level
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.textMuted} uppercase tracking-wider`}>
                       Warning Date
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.textMuted} uppercase tracking-wider`}>
                       Reason
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.textMuted} uppercase tracking-wider`}>
                       Status
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className={`divide-y ${currentTheme.border}`}>
                   {warnings.length === 0 ? (
                     <tr>
                       <td
                         colSpan="6"
-                        className="px-4 py-8 text-center text-sm text-gray-500 italic"
+                        className={`px-4 py-8 text-center text-sm ${currentTheme.textMuted} italic`}
                       >
                         No warning records found. Create a new entry or upload
                         in bulk.
@@ -356,12 +356,12 @@ export default function WarningTab({ currentTheme, preferences }) {
                     warnings.map((warning) => (
                       <tr
                         key={warning.id}
-                        className="hover:bg-gray-50 transition-colors"
+                        className={`${currentTheme.hover} transition-colors`}
                       >
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        <td className={`px-4 py-3 text-sm font-medium ${currentTheme.text}`}>
                           {warning.staff?.staff_id}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme.textSecondary}`}>
                           {warning.staff?.first_name} {warning.staff?.last_name}
                         </td>
                         <td className="px-4 py-3 text-sm">
@@ -377,10 +377,10 @@ export default function WarningTab({ currentTheme, preferences }) {
                             {warning.warning_level}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme.textSecondary}`}>
                           {warning.issued_date}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 max-w-xs truncate">
+                        <td className={`px-4 py-3 text-sm ${currentTheme.textSecondary} max-w-xs truncate`}>
                           {warning.reason}
                         </td>
                         <td className="px-4 py-3 text-sm">

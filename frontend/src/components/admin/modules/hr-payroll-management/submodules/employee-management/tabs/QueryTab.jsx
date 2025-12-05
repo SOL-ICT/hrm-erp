@@ -92,7 +92,7 @@ export default function QueryTab({ currentTheme, preferences }) {
       )}
 
       {/* Client Selector */}
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+      <div className={`${currentTheme.cardBg} ${currentTheme.border} rounded-lg p-3 shadow-sm`}>
         <ClientSelector
           value={selectedClient}
           onChange={setSelectedClient}
@@ -104,8 +104,8 @@ export default function QueryTab({ currentTheme, preferences }) {
       {selectedClient && (
         <>
           {/* Single Column for Query (No Bulk Upload) */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-            <div className="px-4 py-3 bg-gradient-to-r from-teal-50 to-teal-100 border-b border-gray-200 rounded-t-lg">
+          <div className={`${currentTheme.cardBg} ${currentTheme.border} rounded-lg shadow-sm`}>
+            <div className={`px-4 py-3 bg-gradient-to-r from-teal-50 to-teal-100 border-b ${currentTheme.border} rounded-t-lg`}>
               <h3 className="text-sm font-bold text-teal-900 flex items-center gap-2">
                 <span>❓</span> Create Staff Query
               </h3>
@@ -122,7 +122,7 @@ export default function QueryTab({ currentTheme, preferences }) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme.mutedText} uppercase tracking-wide mb-1.5`}>
                       Query Date <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -137,7 +137,7 @@ export default function QueryTab({ currentTheme, preferences }) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme.mutedText} uppercase tracking-wide mb-1.5`}>
                       Status
                     </label>
                     <select
@@ -145,7 +145,7 @@ export default function QueryTab({ currentTheme, preferences }) {
                       onChange={(e) =>
                         setFormData({ ...formData, status: e.target.value })
                       }
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:border-teal-400 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
+                      className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg ${currentTheme.cardBg} hover:border-teal-400 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors`}
                     >
                       <option value="pending">Pending</option>
                       <option value="responded">Responded</option>
@@ -156,7 +156,7 @@ export default function QueryTab({ currentTheme, preferences }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                  <label className={`block text-xs font-semibold ${currentTheme.mutedText} uppercase tracking-wide mb-1.5`}>
                     Query Details <span className="text-red-500">*</span>
                   </label>
                   <textarea
@@ -176,7 +176,7 @@ export default function QueryTab({ currentTheme, preferences }) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme.mutedText} uppercase tracking-wide mb-1.5`}>
                       Response (Optional)
                     </label>
                     <textarea
@@ -191,7 +191,7 @@ export default function QueryTab({ currentTheme, preferences }) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme.mutedText} uppercase tracking-wide mb-1.5`}>
                       Response Date (Optional)
                     </label>
                     <input
@@ -220,9 +220,9 @@ export default function QueryTab({ currentTheme, preferences }) {
           </div>
 
           {/* Queries Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-            <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 rounded-t-lg flex items-center justify-between">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <div className={`${currentTheme.cardBg} ${currentTheme.border} rounded-lg shadow-sm`}>
+            <div className={`px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 border-b ${currentTheme.border} rounded-t-lg flex items-center justify-between`}>
+              <h3 className={`text-sm font-bold ${currentTheme.text} flex items-center gap-2`}>
                 <span>📋</span> Staff Query Records
               </h3>
               <span className="px-2.5 py-1 bg-teal-100 text-teal-800 text-xs font-bold rounded-full">
@@ -231,31 +231,31 @@ export default function QueryTab({ currentTheme, preferences }) {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className={`${currentTheme.tableHeaderBg} border-b ${currentTheme.border}`}>
                   <tr>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.mutedText} uppercase tracking-wider`}>
                       Staff ID
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.mutedText} uppercase tracking-wider`}>
                       Name
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.mutedText} uppercase tracking-wider`}>
                       Query Date
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.mutedText} uppercase tracking-wider`}>
                       Query Details
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.mutedText} uppercase tracking-wider`}>
                       Status
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className={`divide-y ${currentTheme.border}`}>
                   {queries.length === 0 ? (
                     <tr>
                       <td
                         colSpan="5"
-                        className="px-4 py-8 text-center text-sm text-gray-500 italic"
+                        className={`px-4 py-8 text-center text-sm ${currentTheme.mutedText} italic`}
                       >
                         No query records found. Create a new query above.
                       </td>
@@ -264,18 +264,18 @@ export default function QueryTab({ currentTheme, preferences }) {
                     queries.map((query) => (
                       <tr
                         key={query.id}
-                        className="hover:bg-gray-50 transition-colors"
+                        className={`${currentTheme.tableRowHover} transition-colors`}
                       >
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        <td className={`px-4 py-3 text-sm font-medium ${currentTheme.text}`}>
                           {query.staff?.staff_id}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme.text}`}>
                           {query.staff?.first_name} {query.staff?.last_name}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme.text}`}>
                           {query.query_date}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 max-w-xs truncate">
+                        <td className={`px-4 py-3 text-sm ${currentTheme.text} max-w-xs truncate`}>
                           {query.query_details}
                         </td>
                         <td className="px-4 py-3 text-sm">

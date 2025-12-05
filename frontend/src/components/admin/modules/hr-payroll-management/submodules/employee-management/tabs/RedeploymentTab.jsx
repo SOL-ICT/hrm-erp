@@ -317,7 +317,7 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
       )}
 
       {/* Client Selector */}
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+      <div className={`${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.border || 'border border-gray-200'} rounded-lg p-3 shadow-sm`}>
         <ClientSelector
           value={selectedClient}
           onChange={setSelectedClient}
@@ -331,8 +331,8 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
           {/* Two Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* LEFT - Single Entry Form */}
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-              <div className="px-4 py-3 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-gray-200 rounded-t-lg">
+            <div className={`${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.border || 'border border-gray-200'} rounded-lg shadow-sm`}>
+              <div className={`px-4 py-3 bg-gradient-to-r from-orange-50 to-orange-100 ${currentTheme?.border || 'border-b border-gray-200'} rounded-t-lg`}>
                 <h3 className="text-sm font-bold text-orange-900 flex items-center gap-2">
                   <span>🔄</span> Single Redeployment Entry
                 </h3>
@@ -348,7 +348,7 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
                   />
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                       Redeployment Type <span className="text-red-500">*</span>
                     </label>
                     <select
@@ -373,7 +373,7 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
                     {renderTypeSpecificFields()}
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                         Redeployment Date{" "}
                         <span className="text-red-500">*</span>
                       </label>
@@ -392,7 +392,7 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                         Effective Date <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -411,7 +411,7 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                       Reason <span className="text-red-500">*</span>
                     </label>
                     <textarea
@@ -438,8 +438,8 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
             </div>
 
             {/* RIGHT - Bulk Upload */}
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-              <div className="px-4 py-3 bg-gradient-to-r from-green-50 to-green-100 border-b border-gray-200 rounded-t-lg">
+            <div className={`${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.border || 'border border-gray-200'} rounded-lg shadow-sm`}>
+              <div className={`px-4 py-3 bg-gradient-to-r from-green-50 to-green-100 ${currentTheme?.border || 'border-b border-gray-200'} rounded-t-lg`}>
                 <h3 className="text-sm font-bold text-green-900 flex items-center gap-2">
                   <span>📤</span> Bulk Upload Redeployments
                 </h3>
@@ -454,7 +454,7 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
 
                 <form onSubmit={handleBulkUpload} className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                       Upload Excel File
                     </label>
                     <input
@@ -484,9 +484,9 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
           </div>
 
           {/* Redeployments Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-            <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 rounded-t-lg flex items-center justify-between">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <div className={`${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.border || 'border border-gray-200'} rounded-lg shadow-sm`}>
+            <div className={`px-4 py-3 bg-gradient-to-r ${currentTheme?.cardBg || 'from-gray-50 to-gray-100'} ${currentTheme?.border || 'border-b border-gray-200'} rounded-t-lg flex items-center justify-between`}>
+              <h3 className={`text-sm font-bold ${currentTheme?.textPrimary || 'text-gray-900'} flex items-center gap-2`}>
                 <span>📋</span> Redeployment Records
               </h3>
               <span className="px-2.5 py-1 bg-orange-100 text-orange-800 text-xs font-bold rounded-full">
@@ -496,21 +496,21 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className={`${currentTheme?.cardBg || 'bg-gray-50'} ${currentTheme?.border || 'border-b border-gray-200'}`}>
                   <tr>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
                       Staff ID
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
                       Name
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
                       Type
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
                       Redeployment Date
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
                       Effective Date
                     </th>
                   </tr>
@@ -520,7 +520,7 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
                     <tr>
                       <td
                         colSpan="5"
-                        className="px-4 py-8 text-center text-sm text-gray-500 italic"
+                        className={`px-4 py-8 text-center text-sm ${currentTheme?.textSecondary || 'text-gray-500'} italic`}
                       >
                         No redeployment records found. Create a new entry or
                         upload in bulk.
@@ -530,12 +530,12 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
                     redeployments.map((redeployment) => (
                       <tr
                         key={redeployment.id}
-                        className="hover:bg-gray-50 transition-colors"
+                        className={`hover:${currentTheme?.cardBg || 'bg-gray-50'} transition-colors`}
                       >
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        <td className={`px-4 py-3 text-sm font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                           {redeployment.staff?.staff_id}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
                           {redeployment.staff?.first_name}{" "}
                           {redeployment.staff?.last_name}
                         </td>
@@ -544,10 +544,10 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
                             {redeployment.redeployment_type?.replace("_", " ")}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
                           {redeployment.redeployment_date}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
                           {redeployment.effective_date}
                         </td>
                       </tr>

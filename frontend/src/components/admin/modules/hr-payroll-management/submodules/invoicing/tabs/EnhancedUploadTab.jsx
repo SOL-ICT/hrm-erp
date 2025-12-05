@@ -1,18 +1,8 @@
 import React, { useState, useCallback, useEffect } from "react";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
   Button,
   Alert,
   AlertDescription,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Badge,
   Tabs,
   TabsContent,
@@ -46,6 +36,7 @@ import {
  * Includes uploaded files management table
  */
 const EnhancedUploadTab = ({
+  currentTheme,
   attendanceUploads = [],
   onUploadSuccess,
   onProceedToGeneration: parentProceedToGeneration,
@@ -233,11 +224,11 @@ const EnhancedUploadTab = ({
 
   const getStatusBadge = (status) => {
     const statusMap = {
-      pending: { color: "bg-yellow-100 text-yellow-800", label: "Pending" },
-      processing: { color: "bg-blue-100 text-blue-800", label: "Processing" },
-      completed: { color: "bg-green-100 text-green-800", label: "Completed" },
-      failed: { color: "bg-red-100 text-red-800", label: "Failed" },
-      validated: { color: "bg-green-100 text-green-800", label: "Validated" },
+      pending: { color: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300", label: "Pending" },
+      processing: { color: "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300", label: "Processing" },
+      completed: { color: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300", label: "Completed" },
+      failed: { color: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300", label: "Failed" },
+      validated: { color: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300", label: "Validated" },
     };
 
     const config = statusMap[status] || statusMap.pending;
@@ -281,33 +272,35 @@ const EnhancedUploadTab = ({
   return (
     <div className="space-y-6">
       {/* Phase 1.3 Enhanced Upload */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3">
-            <Upload className="w-6 h-6 text-blue-600" />
-            Attendance Upload
-          </CardTitle>
-          <p className="text-sm text-gray-600 mt-2">
+      <div className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg shadow-sm ${currentTheme?.border || 'border'}`}>
+        <div className={`p-6 border-b ${currentTheme?.border || 'border-gray-200'}`}>
+          <div className="flex items-center gap-3">
+            <Upload className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <h3 className={`text-lg font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
+              Attendance Upload
+            </h3>
+          </div>
+          <p className={`text-sm ${currentTheme?.textSecondary || 'text-gray-600'} mt-2`}>
             Direct pay_grade_structure_id matching with real-time validation and
             template coverage analysis
           </p>
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div className="p-6">{/* CardContent equivalent */}
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Client Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
                   Select Client
                 </label>
                 <select
                   value={selectedClient}
                   onChange={(e) => setSelectedClient(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="">Choose a client...</option>
+                  <option value="" className="bg-white dark:bg-slate-800 text-gray-900 dark:text-white">Choose a client...</option>
                   {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
+                    <option key={client.id} value={client.id} className="bg-white dark:bg-slate-800 text-gray-900 dark:text-white">
                       {client.organisation_name}
                     </option>
                   ))}
@@ -316,27 +309,27 @@ const EnhancedUploadTab = ({
 
               {/* Payroll Month Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
                   Payroll Month
                 </label>
                 <input
                   type="month"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 [color-scheme:light] dark:[color-scheme:dark]"
                 />
               </div>
 
               {/* File Upload */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
                   Upload Attendance File
                 </label>
                 <input
                   type="file"
                   accept=".xlsx,.xls,.csv"
                   onChange={handleFileSelect}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  className="block w-full text-sm text-gray-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/30 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/50"
                 />
               </div>
             </div>
@@ -377,16 +370,16 @@ const EnhancedUploadTab = ({
 
             {/* Error Display */}
             {error && (
-              <Alert className="border-red-200 bg-red-50">
-                <XCircle className="w-4 h-4 text-red-600" />
-                <AlertDescription className="text-red-700">
+              <Alert variant="destructive">
+                <XCircle className="w-4 h-4" />
+                <AlertDescription>
                   {error}
                 </AlertDescription>
               </Alert>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Upload Results */}
       {(uploadResult || validationResults) && (
@@ -402,16 +395,18 @@ const EnhancedUploadTab = ({
           </TabsList>
 
           <TabsContent value="upload">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  Upload Successful
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            <div className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg shadow-sm ${currentTheme?.border || 'border'}`}>
+              <div className={`p-6 border-b ${currentTheme?.border || 'border-gray-200'}`}>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <h3 className={`text-lg font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
+                    Upload Successful
+                  </h3>
+                </div>
+              </div>
+              <div className="p-6">
                 {uploadResult && (
-                  <div className="space-y-3">
+                  <div className="space-y-3 text-gray-900 dark:text-slate-200">
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="font-medium">Records Processed:</span>{" "}
@@ -432,54 +427,56 @@ const EnhancedUploadTab = ({
                     </div>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="validation">
             {validationResults && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              <div className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg shadow-sm ${currentTheme?.border || 'border'}`}>
+                <div className={`p-6 border-b ${currentTheme?.border || 'border-gray-200'}`}>
+                  <div className="flex items-center gap-2">
                     {validating ? (
-                      <Clock className="w-5 h-5 text-yellow-600 animate-spin" />
+                      <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400 animate-spin" />
                     ) : (
-                      <Target className="w-5 h-5 text-blue-600" />
+                      <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     )}
-                    Validation Results
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
+                    <h3 className={`text-lg font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
+                      Validation Results
+                    </h3>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-4 text-gray-900 dark:text-slate-200">
                     <div className="grid grid-cols-3 gap-4">
-                      <div className="text-center p-3 bg-green-50 rounded-lg">
-                        <div className="text-2xl font-bold text-green-600">
+                      <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                           {validationResults.summary?.successful_matches || 0}
                         </div>
-                        <div className="text-sm text-green-700">
+                        <div className="text-sm text-green-700 dark:text-green-300">
                           Successful Matches
                         </div>
                       </div>
-                      <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                        <div className="text-2xl font-bold text-yellow-600">
+                      <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                        <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
                           {validationResults.summary?.failed_matches || 0}
                         </div>
-                        <div className="text-sm text-yellow-700">
+                        <div className="text-sm text-yellow-700 dark:text-yellow-300">
                           Failed Matches
                         </div>
                       </div>
-                      <div className="text-center p-3 bg-blue-50 rounded-lg">
-                        <div className="text-2xl font-bold text-blue-600">
+                      <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                           {validationResults.summary?.total_records || 0}
                         </div>
-                        <div className="text-sm text-blue-700">
+                        <div className="text-sm text-blue-700 dark:text-blue-300">
                           Total Records
                         </div>
                       </div>
                     </div>
 
                     {validationResults.summary?.validation_rate && (
-                      <div className="space-y-2">
+                      <div className="space-y-2 text-gray-900 dark:text-slate-200">
                         <div className="flex justify-between text-sm">
                           <span>Validation Success Rate</span>
                           <span className="font-medium">
@@ -512,104 +509,108 @@ const EnhancedUploadTab = ({
                       </Button>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )}
           </TabsContent>
 
           <TabsContent value="coverage">
             {templateCoverage && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-purple-600" />
-                    Template Coverage Analysis
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
+              <div className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg shadow-sm ${currentTheme?.border || 'border'}`}>
+                <div className={`p-6 border-b ${currentTheme?.border || 'border-gray-200'}`}>
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    <h3 className={`text-lg font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
+                      Template Coverage Analysis
+                    </h3>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-4 text-gray-900 dark:text-slate-200">
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-3 bg-purple-50 rounded-lg">
-                        <div className="text-2xl font-bold text-purple-600">
+                      <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                        <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                           {templateCoverage.coverage_percentage?.toFixed(1) ||
                             0}
                           %
                         </div>
-                        <div className="text-sm text-purple-700">
+                        <div className="text-sm text-purple-700 dark:text-purple-300">
                           Template Coverage
                         </div>
                       </div>
-                      <div className="text-center p-3 bg-indigo-50 rounded-lg">
-                        <div className="text-2xl font-bold text-indigo-600">
+                      <div className="text-center p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                        <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
                           {templateCoverage.matched_structures || 0}
                         </div>
-                        <div className="text-sm text-indigo-700">
+                        <div className="text-sm text-indigo-700 dark:text-indigo-300">
                           Matched Structures
                         </div>
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )}
           </TabsContent>
         </Tabs>
       )}
 
       {/* Uploaded Files Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3">
-            <FileCheck className="w-6 h-6 text-green-600" />
-            Uploaded Attendance Files
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg shadow-sm ${currentTheme?.border || 'border'}`}>
+        <div className={`p-6 border-b ${currentTheme?.border || 'border-gray-200'}`}>
+          <div className="flex items-center gap-3">
+            <FileCheck className="w-6 h-6 text-green-600 dark:text-green-400" />
+            <h3 className={`text-lg font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
+              Uploaded Attendance Files
+            </h3>
+          </div>
+        </div>
+        <div className="p-6">
           {!Array.isArray(attendanceUploads) ||
           attendanceUploads.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <FileSpreadsheet className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <div className={`text-center py-8 ${currentTheme?.textSecondary || 'text-gray-500'}`}>
+              <FileSpreadsheet className={`w-12 h-12 mx-auto mb-4 ${currentTheme?.textMuted || 'text-gray-300'}`} />
               <p>No attendance files uploaded yet</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>File Name</TableHead>
-                    <TableHead>Client</TableHead>
-                    <TableHead>Upload Date</TableHead>
-                    <TableHead>Records</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <table className={`min-w-full divide-y ${currentTheme?.border || 'divide-gray-200'}`}>
+                <thead className={`${currentTheme?.cardBg || 'bg-gray-50'}`}>
+                  <tr>
+                    <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>File Name</th>
+                    <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>Client</th>
+                    <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>Upload Date</th>
+                    <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>Records</th>
+                    <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>Status</th>
+                    <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody className={`divide-y ${currentTheme?.border || 'divide-gray-200'}`}>
                   {attendanceUploads.map((upload) => (
-                    <TableRow key={upload.id}>
-                      <TableCell className="font-medium">
+                    <tr key={upload.id} className={`${currentTheme?.cardBg || 'bg-white'} hover:bg-slate-700/50 transition-colors`}>
+                      <td className={`px-6 py-4 whitespace-nowrap font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                         <div className="flex items-center gap-2">
-                          <FileSpreadsheet className="w-4 h-4 text-gray-500" />
+                          <FileSpreadsheet className={`w-4 h-4 ${currentTheme?.textSecondary || 'text-gray-500'}`} />
                           <div>
                             <div>{upload.file_name}</div>
-                            <div className="text-xs text-gray-500">
+                            <div className={`text-xs ${currentTheme?.textSecondary || 'text-gray-500'}`}>
                               {upload.file_size &&
                                 formatFileSize(upload.file_size)}
                             </div>
                           </div>
                         </div>
-                      </TableCell>
-                      <TableCell>
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                         {upload.client?.organisation_name || "N/A"}
-                      </TableCell>
-                      <TableCell>
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                         {upload.created_at
                           ? new Date(upload.created_at).toLocaleDateString()
                           : "N/A"}
-                      </TableCell>
-                      <TableCell>{upload.total_records || "N/A"}</TableCell>
-                      <TableCell>{getStatusBadge(upload.status)}</TableCell>
-                      <TableCell>
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap ${currentTheme?.textPrimary || 'text-gray-900'}`}>{upload.total_records || "N/A"}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(upload.status)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <Button
                             size="sm"
@@ -627,20 +628,20 @@ const EnhancedUploadTab = ({
                             size="sm"
                             variant="outline"
                             onClick={() => handleDeleteUpload(upload.id)}
-                            className="text-red-600 hover:text-red-700"
+                            className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/*Attendance Preview Modal */}
       <AttendancePreviewModal

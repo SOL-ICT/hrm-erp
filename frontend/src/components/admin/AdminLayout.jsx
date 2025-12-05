@@ -38,10 +38,18 @@ const AdminLayout = () => {
     language: "en",
   };
 
-  // Theme state management
-  const [currentThemeKey, setCurrentThemeKey] = useState(
-    preferences.theme || "dark"
-  );
+  // Theme state management - Initialize and apply dark class immediately
+  const [currentThemeKey, setCurrentThemeKey] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("admin_theme") || preferences.theme || "dark";
+      // Apply dark class immediately
+      if (savedTheme === 'dark' || savedTheme === 'transparent') {
+        document.documentElement.classList.add('dark');
+      }
+      return savedTheme;
+    }
+    return preferences.theme || "dark";
+  });
 
   // Enhanced theme configurations with modern dark mode standards
   const themes = {
@@ -109,6 +117,18 @@ const AdminLayout = () => {
       }
     }
   }, []);
+
+  // Apply dark class to document element for Tailwind dark mode
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const htmlElement = document.documentElement;
+      if (currentThemeKey === 'dark' || currentThemeKey === 'transparent') {
+        htmlElement.classList.add('dark');
+      } else {
+        htmlElement.classList.remove('dark');
+      }
+    }
+  }, [currentThemeKey]);
 
   const currentTheme = themes[currentThemeKey] || themes.dark;
 
