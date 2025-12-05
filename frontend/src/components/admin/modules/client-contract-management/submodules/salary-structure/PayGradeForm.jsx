@@ -538,9 +538,11 @@ const PayGradeForm = ({
       newErrors.pay_structure_type = "Pay structure type is required";
     }
 
-    if (Object.keys(formData.emoluments).length === 0) {
-      newErrors.emoluments = "At least one emolument component is required";
-    }
+    // Emoluments are now OPTIONAL - can create grade without emoluments
+    // and add them later via bulk Excel upload in "BULK UPLOAD PAY GRADES" modal
+    // if (Object.keys(formData.emoluments).length === 0) {
+    //   newErrors.emoluments = "At least one emolument component is required";
+    // }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
