@@ -188,7 +188,7 @@ export default function PayrollSettingsTab({ currentTheme, user, setError }) {
       </div>
 
       {/* Section Tabs */}
-      <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
+      <div className={`flex gap-2 border-b ${currentTheme?.border || 'border border-gray-200'}`}>
         {sections.map(({ id, name, icon: Icon }) => (
           <button
             key={id}
@@ -301,13 +301,13 @@ function TaxConfigurationSection({
   return (
     <div className="space-y-6">
       {/* PAYE Brackets */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg ${currentTheme?.border || 'border border-gray-200'} p-6`}>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h3 className={`text-lg font-semibold ${currentTheme?.textPrimary || 'text-gray-900'}`}>
               PAYE Tax Brackets
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <p className={`text-sm ${currentTheme?.textSecondary || 'text-gray-600'} mt-1`}>
               Progressive tax rates (Nigeria 2025)
             </p>
           </div>
@@ -416,13 +416,13 @@ function TaxConfigurationSection({
       </div>
 
       {/* Tax Exemption */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg ${currentTheme?.border || 'border border-gray-200'} p-6`}>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h3 className={`text-lg font-semibold ${currentTheme?.textPrimary || 'text-gray-900'}`}>
               Tax Exemption Threshold
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <p className={`text-sm ${currentTheme?.textSecondary || 'text-gray-600'} mt-1`}>
               CRA + 20% of Gross Income
             </p>
           </div>
@@ -556,14 +556,14 @@ function StatutoryDeductionsSection({
         return (
           <div
             key={key}
-            className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6"
+            className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg ${currentTheme?.border || 'border border-gray-200'} p-6`}
           >
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                <h3 className={`text-lg font-semibold ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                   {name}
                 </h3>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                <p className={`text-xs ${currentTheme?.textSecondary || 'text-gray-600'} mt-1`}>
                   {legal}
                 </p>
               </div>
@@ -743,13 +743,13 @@ function CalculationFormulasSection({
         return (
           <div
             key={key}
-            className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
+            className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg ${currentTheme?.border || 'border border-gray-200'}`}
           >
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className={`p-4 border-b ${currentTheme?.border || 'border border-gray-200'}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Calculator className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                  <h3 className={`font-semibold ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                     {name}
                   </h3>
                   {!isEditing && (
@@ -920,7 +920,7 @@ function UniversalComponentsSection({ settings, currentTheme }) {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg ${currentTheme?.border || 'border border-gray-200'} overflow-hidden`}>
         <table className="w-full">
           <thead className="bg-gray-50 dark:bg-gray-800">
             <tr>
@@ -985,9 +985,9 @@ function UniversalComponentsSection({ settings, currentTheme }) {
 function HistoryModal({ data, onClose, currentTheme }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] overflow-hidden">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+      <div className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] overflow-hidden`}>
+        <div className={`p-6 border-b ${currentTheme?.border || 'border border-gray-200'} flex items-center justify-between`}>
+          <h3 className={`text-lg font-semibold ${currentTheme?.textPrimary || 'text-gray-900'}`}>
             Change History
           </h3>
           <button

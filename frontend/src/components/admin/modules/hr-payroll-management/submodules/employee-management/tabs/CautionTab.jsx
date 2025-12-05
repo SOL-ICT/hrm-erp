@@ -144,7 +144,7 @@ export default function CautionTab({ currentTheme, preferences }) {
       )}
 
       {/* Client Selector */}
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+      <div className={`${currentTheme.cardBg} ${currentTheme.border} rounded-lg p-3 shadow-sm`}>
         <ClientSelector
           value={selectedClient}
           onChange={setSelectedClient}
@@ -158,8 +158,8 @@ export default function CautionTab({ currentTheme, preferences }) {
           {/* Two Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* LEFT - Single Entry Form */}
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-              <div className="px-4 py-3 bg-gradient-to-r from-yellow-50 to-yellow-100 border-b border-gray-200 rounded-t-lg">
+            <div className={`${currentTheme.cardBg} ${currentTheme.border} rounded-lg shadow-sm`}>
+              <div className={`px-4 py-3 bg-gradient-to-r from-yellow-50 to-yellow-100 border-b ${currentTheme.border} rounded-t-lg`}>
                 <h3 className="text-sm font-bold text-yellow-900 flex items-center gap-2">
                   <span>⚠️</span> Single Caution Entry
                 </h3>
@@ -176,7 +176,7 @@ export default function CautionTab({ currentTheme, preferences }) {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme.mutedText} uppercase tracking-wide mb-1.5`}>
                         Caution Date <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -194,7 +194,7 @@ export default function CautionTab({ currentTheme, preferences }) {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme.mutedText} uppercase tracking-wide mb-1.5`}>
                         Status
                       </label>
                       <select
@@ -202,7 +202,7 @@ export default function CautionTab({ currentTheme, preferences }) {
                         onChange={(e) =>
                           setFormData({ ...formData, status: e.target.value })
                         }
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:border-yellow-400 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors"
+                        className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg ${currentTheme.cardBg} hover:border-yellow-400 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors`}
                       >
                         <option value="active">Active</option>
                         <option value="resolved">Resolved</option>
@@ -212,7 +212,7 @@ export default function CautionTab({ currentTheme, preferences }) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme.mutedText} uppercase tracking-wide mb-1.5`}>
                       Reason <span className="text-red-500">*</span>
                     </label>
                     <textarea
@@ -239,8 +239,8 @@ export default function CautionTab({ currentTheme, preferences }) {
             </div>
 
             {/* RIGHT - Bulk Upload */}
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-              <div className="px-4 py-3 bg-gradient-to-r from-green-50 to-green-100 border-b border-gray-200 rounded-t-lg">
+            <div className={`${currentTheme.cardBg} ${currentTheme.border} rounded-lg shadow-sm`}>
+              <div className={`px-4 py-3 bg-gradient-to-r from-green-50 to-green-100 border-b ${currentTheme.border} rounded-t-lg`}>
                 <h3 className="text-sm font-bold text-green-900 flex items-center gap-2">
                   <span>📤</span> Bulk Upload Cautions
                 </h3>
@@ -255,7 +255,7 @@ export default function CautionTab({ currentTheme, preferences }) {
 
                 <form onSubmit={handleBulkUpload} className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme.mutedText} uppercase tracking-wide mb-1.5`}>
                       Upload Excel File
                     </label>
                     <input
@@ -285,9 +285,9 @@ export default function CautionTab({ currentTheme, preferences }) {
           </div>
 
           {/* Cautions Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-            <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 rounded-t-lg flex items-center justify-between">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <div className={`${currentTheme.cardBg} ${currentTheme.border} rounded-lg shadow-sm`}>
+            <div className={`px-4 py-3 ${currentTheme.tableHeaderBg} border-b ${currentTheme.border} rounded-t-lg flex items-center justify-between`}>
+              <h3 className={`text-sm font-bold ${currentTheme.text} flex items-center gap-2`}>
                 <span>📋</span> Caution Records
               </h3>
               <span className="px-2.5 py-1 bg-yellow-100 text-yellow-800 text-xs font-bold rounded-full">
@@ -296,31 +296,31 @@ export default function CautionTab({ currentTheme, preferences }) {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className={`${currentTheme.tableHeaderBg} border-b ${currentTheme.border}`}>
                   <tr>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.mutedText} uppercase tracking-wider`}>
                       Staff ID
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.mutedText} uppercase tracking-wider`}>
                       Name
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.mutedText} uppercase tracking-wider`}>
                       Caution Date
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.mutedText} uppercase tracking-wider`}>
                       Reason
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.mutedText} uppercase tracking-wider`}>
                       Status
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className={`divide-y ${currentTheme.border}`}>
                   {cautions.length === 0 ? (
                     <tr>
                       <td
                         colSpan="5"
-                        className="px-4 py-8 text-center text-sm text-gray-500 italic"
+                        className={`px-4 py-8 text-center text-sm ${currentTheme.mutedText} italic`}
                       >
                         No caution records found. Create a new entry or upload
                         in bulk.
@@ -330,18 +330,18 @@ export default function CautionTab({ currentTheme, preferences }) {
                     cautions.map((caution) => (
                       <tr
                         key={caution.id}
-                        className="hover:bg-gray-50 transition-colors"
+                        className={`${currentTheme.hover} transition-colors`}
                       >
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        <td className={`px-4 py-3 text-sm font-medium ${currentTheme.text}`}>
                           {caution.staff?.staff_id}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme.text}`}>
                           {caution.staff?.first_name} {caution.staff?.last_name}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme.text}`}>
                           {caution.issued_date}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 max-w-xs truncate">
+                        <td className={`px-4 py-3 text-sm ${currentTheme.text} max-w-xs truncate`}>
                           {caution.reason}
                         </td>
                         <td className="px-4 py-3 text-sm">

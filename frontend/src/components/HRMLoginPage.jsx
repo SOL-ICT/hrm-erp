@@ -20,13 +20,35 @@ const HRMLoginPage = () => {
     rememberMe: false,
   });
 
-  const [settings, setSettings] = useState({
-    theme: "light",
-    primaryColor: "#0949b3",
-    backgroundImage: "gradient2",
-    language: "en",
-    deviceType: "auto",
+  // Load saved theme from localStorage, default to 'dark'
+  const [settings, setSettings] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('login_theme');
+      const savedColor = localStorage.getItem('login_primary_color');
+      return {
+        theme: savedTheme || "dark",
+        primaryColor: savedColor || "#0949b3",
+        backgroundImage: "gradient2",
+        language: "en",
+        deviceType: "auto",
+      };
+    }
+    return {
+      theme: "dark",
+      primaryColor: "#0949b3",
+      backgroundImage: "gradient2",
+      language: "en",
+      deviceType: "auto",
+    };
   });
+
+  // Save theme preference whenever it changes
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('login_theme', settings.theme);
+      localStorage.setItem('login_primary_color', settings.primaryColor);
+    }
+  }, [settings.theme, settings.primaryColor]);
 
   const themes = {
     light: {
@@ -38,19 +60,20 @@ const HRMLoginPage = () => {
       inputBorder: "border-gray-300",
     },
     dark: {
-      bg: "from-gray-900 via-gray-800 to-black",
-      cardBg: "bg-gray-800",
+      // Modern dark theme - deep slate with proper depth
+      bg: "from-[#0f1419] via-[#1a1f2e] to-[#0a0e17]",
+      cardBg: "bg-gradient-to-br from-slate-800/95 via-slate-900/95 to-slate-800/95 backdrop-blur-sm shadow-2xl",
       textPrimary: "text-white",
-      textSecondary: "text-gray-300",
-      inputBg: "bg-gray-700",
-      inputBorder: "border-gray-600",
+      textSecondary: "text-slate-300",
+      inputBg: "bg-slate-700/50 backdrop-blur-sm",
+      inputBorder: "border-slate-600/50",
     },
     transparent: {
-      bg: "from-indigo-600/80 via-purple-600/80 to-blue-600/80",
-      cardBg: "bg-white/10 backdrop-blur-md",
+      bg: "from-indigo-900/90 via-blue-900/90 to-slate-900/90",
+      cardBg: "bg-white/10 backdrop-blur-xl shadow-2xl border border-white/20",
       textPrimary: "text-white",
-      textSecondary: "text-white/70",
-      inputBg: "bg-white/20",
+      textSecondary: "text-white/80",
+      inputBg: "bg-white/10 backdrop-blur-sm",
       inputBorder: "border-white/30",
     },
   };

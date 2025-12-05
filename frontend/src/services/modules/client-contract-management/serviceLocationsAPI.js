@@ -97,7 +97,7 @@ const serviceLocationsAPI = {
       formData.append("file", file);
 
       return await apiService.makeRequest(
-        "/admin/service-locations/bulk-import",
+        "/service-locations/bulk-import",
         {
           method: "POST",
           headers: {
@@ -160,12 +160,84 @@ const serviceLocationsAPI = {
     }
   },
 
-  downloadTemplate: async () => {
+  // Get client contact details for auto-fill
+  getClientContactDetails: async (clientId) => {
     try {
-      return await apiService.makeRequest("/service-locations/bulk-template");
+      return await apiService.makeRequest(
+        `/service-locations/client/${clientId}/contact-details`
+      );
+    } catch (error) {
+      console.error("Error fetching client contact details:", error);
+      throw error;
+    }
+  },
+
+  downloadTemplate: async (clientId = null) => {
+    try {
+      const params = clientId ? `?client_id=${clientId}` : '';
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/service-locations/bulk-template${params}`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return {
+          success: false,
+          message: errorData.message || "Failed to download template",
+        };
+      }
+
+      // Check if response is CSV file
+      const contentType = response.headers.get("content-type");
+
+      if (contentType && contentType.includes("text/csv")) {
+        // It's a CSV file - trigger download
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+
+        // Get filename from Content-Disposition header or use default
+        const contentDisposition = response.headers.get("content-disposition");
+        let filename = "service_locations_template.csv";
+        if (contentDisposition) {
+          const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(
+            contentDisposition
+          );
+          if (matches != null && matches[1]) {
+            filename = matches[1].replace(/['"]/g, "");
+          }
+        }
+
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(downloadUrl);
+
+        return {
+          success: true,
+          message: "Template downloaded successfully",
+          filename: filename,
+        };
+      } else {
+        // It's a JSON response (likely an error)
+        const result = await response.json();
+        return result;
+      }
     } catch (error) {
       console.error("Error downloading template:", error);
-      throw error;
+      return {
+        success: false,
+        message: "Error downloading template",
+        error: error.message,
+      };
     }
   },
 };

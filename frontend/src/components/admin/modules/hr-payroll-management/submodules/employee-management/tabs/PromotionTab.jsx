@@ -208,7 +208,7 @@ export default function PromotionTab({ currentTheme, preferences }) {
       )}
 
       {/* Client Selector */}
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+      <div className={`${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.border || 'border border-gray-200'} rounded-lg p-3 shadow-sm`}>
         <ClientSelector
           value={selectedClient}
           onChange={setSelectedClient}
@@ -222,9 +222,9 @@ export default function PromotionTab({ currentTheme, preferences }) {
           {/* Two Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* LEFT - Single Entry Form */}
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-              <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-purple-100 border-b border-gray-200 rounded-t-lg">
-                <h3 className="text-sm font-bold text-purple-900 flex items-center gap-2">
+            <div className={`${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.border || 'border border-gray-200'} rounded-lg shadow-sm`}>
+              <div className={`px-4 py-3 bg-gradient-to-r from-purple-50 to-purple-100 ${currentTheme?.border || 'border-b border-gray-200'} rounded-t-lg`}>
+                <h3 className={`text-sm font-bold ${currentTheme?.textPrimary || 'text-purple-900'} flex items-center gap-2`}>
                   <span>📈</span> Single Promotion Entry
                 </h3>
               </div>
@@ -261,7 +261,7 @@ export default function PromotionTab({ currentTheme, preferences }) {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                         New Job Structure{" "}
                         <span className="text-red-500">*</span>
                       </label>
@@ -287,7 +287,7 @@ export default function PromotionTab({ currentTheme, preferences }) {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                         New Pay Grade <span className="text-red-500">*</span>
                       </label>
                       <select
@@ -312,7 +312,7 @@ export default function PromotionTab({ currentTheme, preferences }) {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                         Promotion Date <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -330,7 +330,7 @@ export default function PromotionTab({ currentTheme, preferences }) {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                         Effective Date <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -360,7 +360,7 @@ export default function PromotionTab({ currentTheme, preferences }) {
                   )}
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                       Reason <span className="text-red-500">*</span>
                     </label>
                     <textarea
@@ -387,9 +387,9 @@ export default function PromotionTab({ currentTheme, preferences }) {
             </div>
 
             {/* RIGHT - Bulk Upload */}
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-              <div className="px-4 py-3 bg-gradient-to-r from-green-50 to-green-100 border-b border-gray-200 rounded-t-lg">
-                <h3 className="text-sm font-bold text-green-900 flex items-center gap-2">
+            <div className={`${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.border || 'border border-gray-200'} rounded-lg shadow-sm`}>
+              <div className={`px-4 py-3 bg-gradient-to-r from-green-50 to-green-100 ${currentTheme?.border || 'border-b border-gray-200'} rounded-t-lg`}>
+                <h3 className={`text-sm font-bold ${currentTheme?.textPrimary || 'text-green-900'} flex items-center gap-2`}>
                   <span>📤</span> Bulk Upload Promotions
                 </h3>
               </div>
@@ -403,7 +403,7 @@ export default function PromotionTab({ currentTheme, preferences }) {
 
                 <form onSubmit={handleBulkUpload} className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                       Upload Excel File
                     </label>
                     <input
@@ -433,9 +433,9 @@ export default function PromotionTab({ currentTheme, preferences }) {
           </div>
 
           {/* Promotions Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-            <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 rounded-t-lg flex items-center justify-between">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <div className={`${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.border || 'border border-gray-200'} rounded-lg shadow-sm`}>
+            <div className={`px-4 py-3 ${currentTheme?.cardBg || 'bg-gradient-to-r from-gray-50 to-gray-100'} ${currentTheme?.border || 'border-b border-gray-200'} rounded-t-lg flex items-center justify-between`}>
+              <h3 className={`text-sm font-bold ${currentTheme?.textPrimary || 'text-gray-900'} flex items-center gap-2`}>
                 <span>📋</span> Promotion Records
               </h3>
               <span className="px-2.5 py-1 bg-purple-100 text-purple-800 text-xs font-bold rounded-full">
@@ -445,24 +445,24 @@ export default function PromotionTab({ currentTheme, preferences }) {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className={`${currentTheme?.cardBg || 'bg-gray-50'} ${currentTheme?.border || 'border-b border-gray-200'}`}>
                   <tr>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
                       Staff ID
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
                       Name
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
                       New Job
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
                       New Grade
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
                       Promotion Date
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
                       Effective Date
                     </th>
                   </tr>
@@ -472,7 +472,7 @@ export default function PromotionTab({ currentTheme, preferences }) {
                     <tr>
                       <td
                         colSpan="6"
-                        className="px-4 py-8 text-center text-sm text-gray-500 italic"
+                        className={`px-4 py-8 text-center text-sm ${currentTheme?.textSecondary || 'text-gray-500'} italic`}
                       >
                         No promotion records found. Create a new entry or upload
                         in bulk.
@@ -482,16 +482,16 @@ export default function PromotionTab({ currentTheme, preferences }) {
                     promotions.map((promotion) => (
                       <tr
                         key={promotion.id}
-                        className="hover:bg-gray-50 transition-colors"
+                        className={`hover:${currentTheme?.cardBg || 'bg-gray-50'} transition-colors`}
                       >
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        <td className={`px-4 py-3 text-sm font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                           {promotion.staff?.staff_id}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
                           {promotion.staff?.first_name}{" "}
                           {promotion.staff?.last_name}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
                           {promotion.job_structure?.job_title}
                         </td>
                         <td className="px-4 py-3 text-sm">
@@ -499,10 +499,10 @@ export default function PromotionTab({ currentTheme, preferences }) {
                             {promotion.pay_grade_structure?.grade_name}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
                           {promotion.promotion_date}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
                           {promotion.effective_date}
                         </td>
                       </tr>

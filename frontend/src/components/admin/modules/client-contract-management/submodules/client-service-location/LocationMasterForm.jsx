@@ -128,12 +128,38 @@ const LocationMasterForm = ({
     }
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = async (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+
+    // ✅ NEW: Auto-fill contact details when client is selected
+    if (name === "client_id" && value) {
+      try {
+        console.log("Fetching contact details for client:", value);
+        const response = await serviceLocationsAPI.getClientContactDetails(value);
+        console.log("Contact details response:", response);
+        
+        if (response.success && response.data) {
+          console.log("Auto-filling contact details:", response.data);
+          setFormData((prev) => ({
+            ...prev,
+            client_id: value,
+            contact_person_name: response.data.contact_person_name || prev.contact_person_name,
+            contact_person_phone: response.data.contact_person_phone || prev.contact_person_phone,
+            contact_person_email: response.data.contact_person_email || prev.contact_person_email,
+          }));
+        } else {
+          console.warn("Response not successful or missing data:", response);
+        }
+      } catch (error) {
+        console.error("Error fetching client contact details:", error);
+        console.error("Error details:", error.message, error.stack);
+        // Continue without auto-fill if error occurs
+      }
+    }
 
     // ✅ NEW: Test auto-assignment when city changes
     if (name === "city" && value.length >= 3) {
@@ -241,6 +267,17 @@ const LocationMasterForm = ({
 
         let message = `Bulk upload completed!\n${response.data.success_count} locations imported successfully.`;
 
+        // Show errors if any
+        if (response.data.error_count > 0) {
+          message += `\n\n❌ ${response.data.error_count} rows had errors:`;
+          response.data.errors.slice(0, 5).forEach(err => {
+            message += `\n  Row ${err.row}: ${err.message}`;
+          });
+          if (response.data.errors.length > 5) {
+            message += `\n  ... and ${response.data.errors.length - 5} more errors`;
+          }
+        }
+
         // Show assignment summary
         if (assignmentSummary.lga_assignments > 0) {
           message += `\n\n📍 LGA-level assignments: ${assignmentSummary.lga_assignments}`;
@@ -259,7 +296,9 @@ const LocationMasterForm = ({
           setUploadFile(null);
           setUploadProgress(0);
           setUploadResults(null);
-          onSave();
+          if (onSave && typeof onSave === 'function') {
+            onSave();
+          }
           onClose();
         }, 2000);
       } else {
@@ -274,55 +313,25 @@ const LocationMasterForm = ({
     }
   };
 
-  const downloadTemplate = () => {
-    const templateData = [
-      {
-        unique_id: "LOC001",
-        location_name: "Victoria Island Branch",
-        short_name: "VI Branch",
-        city: "Victoria Island",
-        full_address: "123 Ahmadu Bello Way, Victoria Island, Lagos",
-        contact_person_name: "John Doe",
-        contact_person_phone: "08012345678",
-        contact_person_email: "john.doe@example.com",
-      },
-      {
-        unique_id: "LOC002",
-        location_name: "Ikeja Main Office",
-        short_name: "Ikeja Office",
-        city: "Ikeja",
-        full_address: "45 Allen Avenue, Ikeja, Lagos",
-        contact_person_name: "Jane Smith",
-        contact_person_phone: "08087654321",
-        contact_person_email: "jane.smith@example.com",
-      },
-      {
-        unique_id: "LOC003",
-        location_name: "Port Harcourt Branch",
-        short_name: "PH Branch",
-        city: "Port Harcourt",
-        full_address: "15 Aba Road, Port Harcourt, Rivers State",
-        contact_person_name: "Mike Johnson",
-        contact_person_phone: "08011223344",
-        contact_person_email: "mike.johnson@example.com",
-      },
-    ];
+  const downloadTemplate = async () => {
+    try {
+      // Validate that a client is selected for bulk upload
+      if (!selectedClient) {
+        alert("Please select a client first to download the template with pre-filled contact details");
+        return;
+      }
 
-    const headers = Object.keys(templateData[0]);
-    const csvContent = [
-      headers.join(","),
-      ...templateData.map((row) =>
-        headers.map((header) => `"${row[header] || ""}"`).join(",")
-      ),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "service_locations_template.csv";
-    a.click();
-    window.URL.revokeObjectURL(url);
+      console.log("Downloading template for client:", selectedClient);
+      const response = await serviceLocationsAPI.downloadTemplate(selectedClient);
+      
+      if (response) {
+        // The API already handles the file download
+        console.log("Template downloaded successfully with client contact details");
+      }
+    } catch (error) {
+      console.error("Error downloading template:", error);
+      alert("Failed to download template. Please try again.");
+    }
   };
 
   const resetForm = () => {
