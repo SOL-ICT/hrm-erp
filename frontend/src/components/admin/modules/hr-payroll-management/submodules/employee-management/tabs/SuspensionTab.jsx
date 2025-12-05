@@ -160,7 +160,7 @@ export default function SuspensionTab({ currentTheme, preferences }) {
       )}
 
       {/* Client Selector */}
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+      <div className={`${currentTheme.cardBg} ${currentTheme.border} rounded-lg p-3 shadow-sm`}>
         <ClientSelector
           value={selectedClient}
           onChange={setSelectedClient}
@@ -174,9 +174,9 @@ export default function SuspensionTab({ currentTheme, preferences }) {
           {/* Two Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* LEFT - Single Entry Form */}
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-              <div className="px-4 py-3 bg-gradient-to-r from-indigo-50 to-indigo-100 border-b border-gray-200 rounded-t-lg">
-                <h3 className="text-sm font-bold text-indigo-900 flex items-center gap-2">
+            <div className={`${currentTheme.cardBg} ${currentTheme.border} rounded-lg shadow-sm`}>
+              <div className={`px-4 py-3 bg-gradient-to-r from-indigo-50 to-indigo-100 border-b ${currentTheme.border} rounded-t-lg`}>
+                <h3 className={`text-sm font-bold ${currentTheme.textPrimary} flex items-center gap-2`}>
                   <span>⏸️</span> Single Suspension Entry
                 </h3>
               </div>
@@ -192,7 +192,7 @@ export default function SuspensionTab({ currentTheme, preferences }) {
 
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme.textSecondary} uppercase tracking-wide mb-1.5`}>
                         Start Date <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -210,7 +210,7 @@ export default function SuspensionTab({ currentTheme, preferences }) {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme.textSecondary} uppercase tracking-wide mb-1.5`}>
                         End Date <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -228,20 +228,20 @@ export default function SuspensionTab({ currentTheme, preferences }) {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme.textSecondary} uppercase tracking-wide mb-1.5`}>
                         Days
                       </label>
                       <input
                         type="number"
                         value={formData.suspension_days}
                         readOnly
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                        className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg ${currentTheme.cardBgSecondary} ${currentTheme.textMuted} cursor-not-allowed`}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme.textSecondary} uppercase tracking-wide mb-1.5`}>
                       Status
                     </label>
                     <select
@@ -249,7 +249,7 @@ export default function SuspensionTab({ currentTheme, preferences }) {
                       onChange={(e) =>
                         setFormData({ ...formData, status: e.target.value })
                       }
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:border-indigo-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                      className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg ${currentTheme.cardBg} hover:border-indigo-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors`}
                     >
                       <option value="active">Active</option>
                       <option value="completed">Completed</option>
@@ -258,7 +258,7 @@ export default function SuspensionTab({ currentTheme, preferences }) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme.textSecondary} uppercase tracking-wide mb-1.5`}>
                       Reason <span className="text-red-500">*</span>
                     </label>
                     <textarea
@@ -285,9 +285,9 @@ export default function SuspensionTab({ currentTheme, preferences }) {
             </div>
 
             {/* RIGHT - Bulk Upload */}
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-              <div className="px-4 py-3 bg-gradient-to-r from-green-50 to-green-100 border-b border-gray-200 rounded-t-lg">
-                <h3 className="text-sm font-bold text-green-900 flex items-center gap-2">
+            <div className={`${currentTheme.cardBg} ${currentTheme.border} rounded-lg shadow-sm`}>
+              <div className={`px-4 py-3 bg-gradient-to-r from-green-50 to-green-100 border-b ${currentTheme.border} rounded-t-lg`}>
+                <h3 className={`text-sm font-bold ${currentTheme.textPrimary} flex items-center gap-2`}>
                   <span>📤</span> Bulk Upload Suspensions
                 </h3>
               </div>
@@ -301,7 +301,7 @@ export default function SuspensionTab({ currentTheme, preferences }) {
 
                 <form onSubmit={handleBulkUpload} className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme.textSecondary} uppercase tracking-wide mb-1.5`}>
                       Upload Excel File
                     </label>
                     <input
@@ -331,9 +331,9 @@ export default function SuspensionTab({ currentTheme, preferences }) {
           </div>
 
           {/* Suspensions Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-            <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 rounded-t-lg flex items-center justify-between">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <div className={`${currentTheme.cardBg} ${currentTheme.border} rounded-lg shadow-sm`}>
+            <div className={`px-4 py-3 ${currentTheme.cardBgSecondary} border-b ${currentTheme.border} rounded-t-lg flex items-center justify-between`}>
+              <h3 className={`text-sm font-bold ${currentTheme.textPrimary} flex items-center gap-2`}>
                 <span>📋</span> Suspension Records
               </h3>
               <span className="px-2.5 py-1 bg-indigo-100 text-indigo-800 text-xs font-bold rounded-full">
@@ -343,34 +343,34 @@ export default function SuspensionTab({ currentTheme, preferences }) {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className={`${currentTheme.cardBgSecondary} border-b ${currentTheme.border}`}>
                   <tr>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.textSecondary} uppercase tracking-wider`}>
                       Staff ID
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.textSecondary} uppercase tracking-wider`}>
                       Name
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.textSecondary} uppercase tracking-wider`}>
                       Start Date
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.textSecondary} uppercase tracking-wider`}>
                       End Date
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.textSecondary} uppercase tracking-wider`}>
                       Days
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.textSecondary} uppercase tracking-wider`}>
                       Status
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className={`divide-y ${currentTheme.border}`}>
                   {suspensions.length === 0 ? (
                     <tr>
                       <td
                         colSpan="6"
-                        className="px-4 py-8 text-center text-sm text-gray-500 italic"
+                        className={`px-4 py-8 text-center text-sm ${currentTheme.textMuted} italic`}
                       >
                         No suspension records found. Create a new entry or
                         upload in bulk.
@@ -380,22 +380,22 @@ export default function SuspensionTab({ currentTheme, preferences }) {
                     suspensions.map((suspension) => (
                       <tr
                         key={suspension.id}
-                        className="hover:bg-gray-50 transition-colors"
+                        className={`${currentTheme.hoverBg} transition-colors`}
                       >
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        <td className={`px-4 py-3 text-sm font-medium ${currentTheme.textPrimary}`}>
                           {suspension.staff?.staff_id}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme.textSecondary}`}>
                           {suspension.staff?.first_name}{" "}
                           {suspension.staff?.last_name}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme.textSecondary}`}>
                           {suspension.suspension_start_date}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme.textSecondary}`}>
                           {suspension.suspension_end_date}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className={`px-4 py-3 text-sm ${currentTheme.textSecondary}`}>
                           <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-semibold">
                             {suspension.suspension_days} days
                           </span>

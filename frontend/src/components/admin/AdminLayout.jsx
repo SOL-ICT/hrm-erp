@@ -38,48 +38,60 @@ const AdminLayout = () => {
     language: "en",
   };
 
-  // Theme state management
-  const [currentThemeKey, setCurrentThemeKey] = useState(
-    preferences.theme || "dark"
-  );
+  // Theme state management - Initialize and apply dark class immediately
+  const [currentThemeKey, setCurrentThemeKey] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("admin_theme") || preferences.theme || "dark";
+      // Apply dark class immediately
+      if (savedTheme === 'dark' || savedTheme === 'transparent') {
+        document.documentElement.classList.add('dark');
+      }
+      return savedTheme;
+    }
+    return preferences.theme || "dark";
+  });
 
-  // Enhanced theme configurations with SOL branding (matching login page dark theme)
+  // Enhanced theme configurations with modern dark mode standards
   const themes = {
     light: {
       bg: "bg-gradient-to-br from-gray-50 via-gray-100 to-white",
-      cardBg: "bg-white/95",
-      sidebarBg: "bg-white shadow-xl",
-      headerBg: "bg-white/95 backdrop-blur-lg",
+      cardBg: "bg-white/95 shadow-sm",
+      sidebarBg: "bg-white shadow-xl border-r border-gray-200",
+      headerBg: "bg-white/95 backdrop-blur-lg border-b border-gray-200",
       textPrimary: "text-gray-900",
       textSecondary: "text-gray-600",
       textMuted: "text-gray-500",
       border: "border-gray-200",
       hover: "hover:bg-gray-50",
+      hoverStrong: "hover:bg-gray-100",
     },
     dark: {
-      // Updated to match sidebar blue theme for consistency
-      bg: `bg-gradient-to-br from-[#0f1419] via-[#0a0e1a] to-[#000510]`,
-      cardBg: `bg-gradient-to-br from-[#1a2332]/95 via-[#141b2d]/95 to-[#0f1722]/95 backdrop-blur-sm`,
-      // Deep blue for sidebar (matching login page feel)
-      sidebarBg: `bg-gradient-to-b from-[${MIDNIGHT_BLUE}] via-[#0f0f3d] to-[#001122] shadow-2xl`,
-      // Slightly lighter blue for header
-      headerBg: `bg-gradient-to-r from-[#1e293b] via-[#0f172a] to-[${MIDNIGHT_BLUE}] backdrop-blur-lg`,
+      // Modern dark theme with proper depth, contrast and elevation
+      bg: "bg-gradient-to-br from-[#0f1419] via-[#1a1f2e] to-[#0a0e17]",
+      // Cards with subtle gradient and backdrop blur for depth
+      cardBg: "bg-gradient-to-br from-slate-800/95 via-slate-900/95 to-slate-800/95 backdrop-blur-sm shadow-xl border border-slate-700/50",
+      // Deep blue sidebar matching login dark theme
+      sidebarBg: `bg-gradient-to-b from-[${MIDNIGHT_BLUE}] via-[#0f0f3d] to-[#001122] shadow-2xl border-r border-slate-700/30`,
+      // Consistent header with slight translucency
+      headerBg: "bg-gradient-to-r from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-lg border-b border-slate-700/50",
       textPrimary: "text-white",
-      textSecondary: "text-gray-300",
-      textMuted: "text-gray-400",
-      border: "border-slate-600/30",
-      hover: "hover:bg-slate-700/50",
+      textSecondary: "text-slate-300",
+      textMuted: "text-slate-400",
+      border: "border-slate-700/50",
+      hover: "hover:bg-slate-700/30",
+      hoverStrong: "hover:bg-slate-600/50",
     },
     transparent: {
       bg: "bg-gradient-to-br from-slate-900/90 via-gray-900/90 to-slate-800/90",
-      cardBg: "bg-white/10 backdrop-blur-md",
-      sidebarBg: `bg-gradient-to-b from-[${MIDNIGHT_BLUE}]/95 to-[#0f0f3d]/95 backdrop-blur-md`,
-      headerBg: `bg-gradient-to-r from-[${MIDNIGHT_BLUE}]/95 to-[#0f0f3d]/95 backdrop-blur-md`,
+      cardBg: "bg-white/10 backdrop-blur-xl shadow-2xl border border-white/20",
+      sidebarBg: `bg-gradient-to-b from-[${MIDNIGHT_BLUE}]/95 to-[#0f0f3d]/95 backdrop-blur-xl border-r border-white/20`,
+      headerBg: "bg-gradient-to-r from-slate-900/80 via-slate-800/80 to-slate-900/80 backdrop-blur-xl border-b border-white/20",
       textPrimary: "text-white",
       textSecondary: "text-white/80",
       textMuted: "text-white/60",
       border: "border-white/20",
       hover: "hover:bg-white/10",
+      hoverStrong: "hover:bg-white/20",
     },
   };
 
@@ -105,6 +117,18 @@ const AdminLayout = () => {
       }
     }
   }, []);
+
+  // Apply dark class to document element for Tailwind dark mode
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const htmlElement = document.documentElement;
+      if (currentThemeKey === 'dark' || currentThemeKey === 'transparent') {
+        htmlElement.classList.add('dark');
+      } else {
+        htmlElement.classList.remove('dark');
+      }
+    }
+  }, [currentThemeKey]);
 
   const currentTheme = themes[currentThemeKey] || themes.dark;
 

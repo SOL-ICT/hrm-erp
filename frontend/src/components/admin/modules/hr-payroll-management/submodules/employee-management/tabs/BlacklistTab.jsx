@@ -97,7 +97,7 @@ export default function BlacklistTab({ currentTheme, preferences }) {
       </div>
 
       {/* Client Selector */}
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+      <div className={`${currentTheme.card} ${currentTheme.border} rounded-lg p-3 shadow-sm`}>
         <ClientSelector
           value={selectedClient}
           onChange={setSelectedClient}
@@ -109,12 +109,12 @@ export default function BlacklistTab({ currentTheme, preferences }) {
       {selectedClient && (
         <>
           {/* Blacklist Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-            <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 rounded-t-lg">
+          <div className={`${currentTheme.card} ${currentTheme.border} rounded-lg shadow-sm`}>
+            <div className={`px-4 py-3 ${currentTheme.headerGradient} border-b ${currentTheme.border} rounded-t-lg`}>
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <h3 className={`text-sm font-bold ${currentTheme.text} flex items-center gap-2`}>
                   <span>🚫</span> Blacklisted Staff
-                  <span className="ml-2 px-2.5 py-1 bg-gray-200 text-gray-800 text-xs font-bold rounded-full">
+                  <span className={`ml-2 px-2.5 py-1 ${currentTheme.badge} ${currentTheme.text} text-xs font-bold rounded-full`}>
                     {filteredStaff.length}{" "}
                     {filteredStaff.length === 1 ? "record" : "records"}
                   </span>
@@ -131,32 +131,32 @@ export default function BlacklistTab({ currentTheme, preferences }) {
 
             <div className="p-4">
               {loading ? (
-                <p className="text-center text-sm text-gray-500 py-8">
+                <p className={`text-center text-sm ${currentTheme.mutedText} py-8`}>
                   ⏳ Loading...
                 </p>
               ) : filteredStaff.length === 0 ? (
-                <p className="text-center text-sm text-gray-500 py-8 italic">
+                <p className={`text-center text-sm ${currentTheme.mutedText} py-8 italic`}>
                   No blacklisted staff found. Staff are added to the blacklist
                   when terminated with the "Add to Blacklist" option.
                 </p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className={`${currentTheme.tableHeader} border-b ${currentTheme.border}`}>
                       <tr>
-                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.text} uppercase tracking-wider`}>
                           Staff ID
                         </th>
-                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.text} uppercase tracking-wider`}>
                           Name
                         </th>
-                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.text} uppercase tracking-wider`}>
                           Blacklist Date
                         </th>
-                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.text} uppercase tracking-wider`}>
                           Reason
                         </th>
-                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.text} uppercase tracking-wider`}>
                           Actions
                         </th>
                       </tr>
@@ -165,18 +165,18 @@ export default function BlacklistTab({ currentTheme, preferences }) {
                       {filteredStaff.map((record) => (
                         <tr
                           key={record.id}
-                          className="hover:bg-gray-50 transition-colors"
+                          className={`${currentTheme.rowHover} transition-colors`}
                         >
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                          <td className={`px-4 py-3 text-sm font-medium ${currentTheme.text}`}>
                             {record.staff?.staff_id}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-700">
+                          <td className={`px-4 py-3 text-sm ${currentTheme.text}`}>
                             {record.staff?.first_name} {record.staff?.last_name}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-700">
+                          <td className={`px-4 py-3 text-sm ${currentTheme.text}`}>
                             {record.blacklist_date}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-700 max-w-xs truncate">
+                          <td className={`px-4 py-3 text-sm ${currentTheme.text} max-w-xs truncate`}>
                             {record.reason}
                           </td>
                           <td className="px-4 py-3 text-sm">
@@ -209,9 +209,9 @@ export default function BlacklistTab({ currentTheme, preferences }) {
           {/* Details Modal */}
           {selectedRecord && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col">
-                <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <div className={`${currentTheme.card} rounded-lg shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col`}>
+                <div className={`px-6 py-4 ${currentTheme.headerGradient} border-b ${currentTheme.border} flex items-center justify-between`}>
+                  <h3 className={`text-lg font-bold ${currentTheme.text} flex items-center gap-2`}>
                     <span>🔍</span> Blacklist Record Details
                   </h3>
                   <button
@@ -223,49 +223,49 @@ export default function BlacklistTab({ currentTheme, preferences }) {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">
+                  <div className={`${currentTheme.tableHeader} ${currentTheme.border} rounded-lg p-4`}>
+                    <h4 className={`text-sm font-bold ${currentTheme.text} uppercase tracking-wide mb-3`}>
                       Basic Information
                     </h4>
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>
-                        <span className="font-semibold text-gray-700">
+                        <span className={`font-semibold ${currentTheme.text}`}>
                           Staff ID:
                         </span>
-                        <span className="ml-2 text-gray-900">
+                        <span className={`ml-2 ${currentTheme.text}`}>
                           {selectedRecord.staff?.staff_id}
                         </span>
                       </div>
                       <div>
-                        <span className="font-semibold text-gray-700">
+                        <span className={`font-semibold ${currentTheme.text}`}>
                           Name:
                         </span>
-                        <span className="ml-2 text-gray-900">
+                        <span className={`ml-2 ${currentTheme.text}`}>
                           {selectedRecord.staff?.first_name}{" "}
                           {selectedRecord.staff?.last_name}
                         </span>
                       </div>
                       <div className="col-span-2">
-                        <span className="font-semibold text-gray-700">
+                        <span className={`font-semibold ${currentTheme.text}`}>
                           Blacklist Date:
                         </span>
-                        <span className="ml-2 text-gray-900">
+                        <span className={`ml-2 ${currentTheme.text}`}>
                           {selectedRecord.blacklist_date}
                         </span>
                       </div>
                       <div className="col-span-2">
-                        <span className="font-semibold text-gray-700">
+                        <span className={`font-semibold ${currentTheme.text}`}>
                           Reason:
                         </span>
-                        <p className="mt-1 text-gray-900">
+                        <p className={`mt-1 ${currentTheme.text}`}>
                           {selectedRecord.reason}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">
+                  <div className={`${currentTheme.tableHeader} ${currentTheme.border} rounded-lg p-4`}>
+                    <h4 className={`text-sm font-bold ${currentTheme.text} uppercase tracking-wide mb-3`}>
                       Staff Data Snapshot (JSON)
                     </h4>
                     <pre className="p-3 bg-gray-900 text-green-400 text-xs rounded-lg overflow-x-auto border border-gray-700">
@@ -274,7 +274,7 @@ export default function BlacklistTab({ currentTheme, preferences }) {
                   </div>
                 </div>
 
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
+                <div className={`px-6 py-4 ${currentTheme.tableHeader} border-t ${currentTheme.border} flex justify-end`}>
                   <button
                     onClick={() => setSelectedRecord(null)}
                     className="px-6 py-2.5 bg-gradient-to-r from-gray-600 to-gray-700 text-white text-sm font-semibold rounded-lg hover:from-gray-700 hover:to-gray-800 transition-all shadow-sm hover:shadow-md"

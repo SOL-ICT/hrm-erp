@@ -464,12 +464,12 @@ export default function AttendanceForPayrollTab({
         <div
           className={`p-4 rounded-lg border ${
             message.type === "success"
-              ? "bg-green-50 border-green-200 text-green-800"
+              ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300"
               : message.type === "error"
-              ? "bg-red-50 border-red-200 text-red-800"
+              ? "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300"
               : message.type === "warning"
-              ? "bg-yellow-50 border-yellow-200 text-yellow-800"
-              : "bg-blue-50 border-blue-200 text-blue-800"
+              ? "bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-300"
+              : "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300"
           }`}
         >
           <div className="flex items-start">
@@ -487,7 +487,7 @@ export default function AttendanceForPayrollTab({
             </div>
             <button
               onClick={() => setMessage(null)}
-              className="ml-auto flex-shrink-0 text-gray-400 hover:text-gray-600"
+              className="ml-auto flex-shrink-0 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
             >
               ✕
             </button>
@@ -496,19 +496,19 @@ export default function AttendanceForPayrollTab({
       )}
 
       {/* Client Selector */}
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+      <div className={`${currentTheme.card} ${currentTheme.border} rounded-lg p-3 shadow-sm`}>
         <ClientSelector value={selectedClient} onChange={setSelectedClient} />
       </div>
 
       {!selectedClient ? (
-        <div className="bg-white border border-gray-200 rounded-lg p-8 text-center shadow-sm">
-          <div className="text-gray-400 mb-2">
+        <div className={`${currentTheme.card} ${currentTheme.border} rounded-lg p-8 text-center shadow-sm`}>
+          <div className={currentTheme.textMuted + " mb-2"}>
             <FileText className="h-12 w-12 mx-auto" />
           </div>
-          <p className="text-gray-600 font-medium">
+          <p className={currentTheme.text + " font-medium"}>
             Please select a client to view and upload attendance
           </p>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className={`text-sm ${currentTheme.textMuted} mt-1`}>
             Use the client selector above to get started
           </p>
         </div>
@@ -517,9 +517,9 @@ export default function AttendanceForPayrollTab({
           {/* Two-Column Layout: Upload Form + Instructions */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* LEFT: Upload Form */}
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-              <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100 border-b">
-                <h3 className="text-sm font-semibold text-gray-800 flex items-center">
+            <div className={`${currentTheme.card} ${currentTheme.border} rounded-lg shadow-sm overflow-hidden`}>
+              <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 border-b">
+                <h3 className={`text-sm font-semibold ${currentTheme.text} flex items-center`}>
                   <Upload className="h-4 w-4 mr-2 text-blue-600" />
                   📤 Upload Attendance for Payroll
                 </h3>
@@ -528,7 +528,7 @@ export default function AttendanceForPayrollTab({
               <div className="p-4 space-y-4">
                 {/* Month Selector */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                  <label className={`block text-xs font-semibold ${currentTheme.textMuted} uppercase tracking-wide mb-1.5`}>
                     <Calendar className="inline h-3 w-3 mr-1" />
                     Payroll Month
                   </label>
@@ -536,13 +536,13 @@ export default function AttendanceForPayrollTab({
                     type="month"
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 text-sm ${currentTheme.input} rounded-lg hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                   />
                 </div>
 
                 {/* File Input */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                  <label className={`block text-xs font-semibold ${currentTheme.textMuted} uppercase tracking-wide mb-1.5`}>
                     <FileText className="inline h-3 w-3 mr-1" />
                     Attendance File
                   </label>
@@ -551,10 +551,10 @@ export default function AttendanceForPayrollTab({
                     type="file"
                     accept=".csv,.xlsx,.xls"
                     onChange={handleFileSelect}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    className={`w-full px-3 py-2 text-sm ${currentTheme.input} rounded-lg hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/30 dark:file:text-blue-300 dark:hover:file:bg-blue-800/40`}
                   />
                   {selectedFile && (
-                    <p className="mt-1.5 text-xs text-gray-600">
+                    <p className={`mt-1.5 text-xs ${currentTheme.textMuted}`}>
                       Selected:{" "}
                       <span className="font-medium">{selectedFile.name}</span> (
                       {(selectedFile.size / 1024).toFixed(2)} KB)
@@ -636,17 +636,17 @@ export default function AttendanceForPayrollTab({
             </div>
 
             {/* RIGHT: Upload Instructions */}
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-              <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-purple-100 border-b">
-                <h3 className="text-sm font-semibold text-gray-800 flex items-center">
+            <div className={`${currentTheme.card} ${currentTheme.border} rounded-lg shadow-sm overflow-hidden`}>
+              <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 border-b">
+                <h3 className={`text-sm font-semibold ${currentTheme.text} flex items-center`}>
                   <FileText className="h-4 w-4 mr-2 text-purple-600" />
                   📋 Upload Instructions
                 </h3>
               </div>
 
-              <div className="p-4 space-y-3 text-sm text-gray-700">
+              <div className={`p-4 space-y-3 text-sm ${currentTheme.text}`}>
                 <div>
-                  <p className="font-semibold text-gray-800 mb-1">
+                  <p className={`font-semibold ${currentTheme.text} mb-1`}>
                     File Format Requirements:
                   </p>
                   <ul className="list-disc list-inside space-y-1 text-xs">
@@ -665,7 +665,7 @@ export default function AttendanceForPayrollTab({
                 </div>
 
                 <div>
-                  <p className="font-semibold text-gray-800 mb-1">
+                  <p className={`font-semibold ${currentTheme.text} mb-1`}>
                     Upload Process:
                   </p>
                   <ol className="list-decimal list-inside space-y-1 text-xs">
@@ -678,22 +678,22 @@ export default function AttendanceForPayrollTab({
                   </ol>
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-blue-800 mb-1">
+                <div className="bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-blue-800 dark:text-blue-300 mb-1">
                     💡 Pro Tip:
                   </p>
-                  <p className="text-xs text-blue-700">
+                  <p className="text-xs text-blue-700 dark:text-blue-400">
                     Employee IDs in your file must match the IDs in the system.
                     The system will automatically validate and match records
                     during upload.
                   </p>
                 </div>
 
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-yellow-800 mb-1">
+                <div className="bg-yellow-50 border border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-300 mb-1">
                     ⚠️ Important:
                   </p>
-                  <p className="text-xs text-yellow-700">
+                  <p className="text-xs text-yellow-700 dark:text-yellow-400">
                     This attendance data is specifically for payroll processing.
                     It will be used to calculate employee salaries and
                     deductions.
@@ -704,9 +704,9 @@ export default function AttendanceForPayrollTab({
           </div>
 
           {/* Recent Payroll Attendance Uploads Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-            <div className="px-4 py-3 bg-gradient-to-r from-green-50 to-green-100 border-b">
-              <h3 className="text-sm font-semibold text-gray-800 flex items-center">
+          <div className={`${currentTheme.card} ${currentTheme.border} rounded-lg shadow-sm overflow-hidden`}>
+            <div className="px-4 py-3 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 border-b">
+              <h3 className={`text-sm font-semibold ${currentTheme.text} flex items-center`}>
                 <FileText className="h-4 w-4 mr-2 text-green-600" />
                 📋 Recent Payroll Attendance Uploads
               </h3>
@@ -734,75 +734,75 @@ export default function AttendanceForPayrollTab({
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                <p className="mt-2 text-sm text-gray-600">Loading uploads...</p>
+                <p className={`mt-2 text-sm ${currentTheme.textMuted}`}>Loading uploads...</p>
               </div>
             ) : payrollUploads.length === 0 ? (
               <div className="p-8 text-center">
-                <FileText className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                <p className="text-gray-600 font-medium">
+                <FileText className={`h-12 w-12 mx-auto ${currentTheme.textMuted} mb-2`} />
+                <p className={`${currentTheme.text} font-medium`}>
                   No attendance uploads yet
                 </p>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className={`text-sm ${currentTheme.textMuted} mt-1`}>
                   Upload your first attendance file using the form above
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className={`min-w-full divide-y ${currentTheme.border}`}>
+                  <thead className={currentTheme.tableHeader}>
                     <tr>
                       <th
                         scope="col"
-                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
+                        className={`px-4 py-3 text-left text-xs font-semibold ${currentTheme.textMuted} uppercase tracking-wider`}
                       >
                         File Name
                       </th>
                       <th
                         scope="col"
-                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
+                        className={`px-4 py-3 text-left text-xs font-semibold ${currentTheme.textMuted} uppercase tracking-wider`}
                       >
                         Month
                       </th>
                       <th
                         scope="col"
-                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
+                        className={`px-4 py-3 text-left text-xs font-semibold ${currentTheme.textMuted} uppercase tracking-wider`}
                       >
                         Upload Date
                       </th>
                       <th
                         scope="col"
-                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
+                        className={`px-4 py-3 text-left text-xs font-semibold ${currentTheme.textMuted} uppercase tracking-wider`}
                       >
                         Records
                       </th>
                       <th
                         scope="col"
-                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
+                        className={`px-4 py-3 text-left text-xs font-semibold ${currentTheme.textMuted} uppercase tracking-wider`}
                       >
                         Status
                       </th>
                       <th
                         scope="col"
-                        className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider"
+                        className={`px-4 py-3 text-right text-xs font-semibold ${currentTheme.textMuted} uppercase tracking-wider`}
                       >
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className={`${currentTheme.card} divide-y ${currentTheme.border}`}>
                     {payrollUploads.map((upload, index) => (
                       <tr
                         key={upload.id || index}
-                        className="hover:bg-gray-50 transition-colors"
+                        className={currentTheme.tableRow}
                       >
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center">
-                            <FileText className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+                            <FileText className={`h-4 w-4 ${currentTheme.textMuted} mr-2 flex-shrink-0`} />
                             <div className="text-sm">
-                              <div className="font-medium text-gray-900">
+                              <div className={`font-medium ${currentTheme.text}`}>
                                 {upload.file_name || upload.fileName || "N/A"}
                               </div>
-                              <div className="text-xs text-gray-500">
+                              <div className={`text-xs ${currentTheme.textMuted}`}>
                                 Uploaded by:{" "}
                                 {upload.uploader
                                   ? upload.uploader.name
@@ -813,14 +813,14 @@ export default function AttendanceForPayrollTab({
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                        <td className={`px-4 py-3 whitespace-nowrap text-sm ${currentTheme.text}`}>
                           {formatMonth(
                             upload.payroll_month ||
                               upload.payrollMonth ||
                               upload.month
                           )}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                        <td className={`px-4 py-3 whitespace-nowrap text-sm ${currentTheme.text}`}>
                           {formatDate(
                             upload.created_at ||
                               upload.uploaded_at ||
@@ -829,11 +829,11 @@ export default function AttendanceForPayrollTab({
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="text-sm">
-                            <div className="font-medium text-gray-900">
+                            <div className={`font-medium ${currentTheme.text}`}>
                               {upload.total_records || upload.totalRecords || 0}{" "}
                               total
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className={`text-xs ${currentTheme.textMuted}`}>
                               {upload.successfully_matched ||
                                 upload.matched_count ||
                                 upload.matchedCount ||
@@ -884,16 +884,16 @@ export default function AttendanceForPayrollTab({
 
       {/* Preview Modal (Simplified - full modal would be in separate component) */}
       {showPreviewModal && previewData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-blue-100 border-b">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className={`${currentTheme.card} rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden`}>
+            <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 border-b">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-800">
+                <h3 className={`text-lg font-semibold ${currentTheme.text}`}>
                   Upload Preview
                 </h3>
                 <button
                   onClick={() => setShowPreviewModal(false)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+                  className={`${currentTheme.textMuted} hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none`}
                 >
                   ×
                 </button>
@@ -952,8 +952,8 @@ export default function AttendanceForPayrollTab({
                     {/* Matched Staff Section */}
                     {previewData.validation.matched_staff &&
                       previewData.validation.matched_staff.length > 0 && (
-                        <div className="bg-white border border-gray-200 rounded-lg">
-                          <div className="bg-green-50 border-b border-green-200 px-4 py-3">
+                        <div className={`${currentTheme.card} ${currentTheme.border} rounded-lg`}>
+                          <div className="bg-green-50 dark:bg-green-900/20 border-b border-green-200 dark:border-green-800 px-4 py-3">
                             <h4 className="text-sm font-semibold text-green-800 flex items-center">
                               <svg
                                 className="w-5 h-5 mr-2"
@@ -972,37 +972,37 @@ export default function AttendanceForPayrollTab({
                           </div>
                           <div className="p-4">
                             <div className="overflow-x-auto">
-                              <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
+                              <table className={`min-w-full divide-y ${currentTheme.border}`}>
+                                <thead className={currentTheme.tableHeader}>
                                   <tr>
-                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                    <th className={`px-3 py-2 text-left text-xs font-medium ${currentTheme.textMuted} uppercase`}>
                                       Employee Code
                                     </th>
-                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                    <th className={`px-3 py-2 text-left text-xs font-medium ${currentTheme.textMuted} uppercase`}>
                                       Name
                                     </th>
-                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                    <th className={`px-3 py-2 text-left text-xs font-medium ${currentTheme.textMuted} uppercase`}>
                                       Days Worked
                                     </th>
-                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                    <th className={`px-3 py-2 text-left text-xs font-medium ${currentTheme.textMuted} uppercase`}>
                                       Status
                                     </th>
                                   </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
+                                <tbody className={`${currentTheme.card} divide-y ${currentTheme.border}`}>
                                   {previewData.validation.matched_staff.map(
                                     (staff, index) => (
                                       <tr
                                         key={index}
-                                        className="hover:bg-gray-50"
+                                        className={currentTheme.tableRow}
                                       >
-                                        <td className="px-3 py-2 text-sm font-medium text-gray-900">
+                                        <td className={`px-3 py-2 text-sm font-medium ${currentTheme.text}`}>
                                           {staff.employee_code}
                                         </td>
-                                        <td className="px-3 py-2 text-sm text-gray-700">
+                                        <td className={`px-3 py-2 text-sm ${currentTheme.text}`}>
                                           {staff.employee_name}
                                         </td>
-                                        <td className="px-3 py-2 text-sm text-gray-700">
+                                        <td className={`px-3 py-2 text-sm ${currentTheme.text}`}>
                                           {staff.days_worked} days
                                         </td>
                                         <td className="px-3 py-2">
@@ -1025,8 +1025,8 @@ export default function AttendanceForPayrollTab({
                     {/* Unmatched Staff Section */}
                     {previewData.validation.unmatched_staff &&
                       previewData.validation.unmatched_staff.length > 0 && (
-                        <div className="bg-white border border-yellow-200 rounded-lg">
-                          <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-3">
+                        <div className={`${currentTheme.card} border border-yellow-200 dark:border-yellow-800 rounded-lg`}>
+                          <div className="bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 px-4 py-3">
                             <h4 className="text-sm font-semibold text-yellow-800 flex items-center">
                               <svg
                                 className="w-5 h-5 mr-2"
@@ -1049,13 +1049,13 @@ export default function AttendanceForPayrollTab({
                                 (staff, index) => (
                                   <div
                                     key={index}
-                                    className="flex items-center justify-between bg-yellow-50 border border-yellow-200 rounded p-2"
+                                    className="flex items-center justify-between bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-2"
                                   >
                                     <div>
-                                      <span className="font-medium text-gray-900">
+                                      <span className={`font-medium ${currentTheme.text}`}>
                                         {staff.employee_code}
                                       </span>
-                                      <span className="text-gray-600 ml-2">
+                                      <span className={`${currentTheme.textMuted} ml-2`}>
                                         - {staff.employee_name}
                                       </span>
                                     </div>
@@ -1073,8 +1073,8 @@ export default function AttendanceForPayrollTab({
                     {/* Errors Section */}
                     {previewData.validation.errors &&
                       JSON.parse(previewData.validation.errors).length > 0 && (
-                        <div className="bg-white border border-red-200 rounded-lg">
-                          <div className="bg-red-50 border-b border-red-200 px-4 py-3">
+                        <div className={`${currentTheme.card} border border-red-200 dark:border-red-800 rounded-lg`}>
+                          <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800 px-4 py-3">
                             <h4 className="text-sm font-semibold text-red-800 flex items-center">
                               <svg
                                 className="w-5 h-5 mr-2"
@@ -1111,16 +1111,16 @@ export default function AttendanceForPayrollTab({
 
                     {/* Template Coverage Summary */}
                     {previewData.validation.template_coverage && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <h4 className="text-sm font-semibold text-blue-800 mb-2">
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                        <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">
                           Template Coverage
                         </h4>
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
-                            <span className="text-gray-600">
+                            <span className={currentTheme.textMuted}>
                               Covered Pay Grades:
                             </span>
-                            <span className="ml-2 font-semibold text-blue-700">
+                            <span className="ml-2 font-semibold text-blue-700 dark:text-blue-400">
                               {
                                 previewData.validation.template_coverage
                                   .covered_pay_grades
@@ -1128,8 +1128,8 @@ export default function AttendanceForPayrollTab({
                             </span>
                           </div>
                           <div>
-                            <span className="text-gray-600">Coverage:</span>
-                            <span className="ml-2 font-semibold text-blue-700">
+                            <span className={currentTheme.textMuted}>Coverage:</span>
+                            <span className="ml-2 font-semibold text-blue-700 dark:text-blue-400">
                               {
                                 previewData.validation.template_coverage
                                   .coverage_percentage
@@ -1145,10 +1145,10 @@ export default function AttendanceForPayrollTab({
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-gray-50 border-t flex justify-end space-x-3">
+            <div className={`px-6 py-4 ${currentTheme.tableHeader} border-t flex justify-end space-x-3`}>
               <button
                 onClick={() => setShowPreviewModal(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-800 text-sm font-semibold rounded-lg hover:bg-gray-300 transition-colors"
+                className={`px-4 py-2 ${currentTheme.tableHeader} ${currentTheme.text} text-sm font-semibold rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors border ${currentTheme.border}`}
               >
                 Close
               </button>

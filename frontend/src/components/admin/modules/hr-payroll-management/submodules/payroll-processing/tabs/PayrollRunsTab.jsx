@@ -454,7 +454,7 @@ export default function PayrollRunsTab({
       )}
 
       {/* Client Selector */}
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+      <div className={`${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.border || 'border border-gray-200'} rounded-lg p-3 shadow-sm`}>
         <ClientSelector
           value={selectedClient}
           onChange={setSelectedClient}
@@ -468,16 +468,16 @@ export default function PayrollRunsTab({
           {/* Two Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* LEFT - Create Payroll Run Form */}
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-              <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100 border-b border-gray-200 rounded-t-lg">
-                <h3 className="text-sm font-bold text-blue-900 flex items-center gap-2">
+            <div className={`${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.border || 'border border-gray-200'} rounded-lg shadow-sm`}>
+              <div className={`px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100 ${currentTheme?.border || 'border-b border-gray-200'} rounded-t-lg`}>
+                <h3 className={`text-sm font-bold ${currentTheme?.textPrimary || 'text-blue-900'} flex items-center gap-2`}>
                   <span>➕</span> Create New Payroll Run
                 </h3>
               </div>
               <div className="p-4">
                 <form onSubmit={handleCreatePayroll} className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                       Run Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -494,7 +494,7 @@ export default function PayrollRunsTab({
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                         Month <span className="text-red-500">*</span>
                       </label>
                       <select
@@ -525,7 +525,7 @@ export default function PayrollRunsTab({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                         Year <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -546,7 +546,7 @@ export default function PayrollRunsTab({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                       Notes
                     </label>
                     <textarea
@@ -577,21 +577,21 @@ export default function PayrollRunsTab({
             {/* RIGHT - Filters & Quick Stats */}
             <div className="space-y-4">
               {/* Filters */}
-              <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-purple-100 border-b border-gray-200 rounded-t-lg">
-                  <h3 className="text-sm font-bold text-purple-900 flex items-center gap-2">
+              <div className={`${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.border || 'border border-gray-200'} rounded-lg shadow-sm`}>
+                <div className={`px-4 py-3 bg-gradient-to-r from-purple-50 to-purple-100 ${currentTheme?.border || 'border-b border-gray-200'} rounded-t-lg`}>
+                  <h3 className={`text-sm font-bold ${currentTheme?.textPrimary || 'text-purple-900'} flex items-center gap-2`}>
                     <span>🔍</span> Filters
                   </h3>
                 </div>
                 <div className="p-4 space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                       Status
                     </label>
                     <select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:border-purple-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                      className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg ${currentTheme?.cardBg || 'bg-white'} hover:border-purple-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors`}
                     >
                       <option value="all">All Status</option>
                       <option value="draft">Draft</option>
@@ -602,13 +602,13 @@ export default function PayrollRunsTab({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                    <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
                       Period
                     </label>
                     <select
                       value={dateFilter}
                       onChange={(e) => setDateFilter(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:border-purple-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                      className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg ${currentTheme?.cardBg || 'bg-white'} hover:border-purple-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors`}
                     >
                       <option value="all">All Periods</option>
                       <option value="current_month">Current Month</option>
@@ -621,9 +621,9 @@ export default function PayrollRunsTab({
               </div>
 
               {/* Quick Stats */}
-              <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                <div className="px-4 py-3 bg-gradient-to-r from-green-50 to-green-100 border-b border-gray-200 rounded-t-lg">
-                  <h3 className="text-sm font-bold text-green-900 flex items-center gap-2">
+              <div className={`${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.border || 'border border-gray-200'} rounded-lg shadow-sm`}>
+                <div className={`px-4 py-3 bg-gradient-to-r from-green-50 to-green-100 ${currentTheme?.border || 'border-b border-gray-200'} rounded-t-lg`}>
+                  <h3 className={`text-sm font-bold ${currentTheme?.textPrimary || 'text-green-900'} flex items-center gap-2`}>
                     <span>📊</span> Quick Stats
                   </h3>
                 </div>
@@ -658,9 +658,9 @@ export default function PayrollRunsTab({
           </div>
 
           {/* Payroll Runs Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-            <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <div className={`${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.border || 'border border-gray-200'} rounded-lg shadow-sm overflow-hidden`}>
+            <div className={`px-4 py-3 bg-gradient-to-r ${currentTheme?.cardBg || 'from-gray-50 to-gray-100'} ${currentTheme?.border || 'border-b border-gray-200'}`}>
+              <h3 className={`text-sm font-bold ${currentTheme?.textPrimary || 'text-gray-900'} flex items-center gap-2`}>
                 <span>📋</span> Payroll Runs ({payrollRuns.length})
               </h3>
             </div>
@@ -668,56 +668,56 @@ export default function PayrollRunsTab({
             {loading ? (
               <div className="p-12 text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="mt-4 text-sm text-gray-500">
+                <p className={`mt-4 text-sm ${currentTheme?.textSecondary || 'text-gray-500'}`}>
                   Loading payroll runs...
                 </p>
               </div>
             ) : payrollRuns.length === 0 ? (
               <div className="p-12 text-center">
                 <div className="text-5xl mb-4">📊</div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                <h3 className={`text-lg font-semibold ${currentTheme?.textPrimary || 'text-gray-700'} mb-2`}>
                   No Payroll Runs Yet
                 </h3>
-                <p className="text-sm text-gray-500">
+                <p className={`text-sm ${currentTheme?.textSecondary || 'text-gray-500'}`}>
                   Create your first payroll run using the form above
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+                  <thead className={`${currentTheme?.cardBg || 'bg-gray-50'} ${currentTheme?.border || 'border-b border-gray-200'}`}>
                     <tr>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700 uppercase tracking-wide">
+                      <th className={`px-4 py-3 text-left font-semibold ${currentTheme?.textPrimary || 'text-gray-700'} uppercase tracking-wide`}>
                         Run Name
                       </th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700 uppercase tracking-wide">
+                      <th className={`px-4 py-3 text-left font-semibold ${currentTheme?.textPrimary || 'text-gray-700'} uppercase tracking-wide`}>
                         Period
                       </th>
-                      <th className="px-4 py-3 text-center font-semibold text-gray-700 uppercase tracking-wide">
+                      <th className={`px-4 py-3 text-center font-semibold ${currentTheme?.textPrimary || 'text-gray-700'} uppercase tracking-wide`}>
                         Status
                       </th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-700 uppercase tracking-wide">
+                      <th className={`px-4 py-3 text-right font-semibold ${currentTheme?.textPrimary || 'text-gray-700'} uppercase tracking-wide`}>
                         Employees
                       </th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-700 uppercase tracking-wide">
+                      <th className={`px-4 py-3 text-right font-semibold ${currentTheme?.textPrimary || 'text-gray-700'} uppercase tracking-wide`}>
                         Net Pay
                       </th>
-                      <th className="px-4 py-3 text-center font-semibold text-gray-700 uppercase tracking-wide">
+                      <th className={`px-4 py-3 text-center font-semibold ${currentTheme?.textPrimary || 'text-gray-700'} uppercase tracking-wide`}>
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className={`${currentTheme?.border || 'divide-y divide-gray-200'}`}>
                     {payrollRuns.map((run) => (
                       <tr
                         key={run.id}
-                        className="hover:bg-gray-50 transition-colors"
+                        className={`hover:${currentTheme?.cardBg || 'bg-gray-50'} transition-colors`}
                       >
                         <td className="px-4 py-3">
-                          <div className="font-medium text-gray-900">
+                          <div className={`font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                             {run.run_name}
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className={`text-xs ${currentTheme?.textSecondary || 'text-gray-500'}`}>
                             Created by{" "}
                             {typeof run.created_by === "object" &&
                             run.created_by !== null
@@ -729,7 +729,7 @@ export default function PayrollRunsTab({
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-gray-700">
+                          <div className={`${currentTheme?.textPrimary || 'text-gray-700'}`}>
                             {new Date(
                               run.year,
                               run.month - 1
@@ -749,7 +749,7 @@ export default function PayrollRunsTab({
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <div className="font-medium text-gray-900">
+                          <div className={`font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                             {run.employee_count}
                           </div>
                         </td>
@@ -757,7 +757,7 @@ export default function PayrollRunsTab({
                           <div className="font-semibold text-green-700">
                             {formatCurrency(run.total_net)}
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className={`text-xs ${currentTheme?.textSecondary || 'text-gray-500'}`}>
                             Gross: {formatCurrency(run.total_gross)}
                           </div>
                         </td>
@@ -837,12 +837,12 @@ export default function PayrollRunsTab({
 
       {/* No Client Selected */}
       {!selectedClient && (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-12 text-center">
+        <div className={`${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.border || 'border border-gray-200'} rounded-lg shadow-sm p-12 text-center`}>
           <div className="text-5xl mb-4">🏢</div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">
+          <h3 className={`text-lg font-semibold ${currentTheme?.textPrimary || 'text-gray-700'} mb-2`}>
             Select a Client to Begin
           </h3>
-          <p className="text-sm text-gray-500">
+          <p className={`text-sm ${currentTheme?.textSecondary || 'text-gray-500'}`}>
             Choose a client from the dropdown above to manage their payroll runs
           </p>
         </div>
@@ -851,7 +851,7 @@ export default function PayrollRunsTab({
       {/* Preview Modal */}
       {showPreviewModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+          <div className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden`}>
             {/* Modal Header */}
             <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex justify-between items-center">
               <h2 className="text-xl font-bold">📊 Payroll Run Details</h2>
@@ -875,27 +875,27 @@ export default function PayrollRunsTab({
               ) : previewData ? (
                 <>
                   {/* Summary Section */}
-                  <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                    <h3 className="text-lg font-bold text-gray-800 mb-4">
+                  <div className={`${currentTheme?.cardBg || 'bg-gray-50'} rounded-lg p-6 mb-6`}>
+                    <h3 className={`text-lg font-bold ${currentTheme?.textPrimary || 'text-gray-800'} mb-4`}>
                       Summary
                     </h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <p className="text-xs text-gray-500 mb-1">Period</p>
-                        <p className="font-semibold text-gray-800">
+                        <p className={`text-xs ${currentTheme?.textSecondary || 'text-gray-500'} mb-1`}>Period</p>
+                        <p className={`font-semibold ${currentTheme?.textPrimary || 'text-gray-800'}`}>
                           {previewData.month}/{previewData.year}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500 mb-1">
+                        <p className={`text-xs ${currentTheme?.textSecondary || 'text-gray-500'} mb-1`}>
                           Total Staff
                         </p>
-                        <p className="font-semibold text-gray-800">
+                        <p className={`font-semibold ${currentTheme?.textPrimary || 'text-gray-800'}`}>
                           {previewData.total_staff_count || 0}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500 mb-1">
+                        <p className={`text-xs ${currentTheme?.textSecondary || 'text-gray-500'} mb-1`}>
                           Total Gross
                         </p>
                         <p className="font-semibold text-green-600">
@@ -906,7 +906,7 @@ export default function PayrollRunsTab({
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500 mb-1">Total Net</p>
+                        <p className={`text-xs ${currentTheme?.textSecondary || 'text-gray-500'} mb-1`}>Total Net</p>
                         <p className="font-semibold text-blue-600">
                           ₦
                           {Number(
@@ -919,7 +919,7 @@ export default function PayrollRunsTab({
 
                   {/* Staff Breakdown */}
                   <div>
-                    <h3 className="text-lg font-bold text-gray-800 mb-4">
+                    <h3 className={`text-lg font-bold ${currentTheme?.textPrimary || 'text-gray-800'} mb-4`}>
                       Staff Breakdown ({previewData.payroll_items?.length || 0}{" "}
                       employees)
                     </h3>
@@ -1004,7 +1004,7 @@ export default function PayrollRunsTab({
             </div>
 
             {/* Modal Footer */}
-            <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3">
+            <div className={`${currentTheme?.cardBg || 'bg-gray-50'} px-6 py-4 flex justify-end gap-3`}>
               <button
                 onClick={() => setShowPreviewModal(false)}
                 className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
