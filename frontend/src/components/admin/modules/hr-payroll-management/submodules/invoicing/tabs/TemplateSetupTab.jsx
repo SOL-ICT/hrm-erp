@@ -9,6 +9,7 @@ import ExportTemplateBuilder from "../../export-templates/ExportTemplateBuilder"
  * Handles salary template configuration with client list and setup modal
  */
 const TemplateSetupTab = ({
+  currentTheme,
   // Client and structure data
   clients,
   selectedTemplateClient,
@@ -451,14 +452,14 @@ const TemplateSetupTab = ({
   return (
     <div className="space-y-6">
       {/* Template Management Overview */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-6 border-b border-gray-200">
+      <div className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg shadow-sm ${currentTheme?.border || 'border'}`}>
+        <div className={`p-6 border-b ${currentTheme?.border || 'border-gray-200'}`}>
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="text-lg font-medium text-gray-900">
+              <h3 className={`text-lg font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                 Template Management
               </h3>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className={`text-sm ${currentTheme?.textSecondary || 'text-gray-600'} mt-1`}>
                 Configure calculation templates (salary computation) and export
                 templates (invoice formatting)
               </p>
@@ -466,7 +467,7 @@ const TemplateSetupTab = ({
             <div className="flex space-x-3">
               <button
                 onClick={fetchClients}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className={`inline-flex items-center px-3 py-2 ${currentTheme?.border || 'border border-gray-300'} shadow-sm text-sm leading-4 font-medium rounded-md ${currentTheme?.textPrimary || 'text-gray-700'} ${currentTheme?.cardBg || 'bg-white'} ${currentTheme?.hover || 'hover:bg-gray-50'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
                 title="Refresh client list and template status"
               >
                 <svg
@@ -490,14 +491,14 @@ const TemplateSetupTab = ({
       </div>
 
       {/* Template Setup Clients List */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-6 border-b border-gray-200">
+      <div className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg shadow-sm ${currentTheme?.border || 'border'}`}>
+        <div className={`p-6 border-b ${currentTheme?.border || 'border-gray-200'}`}>
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="text-lg font-medium text-gray-900">
+              <h3 className={`text-lg font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                 Client Calculation Template Setup
               </h3>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className={`text-sm ${currentTheme?.textSecondary || 'text-gray-600'} mt-1`}>
                 Configure salary calculation templates for each client (Phase 1:
                 HOW to calculate)
               </p>
@@ -506,32 +507,32 @@ const TemplateSetupTab = ({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className={`w-full divide-y ${currentTheme?.border || 'divide-gray-200'}`}>
+            <thead className={currentTheme?.bg || 'bg-gray-50'}>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>
                   Client
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>
                   Contact
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>
                   Template Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className={`${currentTheme?.cardBg || 'bg-white'} divide-y ${currentTheme?.border || 'divide-gray-200'}`}>
               {!clients || clients.length === 0 ? (
                 <tr>
                   <td
                     colSpan={5}
-                    className="px-6 py-8 text-center text-gray-500"
+                    className={`px-6 py-8 text-center ${currentTheme?.textSecondary || 'text-gray-500'}`}
                   >
                     Loading clients...
                   </td>
@@ -558,7 +559,7 @@ const TemplateSetupTab = ({
                 <tr>
                   <td
                     colSpan={5}
-                    className="px-6 py-8 text-center text-gray-500"
+                    className={`px-6 py-8 text-center ${currentTheme?.textSecondary || 'text-gray-500'}`}
                   >
                     No clients found. Please ensure you have created clients in
                     the Client Management section.
@@ -573,29 +574,29 @@ const TemplateSetupTab = ({
                 </tr>
               ) : (
                 clients.map((client) => (
-                  <tr key={client.id} className="hover:bg-gray-50">
+                  <tr key={client.id} className={currentTheme?.hover || 'hover:bg-gray-50'}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-10 w-10 flex-shrink-0">
-                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                            <span className="text-sm font-medium text-blue-600">
+                          <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                            <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                               {client.organisation_name?.charAt(0) || "N"}
                             </span>
                           </div>
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className={`text-sm font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                             {client.organisation_name || "N/A"}
                           </div>
-                          <div className="text-sm text-gray-500">
+                          <div className={`text-sm ${currentTheme?.textSecondary || 'text-gray-500'}`}>
                             {client.cac_registration_number || "No CAC number"}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                       <div>{client.phone || "No phone"}</div>
-                      <div className="text-gray-500">
+                      <div className={currentTheme?.textSecondary || 'text-gray-500'}>
                         {client.head_office_address || "No address"}
                       </div>
                     </td>
@@ -603,10 +604,10 @@ const TemplateSetupTab = ({
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           client.status === "active"
-                            ? "bg-green-100 text-green-800"
+                            ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
                             : client.status === "inactive"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-gray-100 text-gray-800"
+                            ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
+                            : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300"
                         }`}
                       >
                         {client.status || "unknown"}
@@ -620,8 +621,8 @@ const TemplateSetupTab = ({
                           <span
                             className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                               templateCount > 0
-                                ? "bg-green-100 text-green-800"
-                                : "bg-yellow-100 text-yellow-800"
+                                ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                                : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300"
                             }`}
                           >
                             {templateCount > 0

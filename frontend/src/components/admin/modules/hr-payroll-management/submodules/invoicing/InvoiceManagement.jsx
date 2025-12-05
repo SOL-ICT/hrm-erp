@@ -38,8 +38,9 @@ import {
 /**
  * Modular Invoice Management Component
  * Refactored from large monolithic component into manageable tab-based structure
+ * Now with theme support matching Payroll Processing UI
  */
-const InvoiceManagement = () => {
+const InvoiceManagement = ({ currentTheme, preferences, onBack }) => {
   const { user } = useAuth();
   const { clients, loading: clientsLoading } = useClients();
 
@@ -127,6 +128,8 @@ const InvoiceManagement = () => {
   useEffect(() => {
     if (activeTab === "invoices") {
       loadGeneratedInvoices();
+    } else if (activeTab === "generate") {
+      loadAttendanceUploads(); // Refresh attendance uploads when switching to generate tab
     }
   }, [activeTab]);
 
@@ -151,8 +154,10 @@ const InvoiceManagement = () => {
   const loadAttendanceUploads = async () => {
     try {
       const response = await invoiceApiService.getAttendanceUploads();
+      console.log('Attendance uploads API response:', response);
       if (response.success) {
         const uploadsData = response.data || response.uploads || [];
+        console.log('Attendance uploads data:', uploadsData);
         setAttendanceUploads(Array.isArray(uploadsData) ? uploadsData : []);
       } else {
         setAttendanceUploads([]);
@@ -1318,90 +1323,77 @@ const InvoiceManagement = () => {
 
   if (clientsLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className={`min-h-screen ${currentTheme.bg} flex items-center justify-center`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading clients...</p>
+          <p className={currentTheme.textSecondary}>Loading clients...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-12xl mx-auto px-4 sm:px-6 lg:px-12">
-          <div className="py-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  Enhanced Invoicing System
-                </h1>
-                <p className="text-gray-600 mt-1">
-                  Streamlined invoice management with Phase 1.3 enhancements
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <FileSpreadsheet className="w-6 h-6 text-blue-600" />
-                <span className="text-sm text-gray-500">
-                  {clients.length} clients available
-                </span>
-              </div>
-            </div>
-          </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className={`text-3xl font-bold ${currentTheme.textPrimary}`}>
+            Enhanced Invoicing System
+          </h1>
+          <p className={`${currentTheme.textSecondary} mt-1`}>
+            Streamlined invoice management with attendance-based calculations
+          </p>
         </div>
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            ← Back
+          </button>
+        )}
       </div>
 
       {/* Global Error Display */}
       {error && (
-        <div className="max-w-12xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-          <Alert className="border-red-200 bg-red-50">
-            <AlertDescription className="text-red-700">
-              {error}
-            </AlertDescription>
-          </Alert>
+        <div className="p-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200">
+          {error}
         </div>
       )}
 
-      {/* Navigation Tabs */}
-      <div className="max-w-12xl mx-auto px-4 sm:px-6 lg:px-12 pt-6">
-        <div className="bg-white rounded-lg shadow-sm border mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 px-6">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-3 py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === tab.id
-                        ? "border-blue-500 text-blue-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* Tab Description */}
-          <div className="px-6 py-3 bg-gray-50">
-            <p className="text-sm text-gray-600">
-              {tabs.find((tab) => tab.id === activeTab)?.description}
-            </p>
-          </div>
+      {/* Main Card with Tabs */}
+      <div
+        className={`${currentTheme.cardBg} ${currentTheme.border} rounded-xl backdrop-blur-md shadow-lg overflow-hidden`}
+      >
+        {/* Tabs Navigation */}
+        <div className="flex flex-wrap border-b border-gray-200 dark:border-gray-700">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-6 py-4 font-medium transition-all ${
+                  isActive
+                    ? "bg-blue-600 text-white border-b-2 border-blue-400"
+                    : `${currentTheme.textSecondary} hover:bg-gray-100 dark:hover:bg-gray-800`
+                }`}
+                title={tab.description}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Tab Content */}
-        <div className="space-y-6">
+        <div className="p-6">
           {/* Upload Files Tab */}
           {activeTab === "upload" && (
             <EnhancedUploadTab
+              currentTheme={currentTheme}
               attendanceUploads={attendanceUploads}
               onUploadSuccess={handleUploadSuccess}
               onProceedToGeneration={() => setActiveTab("generate")}
@@ -1412,6 +1404,7 @@ const InvoiceManagement = () => {
           {/* Generate Invoices Tab */}
           {activeTab === "generate" && (
             <InvoiceGenerationTab
+              currentTheme={currentTheme}
               clients={clients}
               attendanceUploads={attendanceUploads}
               selectedUpload={selectedUpload}
@@ -1429,6 +1422,7 @@ const InvoiceManagement = () => {
           {/* Generated Invoices Tab */}
           {activeTab === "invoices" && (
             <GeneratedInvoicesTab
+              currentTheme={currentTheme}
               generatedInvoices={generatedInvoices}
               loading={loading}
               formatCurrency={formatCurrency}
@@ -1445,6 +1439,7 @@ const InvoiceManagement = () => {
           {/* Template Setup Tab */}
           {activeTab === "templates" && (
             <TemplateSetupTab
+              currentTheme={currentTheme}
               // Client and structure data
               clients={clients}
               selectedTemplateClient={selectedTemplateClient}
@@ -1505,29 +1500,17 @@ const InvoiceManagement = () => {
           )}
 
           {/* Upcoming Features Tab */}
-          {activeTab === "upcoming" && <UpcomingFeaturesTab />}
+          {activeTab === "upcoming" && <UpcomingFeaturesTab currentTheme={currentTheme} />}
 
           {/* Loading State */}
           {loading && (
-            <Card>
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Loading...</p>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className={currentTheme.textSecondary}>Loading...</p>
+              </div>
+            </div>
           )}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center text-sm text-gray-500">
-          <p>Enhanced Invoicing System v1.3 - SOL ICT Solutions</p>
-          <p className="mt-1">
-            Phase 1.3: Enhanced Attendance Upload Process ✅ Complete
-          </p>
         </div>
       </div>
 

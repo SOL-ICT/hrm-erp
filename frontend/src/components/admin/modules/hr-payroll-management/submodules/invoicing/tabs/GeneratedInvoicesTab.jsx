@@ -17,6 +17,7 @@ import {
  * Displays and manages generated invoices
  */
 const GeneratedInvoicesTab = ({
+  currentTheme,
   generatedInvoices = [],
   loading,
   formatCurrency,
@@ -81,10 +82,10 @@ const GeneratedInvoicesTab = ({
   return (
     <div className="space-y-6">
       {/* Generated Invoices Table */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-6 border-b">
+      <div className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg shadow-sm ${currentTheme?.border || 'border'}`}>
+        <div className={`p-6 border-b ${currentTheme?.border || 'border-gray-200'}`}>
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-gray-900">
+            <h3 className={`text-lg font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
               Generated Invoices
             </h3>
             <div className="flex items-center space-x-2">
@@ -96,45 +97,42 @@ const GeneratedInvoicesTab = ({
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className={`w-full divide-y ${currentTheme?.border || 'divide-gray-200'}`}>
+            <thead className={currentTheme?.bg || 'bg-gray-50'}>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>
                   Invoice Number
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>
                   Client
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>
                   Month
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>
                   Type
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>
                   Amount
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>
                   FIRS Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>
                   Generated
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`px-6 py-3 text-left text-xs font-medium ${currentTheme?.textSecondary || 'text-gray-500'} uppercase tracking-wider`}>
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className={`${currentTheme?.cardBg || 'bg-white'} divide-y ${currentTheme?.border || 'divide-gray-200'}`}>
               {!Array.isArray(generatedInvoices) ||
               generatedInvoices.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={9}
-                    className="px-6 py-8 text-center text-gray-500"
+                    colSpan={8}
+                    className={`px-6 py-8 text-center ${currentTheme?.textSecondary || 'text-gray-500'}`}
                   >
                     {loading ? (
                       <div className="flex items-center justify-center">
@@ -148,39 +146,36 @@ const GeneratedInvoicesTab = ({
                 </tr>
               ) : (
                 generatedInvoices.map((invoice) => (
-                  <tr key={invoice.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <tr key={invoice.id} className={currentTheme?.hover || 'hover:bg-gray-50'}>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                       {invoice.invoice_number}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                       {invoice.client?.organisation_name || "Unknown"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                       {invoice.invoice_period
                         ? formatDate(invoice.invoice_period)
                         : "Unknown"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                       {invoice.invoice_type === "with_schedule"
                         ? "With Schedule"
                         : "Summary Only"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
                       {formatCurrency(invoice.total_amount)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(invoice.status)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getFIRSStatusBadge(invoice)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${currentTheme?.textSecondary || 'text-gray-500'}`}>
                       {invoice.created_at
                         ? formatDate(invoice.created_at)
                         : "Unknown"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex gap-1">
                         <Button
                           variant="outline"
                           size="sm"
@@ -266,9 +261,9 @@ const GeneratedInvoicesTab = ({
 
       {/* Invoice Statistics Summary */}
       {generatedInvoices.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border">
+        <div className={`${currentTheme?.cardBg || 'bg-white'} rounded-lg shadow-sm ${currentTheme?.border || 'border'}`}>
           <div className="p-6">
-            <h4 className="text-md font-medium text-gray-900 mb-4">
+            <h4 className={`text-md font-medium ${currentTheme?.textPrimary || 'text-gray-900'} mb-4`}>
               Invoice Summary
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -276,7 +271,7 @@ const GeneratedInvoicesTab = ({
                 <div className="text-2xl font-bold text-blue-600">
                   {generatedInvoices.length}
                 </div>
-                <div className="text-sm text-gray-500">Total Invoices</div>
+                <div className={`text-sm ${currentTheme?.textSecondary || 'text-gray-500'}`}>Total Invoices</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
@@ -287,7 +282,7 @@ const GeneratedInvoicesTab = ({
                     )
                   )}
                 </div>
-                <div className="text-sm text-gray-500">Total Amount</div>
+                <div className={`text-sm ${currentTheme?.textSecondary || 'text-gray-500'}`}>Total Amount</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-yellow-600">
@@ -296,7 +291,7 @@ const GeneratedInvoicesTab = ({
                       .length
                   }
                 </div>
-                <div className="text-sm text-gray-500">Pending</div>
+                <div className={`text-sm ${currentTheme?.textSecondary || 'text-gray-500'}`}>Pending</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
@@ -305,7 +300,7 @@ const GeneratedInvoicesTab = ({
                       .length
                   }
                 </div>
-                <div className="text-sm text-gray-500">Paid</div>
+                <div className={`text-sm ${currentTheme?.textSecondary || 'text-gray-500'}`}>Paid</div>
               </div>
             </div>
           </div>
