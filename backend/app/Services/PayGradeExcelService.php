@@ -200,9 +200,19 @@ class PayGradeExcelService
 
                 // Emolument amounts (editable - pre-fill if exists)
                 $existingEmoluments = $grade->emoluments ?? [];
+                
+                // Ensure emoluments is an array (handle both JSON string and array cases)
+                if (is_string($existingEmoluments)) {
+                    $existingEmoluments = json_decode($existingEmoluments, true) ?? [];
+                }
+                
                 $existingAmounts = [];
-                foreach ($existingEmoluments as $emol) {
-                    $existingAmounts[$emol['component_id']] = $emol['amount'] ?? 0;
+                if (is_array($existingEmoluments)) {
+                    foreach ($existingEmoluments as $emol) {
+                        if (is_array($emol) && isset($emol['component_id'])) {
+                            $existingAmounts[$emol['component_id']] = $emol['amount'] ?? 0;
+                        }
+                    }
                 }
 
                 $col = 'C';
