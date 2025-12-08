@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation"; // Importing the router
+import { useNavigation } from '@/components/staff/components/NavigationContext'; 
 import { 
   Menu, 
   X, 
@@ -22,7 +24,8 @@ export default function StaffHeader({
   isSidebarOpen,
   setIsSidebarOpen,
   isMobileSidebarOpen,
-  setIsMobileSidebarOpen
+  setIsMobileSidebarOpen,
+  setActiveComponent
 }) {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -33,7 +36,7 @@ export default function StaffHeader({
   const [isNavOpen, setIsNavOpen] = useState(false);
 
   //user
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
 
   // Close all dropdowns
   const closeAllDropdowns = () => {
@@ -167,7 +170,7 @@ export default function StaffHeader({
               </button>
 
               {/* Country/Language Dropdown */}
-              <div className="relative">
+              {/* <div className="relative">
                 <button 
                   onClick={() => {
                     closeAllDropdowns();
@@ -191,7 +194,7 @@ export default function StaffHeader({
                     ))}
                   </div>
                 )}
-              </div>
+              </div> */}
 
               {/* Fullscreen Toggle */}
               <button 
@@ -202,7 +205,7 @@ export default function StaffHeader({
               </button>
 
               {/* Messages Dropdown */}
-              <div className="relative">
+              {/* <div className="relative">
                 <button 
                   onClick={() => {
                     closeAllDropdowns();
@@ -234,61 +237,90 @@ export default function StaffHeader({
                     </div>
                   </div>
                 )}
-              </div>
+              </div> */}
 
               {/* Notifications */}
-              <button className="p-2 hover:bg-gray-100 rounded-md relative">
+              {/* <button className="p-2 hover:bg-gray-100 rounded-md relative">
                 <Bell className="w-5 h-5 text-gray-600" />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+              </button> */}
 
-              {/* Profile Dropdown */}
-              <div className="relative">
-                <button 
-                  onClick={() => {
-                    closeAllDropdowns();
-                    setIsProfileOpen(!isProfileOpen);
-                  }}
-                  className="flex items-center space-x-2 p-1 hover:bg-gray-100 rounded-md"
-                >
-                  <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-gray-600" />
-                  </div>
-                </button>
-                {isProfileOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-50">
-                    <div className="p-4 border-b border-gray-200 text-center">
-                      <h6 className="font-semibold text-gray-900">{user?.name || "Loading..."}</h6>
-                      <p className="text-sm text-gray-600">App Developer</p>
-                    </div>
-                    <div className="py-2">
-                      <a href="#" className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-50">
-                        <User className="w-4 h-4 text-gray-600" />
-                        <span className="text-sm">Profile</span>
-                      </a>
-                      <a href="#" className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-50">
-                        <Settings className="w-4 h-4 text-gray-600" />
-                        <span className="text-sm">Settings</span>
-                      </a>
-                      <a href="#" className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-50">
-                        <MessageSquare className="w-4 h-4 text-gray-600" />
-                        <span className="text-sm">Messages</span>
-                      </a>
-                      <a href="#" className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-50">
-                        <Edit2 className="w-4 h-4 text-gray-600" />
-                        <span className="text-sm">Change Password</span>
-                      </a>
-                      <a href="#" className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-50 text-red-600">
-                        <LogOut className="w-4 h-4" />
-                        <span className="text-sm">Sign Out</span>
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
+{/* Profile Dropdown */}
+<div className="relative">
+  <button 
+    onClick={() => {
+      closeAllDropdowns();
+      setIsProfileOpen(!isProfileOpen);
+    }}
+    className="flex items-center space-x-2 p-1 hover:bg-gray-100 rounded-md"
+  >
+    <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+      <User className="w-4 h-4 text-gray-600" />
+    </div>
+  </button>
+
+  {isProfileOpen && (
+    <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+      <div className="p-4 border-b border-gray-200 text-center">
+        <h6 className="font-semibold text-gray-900">{user?.name || "Loading..."}</h6>
+        <p className="text-sm text-gray-600">App Developer</p>
+      </div>
+      <div className="py-2">
+        {/* Profile Link as a Button */}
+        <button 
+          onClick={() => setActiveComponent("settings")} 
+          className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-50"
+        >
+          <User className="w-4 h-4 text-gray-900" />
+          <span className="text-sm text-gray-900">Profile</span>
+        </button>
+
+        {/* Settings Link as a Button */}
+        <button 
+          onClick={() => setActiveComponent("settings")} 
+          className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-50"
+        >
+          <Settings className="w-4 h-4 text-gray-900" />
+          <span className="text-sm text-gray-900">Settings</span>
+        </button>
+
+        {/* Messages Link */}
+        <button 
+          onClick={() => setActiveComponent("settings")} 
+          className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-50"
+        >
+          <MessageSquare className="w-4 h-4 text-gray-900" />
+          <span className="text-sm text-gray-900">Messages</span>
+        </button>
+
+        {/* Change Password Link */}
+        <button 
+        // empty for now 
+          onClick={() => setActiveComponent("settings")} 
+          className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-50"
+        >
+          <Edit2 className="w-4 h-4 text-gray-900" />
+          <span className="text-sm text-gray-900">Change Password</span>
+        </button>
+
+        {/* Logout Button */}
+        <button
+          onClick={logout}
+          className="w-full text-left flex items-center space-x-3 px-4 py-2 hover:bg-gray-50 text-red-600"
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="text-sm">Sign Out</span>
+        </button>
+      </div>
+    </div>
+  )}
+</div>
 
               {/* Settings Icon */}
-              <button className="p-2 hover:bg-gray-100 rounded-md">
+              <button className="p-2 hover:bg-gray-100 rounded-md"
+                onClick={() => setActiveComponent("settings")}
+              >
+               
                 <Settings className="w-5 h-5 text-gray-600 animate-spin" />
               </button>
             </div>

@@ -1,28 +1,97 @@
-"use client"
-
 import React, { useState, useEffect } from 'react';
-import { Mail, PhoneCall, Info, ChevronDown } from 'lucide-react';
+import { Mail, PhoneCall, Info, ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { PieChart } from 'react-minimal-pie-chart';
 import CalendarReact from 'react-calendar';
+import { useAuth } from '@/contexts/AuthContext';
 import 'react-calendar/dist/Calendar.css'; // Import react-calendar styles
 
 export default function LeaveApply() {
-  const [dateRangeType, setDateRangeType] = useState('single');
   const [leaveType, setLeaveType] = useState('');
   const [reason, setReason] = useState('');
-  const [singleDate, setSingleDate] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [numberOfDays, setNumberOfDays] = useState('');
+  const [publicHolidays, setPublicHolidays] = useState('');
+  const [handOverTo, setHandOverTo] = useState('');
+  const [handOverEmail, setHandOverEmail] = useState('');
   const [dateError, setDateError] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [leaves, setLeaves] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [applications, setApplications] = useState([]);
+  const [currentBalance, setCurrentBalance] = useState(20);
+  const [usedDays, setUsedDays] = useState(0);
 
   // Get today's date in YYYY-MM-DD format
   const today = new Date().toISOString().split('T')[0];
+  const currentYear = new Date().getFullYear();
+  
 
-  // Fetch leave applications for chart
+  // Dummy staff data
+  const staffList = [
+    { id: '1', name: 'John Smith', email: 'john.smith@company.com' },
+    { id: '2', name: 'Sarah Johnson', email: 'sarah.johnson@company.com' },
+    { id: '3', name: 'Michael Brown', email: 'michael.brown@company.com' },
+    { id: '4', name: 'Emily Davis', email: 'emily.davis@company.com' },
+    { id: '5', name: 'David Wilson', email: 'david.wilson@company.com' }
+  ];
+
+  const { user } = useAuth();
+  const [profile, setProfile] = useState(null);
+
+  useEffect(() => {
+  const fetchUserProfile = async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      // Get CSRF token
+      await fetch('http://localhost:8000/sanctum/csrf-cookie', {
+        credentials: 'include',
+      });
+
+      // Fetch the current user's profile
+      const response = await fetch(`http://localhost:8000/api/staff/staff-profiles/${user?.id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'include',
+      });
+
+      console.log('[FETCH] Response status:', response.status);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          setErrorMessage('Authentication failed. Please log in again.');
+        } else {
+          setErrorMessage(`Failed to fetch profile: HTTP ${response.status}`);
+        }
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('[FETCH] Profile data:', data);
+      setProfile(data);
+
+    } catch (error) {
+      console.error('[FETCH] Error fetching profile:', error);
+      if (!errorMessage) {
+        setErrorMessage('An error occurred while fetching the profile.');
+      }
+      setProfile(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  fetchUserProfile();
+}, [user?.id]); 
+
+  // Fetch leave applications
   useEffect(() => {
     const fetchLeaves = async () => {
       setIsLoading(true);
@@ -47,8 +116,18 @@ export default function LeaveApply() {
         }
 
         const data = await response.json();
-        console.log('Fetched leave data:', data); // Debug log
+        console.log('Fetched leave data:', data);
+        
+        // Filter current year leaves
+        const currentYearLeaves = data.filter(leave => 
+          new Date(leave.start_date).getFullYear() === currentYear
+        );
+        
         setLeaves(data);
+        
+        // Calculate used days for current year
+        const totalUsedDays = currentYearLeaves.reduce((acc, leave) => acc + (leave.days || 0), 0);
+        setUsedDays(totalUsedDays);
       } catch (error) {
         console.error('Failed to fetch leave data:', error);
         if (!errorMessage) setErrorMessage('An error occurred while fetching leaves.');
@@ -60,132 +139,197 @@ export default function LeaveApply() {
     fetchLeaves();
   }, []);
 
-  // Compute chart data based on leave types
-  const chartColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A569BD', '#58D68D'];
-  const typeCounts = leaves.reduce((acc, leave) => {
-    const typeName = leave.leave_type_name || 'Unknown';
-    acc[typeName] = (acc[typeName] || 0) + 1;
-    return acc;
-  }, {});
+  // Update hand over email when staff selection changes
+  useEffect(() => {
+    if (handOverTo) {
+      const selectedStaff = staffList.find(staff => staff.id === handOverTo);
+      setHandOverEmail(selectedStaff ? selectedStaff.email : '');
+    } else {
+      setHandOverEmail('');
+    }
+  }, [handOverTo]);
 
-  const chartData = Object.entries(typeCounts)
-    .map(([label, value], index) => ({
-      label,
-      value,
-      color: chartColors[index % chartColors.length],
-    }))
-    .filter(item => item.value > 0);
+  // Calculate end date based on start date, number of days, and public holidays
+  const calculateEndDate = (startDateStr, days, holidays) => {
+    if (!startDateStr || !days) return '';
+    
+    const start = new Date(startDateStr);
+    let currentDate = new Date(start);
+    let addedDays = 0;
+    const totalDaysToAdd = parseInt(days) + parseInt(holidays || 0) - 1;
 
-  // Validate dates
-  const validateDates = (start, end) => {
-    if (!start && !end) {
-      setDateError('');
-      return;
+    while (addedDays < totalDaysToAdd) {
+      currentDate.setDate(currentDate.getDate() + 1);
+      // Skip weekends
+      if (currentDate.getDay() !== 0 && currentDate.getDay() !== 6) {
+        addedDays++;
+      }
+    }
+
+    return currentDate.toISOString().split('T')[0];
+  };
+ // Update current balance when profile changes
+  useEffect(() => {
+  if (profile?.leave_entitlement != null) {
+    setCurrentBalance(profile.leave_entitlement);
+  }
+}, [profile]);
+
+
+  // Auto-calculate end date when start date, number of days, or public holidays change
+  useEffect(() => {
+    if (startDate && numberOfDays) {
+      const calculatedEndDate = calculateEndDate(startDate, numberOfDays, publicHolidays);
+      setEndDate(calculatedEndDate);
+    }
+  }, [startDate, numberOfDays, publicHolidays]);
+
+  // Validate dates and balance
+  const validateApplication = () => {
+    if (!startDate) {
+      setDateError('Start date is required');
+      return false;
     }
     
-    if (start && start < today) {
+    if (startDate < today) {
       setDateError('Cannot apply for leave on past dates');
-      return;
+      return false;
     }
+
+    if (!numberOfDays || parseInt(numberOfDays) <= 0) {
+      setDateError('Number of days must be greater than 0');
+      return false;
+    }
+
+    // Check balance
+    const pendingDays = applications.reduce((acc, app) => acc + parseInt(app.numberOfDays), 0);
+    const availableBalance = currentBalance - usedDays - pendingDays;
     
-    if (end && start && end < start) {
-      setDateError('Return date cannot be before start date');
-      return;
+    if (parseInt(numberOfDays) > availableBalance) {
+      setDateError(`Insufficient leave balance. Available: ${availableBalance} days, Requested: ${numberOfDays} days`);
+      return false;
     }
     
     setDateError('');
+    return true;
   };
 
-  const handleStartDateChange = (date) => {
-    setStartDate(date);
-    validateDates(date, endDate);
-  };
-
-  const handleEndDateChange = (date) => {
-    setEndDate(date);
-    validateDates(startDate, date);
-  };
-
-  const handleSingleDateChange = (date) => {
-    setSingleDate(date);
-    if (date && date < today) {
-      setDateError('Cannot apply for leave on past dates');
-    } else {
-      setDateError('');
-    }
-  };
-
-  const resetForm = () => {
-    setDateRangeType('single');
+  const resetCurrentForm = () => {
     setLeaveType('');
     setReason('');
-    setSingleDate('');
     setStartDate('');
     setEndDate('');
+    setNumberOfDays('');
+    setPublicHolidays('');
+    setHandOverTo('');
+    setHandOverEmail('');
     setDateError('');
     setErrorMessage('');
   };
 
-  const calculateDays = () => {
-    if (dateRangeType === 'single' && singleDate) {
-      return 1;
-    }
-    if (dateRangeType === 'multiple' && startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      return Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
-    }
-    return 0;
-  };
-
-  const handleSubmit = async () => {
-    if (dateError) {
-      console.log('Submission blocked due to date error:', dateError);
+  const addToApplicationList = () => {
+    if (!validateApplication() || !leaveType || !reason || !handOverTo) {
+      setErrorMessage('Please fill in all required fields and ensure valid dates');
       return;
     }
 
-    const days = calculateDays();
-    if (days === 0) {
-      setErrorMessage('Please select valid dates');
-      return;
-    }
-
-    const payload = {
-      leave_type_id: leaveType,
+    const newApplication = {
+      id: Date.now(),
+      leaveType,
+      leaveTypeName: leaveTypes.find(type => type.value === leaveType)?.label || '',
       reason,
-      start_date: dateRangeType === 'single' ? singleDate : startDate,
-      end_date: dateRangeType === 'single' ? singleDate : endDate,
-      days,
+      startDate,
+      endDate,
+      numberOfDays,
+      publicHolidays: publicHolidays || '0',
+      handOverTo,
+      handOverToName: staffList.find(staff => staff.id === handOverTo)?.name || '',
+      handOverEmail
     };
 
+    setApplications([...applications, newApplication]);
+    resetCurrentForm();
+    setErrorMessage('');
+  };
+
+  const removeFromApplicationList = (id) => {
+    setApplications(applications.filter(app => app.id !== id));
+  };
+
+  const submitAllApplications = async () => {
+    if (applications.length === 0) {
+      setErrorMessage('No applications to submit');
+      return;
+    }
+
     try {
-      const response = await fetch('http://localhost:8000/api/staff/leave-applications', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      });
+      const promises = applications.map(app => 
+        fetch('http://localhost:8000/api/staff/leave-applications', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            leave_type_id: app.leaveType,
+            reason: app.reason,
+            start_date: app.startDate,
+            end_date: app.endDate,
+            days: parseInt(app.numberOfDays),
+          }),
+        })
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        setErrorMessage(errorData.message || 'Submission failed. Please check your input.');
-        console.error('Server responded with error:', errorData);
-        return;
+      const responses = await Promise.all(promises);
+      
+      // Check if all submissions were successful
+      const allSuccessful = responses.every(response => response.ok);
+      
+      if (allSuccessful) {
+        setShowSuccess(true);
+        setApplications([]);
+        setErrorMessage('');
+        setTimeout(() => {
+          setShowSuccess(false);
+          // Refresh leave data
+          window.location.reload();
+        }, 2000);
+      } else {
+        setErrorMessage('Some applications failed to submit. Please try again.');
       }
-
-      setShowSuccess(true);
-      setErrorMessage('');
-      setTimeout(() => {
-        setShowSuccess(false);
-        resetForm();
-      }, 2000);
     } catch (error) {
-      setErrorMessage('An error occurred while submitting. Please try again.');
+      setErrorMessage('An error occurred while submitting applications. Please try again.');
       console.error('Submission error:', error);
     }
   };
+
+  // Calculate current balance info
+  const pendingDays = applications.reduce((acc, app) => acc + parseInt(app.numberOfDays), 0);
+  const availableBalance = currentBalance - usedDays - pendingDays;
+
+  // Compute chart data based on leave types
+  const chartColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A569BD', '#58D68D'];
+  const currentYearLeaves = leaves.filter(leave => 
+    new Date(leave.start_date).getFullYear() === currentYear
+  );
+  
+  const typeCounts = currentYearLeaves.reduce((acc, leave) => {
+    const typeName = leave.leave_type_name || 'Unknown';
+    acc[typeName] = {
+      count: (acc[typeName]?.count || 0) + 1,
+      days: (acc[typeName]?.days || 0) + (leave.days || 0)
+    };
+    return acc;
+  }, {});
+
+  const chartData = Object.entries(typeCounts)
+    .map(([label, data], index) => ({
+      label,
+      value: data.count,
+      color: chartColors[index % chartColors.length],
+      days: data.days
+    }))
+    .filter(item => item.value > 0);
 
   const leaveTypes = [
     { value: '1', label: 'Annual Leave Senior Staff Level' },
@@ -201,7 +345,7 @@ export default function LeaveApply() {
         <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg">
             <h3 className="text-lg font-semibold text-green-600">Submitted Successfully!</h3>
-            <p className="text-sm text-gray-600 mt-2">Your leave application has been submitted.</p>
+            <p className="text-sm text-gray-600 mt-2">All leave applications have been submitted.</p>
           </div>
         </div>
       )}
@@ -249,76 +393,80 @@ export default function LeaveApply() {
             <h4 className="text-lg font-semibold text-gray-900">Apply Leaves</h4>
           </div>
           
-          <div className="p-6">
-            {/* Leave Dates Selection */}
-            <div className="mb-6">
+          <div className="p-6 space-y-6">
+            {/* Leave Category Level */}
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Leaves Dates
+                Leave Category Level
               </label>
-              <div className="relative">
-                <select
-                  value={dateRangeType}
-                  onChange={(e) => setDateRangeType(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white text-gray-900"
-                >
-                  <option value="single">Single Leaves</option>
-                  <option value="multiple">Multiple Leaves</option>
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
+              <input
+                type="text"
+                value={profile?.category_name || ''}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+              />
             </div>
 
-            {/* Date Range Input */}
-            <div className="mb-6">
+            {/* Start Date */}
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date Range:
+                Start Date *
               </label>
-              {dateRangeType === 'single' ? (
-                <div className="relative">
-                  <input
-                    type="date"
-                    name="singledaterange"
-                    value={singleDate}
-                    onChange={(e) => handleSingleDateChange(e.target.value)}
-                    min={today}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-                  />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="relative">
-                    <input
-                      type="date"
-                      name="startDate"
-                      value={startDate}
-                      onChange={(e) => handleStartDateChange(e.target.value)}
-                      min={today}
-                      placeholder="Start Date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-                    />
-                  </div>
-                  <div className="relative">
-                    <input
-                      type="date"
-                      name="endDate"
-                      value={endDate}
-                      onChange={(e) => handleEndDateChange(e.target.value)}
-                      min={startDate || today}
-                      placeholder="End Date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-                    />
-                  </div>
-                </div>
-              )}
-              {dateError && (
-                <p className="mt-2 text-sm text-red-600">{dateError}</p>
-              )}
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                min={today}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+              />
+            </div>
+
+            {/* Number of Days */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Number of Days *
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={numberOfDays}
+                onChange={(e) => setNumberOfDays(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+              />
+            </div>
+
+            {/* Public Holidays */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Public Holidays
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={publicHolidays}
+                onChange={(e) => setPublicHolidays(e.target.value)}
+                placeholder="0"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+              />
+            </div>
+
+            {/* End Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+              />
             </div>
 
             {/* Leave Types */}
-            <div className="mb-6">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Leaves Types
+                Leave Type *
               </label>
               <div className="relative">
                 <select
@@ -337,57 +485,147 @@ export default function LeaveApply() {
               </div>
             </div>
 
-            {/* Reason */}
-            <div className="mb-6">
+            {/* Hand Over To */}
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Reason:
+                Hand Over To *
+              </label>
+              <div className="relative">
+                <select
+                  value={handOverTo}
+                  onChange={(e) => setHandOverTo(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white text-gray-900"
+                >
+                  <option value="">Select Staff</option>
+                  {staffList.map((staff) => (
+                    <option key={staff.id} value={staff.id}>
+                      {staff.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                value={handOverEmail}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                placeholder="Email will auto-populate"
+              />
+            </div>
+
+            {/* Reason */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Reason *
               </label>
               <textarea
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-gray-900"
-                rows={2}
+                rows={3}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               />
             </div>
+
+            {dateError && (
+              <p className="text-sm text-red-600">{dateError}</p>
+            )}
           </div>
 
           {/* Card Footer */}
           <div className="p-6 border-t border-gray-200">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center">
-                <span className="text-sm font-semibold text-gray-900">Selected Days:</span>
-                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                  {calculateDays()}
+            <div className="mb-4 text-sm text-gray-600">
+              <div className="flex justify-between">
+                <span>Current Balance:</span>
+                <span className="font-medium">{currentBalance} days</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Used This Year:</span>
+                <span className="font-medium">{usedDays} days</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Pending Applications:</span>
+                <span className="font-medium">{pendingDays} days</span>
+              </div>
+              <div className="flex justify-between border-t pt-2 mt-2">
+                <span>Available Balance:</span>
+                <span className={`font-bold ${availableBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {availableBalance} days
                 </span>
               </div>
-              <div className="flex space-x-2">
-                <button 
-                  className="px-4 py-2 text-sm font-medium text-blue-600 bg-white border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
-                  onClick={resetForm}
-                >
-                  Close
-                </button>
-                <button 
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-                  onClick={handleSubmit}
-                  disabled={dateError || !leaveType || (!singleDate && dateRangeType === 'single') || (!startDate && !endDate && dateRangeType === 'multiple')}
-                >
-                  Submit
-                </button>
-              </div>
+            </div>
+            
+            <div className="flex space-x-2">
+              <button 
+                className="flex-1 px-4 py-2 text-sm font-medium text-blue-600 bg-white border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+                onClick={resetCurrentForm}
+              >
+                Clear
+              </button>
+              <button 
+                className="flex-1 flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                onClick={addToApplicationList}
+                disabled={!leaveType || !reason || !handOverTo || !numberOfDays || !startDate || dateError}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add to List
+              </button>
             </div>
           </div>
         </div>
 
         {/* CALENDAR */}
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <CalendarReact className="text-gray-900" />
+          <div className="p-4 bg-gray-50 rounded-lg mb-4">
+            <div className="text-center text-gray-600 text-sm">
+              Calendar View
+            </div>
+            <div className="mt-5 text-center text-xs text-gray-500">
+              <CalendarReact />
+            </div>
+          </div>
+          
+          {/* Application List */}
+          {applications.length > 0 && (
+            <div className="mt-6 border-t pt-4">
+              <h5 className="font-semibold text-gray-900 mb-3">Pending Applications ({applications.length})</h5>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {applications.map((app) => (
+                  <div key={app.id} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
+                    <div>
+                      <div className="font-medium">{app.leaveTypeName}</div>
+                      <div className="text-gray-600">{app.startDate} - {app.endDate} ({app.numberOfDays} days)</div>
+                    </div>
+                    <button
+                      onClick={() => removeFromApplicationList(app.id)}
+                      className="text-red-600 hover:text-red-800 p-1"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={submitAllApplications}
+                className="w-full mt-3 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Submit All Applications
+              </button>
+            </div>
+          )}
         </div>
 
         {/* LEAVES OVERVIEW */}
         <div className="bg-white rounded-lg shadow-sm">
           <div className="p-6 border-b border-gray-200">
-            <h4 className="text-lg font-semibold text-gray-900">Leaves Overview</h4>
+            <h4 className="text-lg font-semibold text-gray-900">Leaves Overview ({currentYear})</h4>
           </div>
           
           <div className="p-6">
@@ -410,17 +648,42 @@ export default function LeaveApply() {
                   />
                 </div>
               ) : (
-                <p className="text-gray-500 text-sm">No leave applications found. Apply for a leave to see data.</p>
+                <p className="text-gray-500 text-sm">No leave applications found for {currentYear}.</p>
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4 max-w-xs mx-auto">
-              {chartData.map((item, index) => (
-                <div key={index} className="flex items-center">
-                  <span className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: item.color }}></span>
-                  <span className="text-sm font-semibold text-gray-700">{item.label}</span>
+            {/* Legend and Numerical Breakdown */}
+            <div className="space-y-3">
+              <div className="text-sm font-semibold text-gray-900 border-b pb-2">
+                Leave Applications This Year:
+              </div>
+              {chartData.length > 0 ? (
+                <div className="space-y-2">
+                  {chartData.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center">
+                        <span className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: item.color }}></span>
+                        <span className="text-gray-700">{item.label}</span>
+                      </div>
+                      <div className="text-gray-900 font-medium">
+                        {item.value} apps ({item.days} days)
+                      </div>
+                    </div>
+                  ))}
+                  <div className="border-t pt-2 mt-2">
+                    <div className="flex justify-between text-sm font-semibold">
+                      <span>Total Used:</span>
+                      <span className="text-red-600">{usedDays} days</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-semibold">
+                      <span>Remaining Balance:</span>
+                      <span className="text-green-600">{currentBalance - usedDays} days</span>
+                    </div>
+                  </div>
                 </div>
-              ))}
+              ) : (
+                <p className="text-gray-500 text-sm">Apply for leaves to see breakdown here.</p>
+              )}
             </div>
           </div>
         </div>

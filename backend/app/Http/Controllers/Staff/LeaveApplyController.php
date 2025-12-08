@@ -14,7 +14,7 @@ class LeaveApplyController extends Controller
     {
         try {
             $validated = $request->validate([
-                'leave_type_id' => 'required|integer|exists:leave_types,id',
+                'leave_type_id' => 'required|integer',
                 'start_date' => 'required|date',
                 'end_date' => 'nullable|date|after_or_equal:start_date',
                 'days' => 'required|integer|min:1',
@@ -99,84 +99,6 @@ class LeaveApplyController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error fetching leave applications',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    // Delete a pending leave application
-    public function destroy($id)
-    {
-        try {
-            // Check if user is authenticated
-            if (!Auth::check()) {
-                return response()->json(['message' => 'Unauthenticated'], 401);
-            }
-
-            // Find the leave application
-            $leave = DB::table('leave_applications')
-                ->where('id', $id)
-                ->where('staff_id', Auth::id())
-                ->where('status', 'pending')
-                ->first();
-
-            if (!$leave) {
-                return response()->json(['message' => 'Leave application not found or not eligible for deletion'], 404);
-            }
-
-            // Delete the leave application
-            DB::table('leave_applications')->where('id', $id)->delete();
-
-            return response()->json(['message' => 'Leave application deleted successfully'], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Error deleting leave application',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    // Submit a report issue
-    public function reportIssue(Request $request)
-    {
-        try {
-            $validated = $request->validate([
-                'email' => 'required|email',
-                'subject' => 'required|string|max:500',
-            ]);
-
-            // Check if user is authenticated
-            if (!Auth::check()) {
-                return response()->json(['message' => 'Unauthenticated'], 401);
-            }
-
-            // Insert report into database
-            $reportId = DB::table('reports')->insertGetId([
-                'staff_id' => Auth::id(),
-                'email' => $validated['email'],
-                'subject' => $validated['subject'],
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            return response()->json([
-                'message' => 'Report submitted successfully',
-                'data' => [
-                    'id' => $reportId,
-                    'email' => $validated['email'],
-                    'subject' => $validated['subject'],
-                ]
-            ], 201);
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Error submitting report',
                 'error' => $e->getMessage()
             ], 500);
         }

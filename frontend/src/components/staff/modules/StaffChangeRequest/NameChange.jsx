@@ -2,14 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import {
-  CalendarDays,
-  User,
-  Building,
   Mail,
-  FileText,
   Save,
-  Trash2,
-  List,
   ArrowLeft,
   Upload,
   CheckCircle,
@@ -17,7 +11,7 @@ import {
   PlusCircle,
 } from "lucide-react";
 
-// Pre-populated mock data for the employee and their requests
+// Example employee data (static for now)
 const employeeData = {
   employeeCode: "SOL/2023/0298",
   clientName: "Strategic Outsourcing Limited",
@@ -25,50 +19,6 @@ const employeeData = {
   formalName: "Ibrahim Babajide Runmonkun",
   designation: "Officer",
   emailId: "bdam81@gmail.com",
-  solRmEmailId: "elimreports@solnigeria.com",
-};
-
-// Mock API call to simulate fetching requests from a backend
-const fetchRequests = () => {
-  // In a real app, this would be an API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // Mock data for the user's name change requests
-      const mockRequests = [
-        {
-          id: 1,
-          firstName: "Ibrahim",
-          middleName: "Babajide",
-          lastName: "Runmonkun",
-          reason: "Original name",
-          status: "Approved",
-          submissionDate: "2024-01-15",
-        },
-        // Uncomment this to test the 'Pending' state
-        // {
-        //   id: 2,
-        //   firstName: "Ibrahim",
-        //   middleName: "David",
-        //   lastName: "Babajide",
-        //   reason: "Typographical error correction",
-        //   status: "Pending",
-        //   submissionDate: "2024-08-20",
-        // },
-        // Uncomment this to test the 'Rejected' state
-        // {
-        //   id: 3,
-        //   firstName: "Ibrahim",
-        //   middleName: "David",
-        //   lastName: "Smith",
-        //   reason: "Changed my mind",
-        //   status: "Rejected",
-        //   submissionDate: "2024-07-10",
-        //   rejectionReason: "Reason for change was not valid.",
-        // },
-      ];
-      resolve(mockRequests);
-    }, 500); // Simulate network delay
-  });
 };
 
 export default function NameChange() {
@@ -76,7 +26,6 @@ export default function NameChange() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isRequestSubmitted, setIsRequestSubmitted] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
     middleName: "",
@@ -85,22 +34,47 @@ export default function NameChange() {
     proofOfReason: null,
   });
   const [fileName, setFileName] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
+  // Fetch requests from backend
   useEffect(() => {
-    const getRequests = async () => {
+    const fetchRequests = async () => {
       setLoading(true);
-      const data = await fetchRequests();
-      setRequests(data);
-      setLoading(false);
-    };
-    getRequests();
-  }, [isRequestSubmitted]);
+      setErrorMessage("");
+      try {
+        const response = await fetch("http://localhost:8000/api/staff/name-change-requests", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          credentials: "include",
+        });
 
+        if (!response.ok) {
+          throw new Error("Failed to fetch requests");
+        }
+
+        const data = await response.json();
+        setRequests(data);
+      } catch (error) {
+        console.error("Error fetching requests:", error);
+        setErrorMessage("Unable to load requests. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRequests();
+  }, [isSubmitting]);
+
+  // Handle input change
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Handle file input
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -109,25 +83,52 @@ export default function NameChange() {
     }
   };
 
+  // Submit new request
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Simulate API call
-    console.log("Submitting form:", formData);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsSubmitting(false);
-    setIsRequestSubmitted(true);
-    setShowForm(false);
-    // Reset form fields
-    setFormData({
-      firstName: "",
-      middleName: "",
-      lastName: "",
-      reasonForChange: "",
-      proofOfReason: null,
-    });
-    setFileName("");
-    alert("Name change request submitted successfully!");
+    setErrorMessage("");
+
+    try {
+      const payload = new FormData();
+      payload.append("first_name", formData.firstName);
+      payload.append("middle_name", formData.middleName);
+      payload.append("last_name", formData.lastName);
+      payload.append("reason", formData.reasonForChange);
+      payload.append("proof_document", formData.proofOfReason);
+
+      const response = await fetch("http://localhost:8000/api/staff/name-change-requests", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+        },
+        body: payload,
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to submit request");
+      }
+
+      await response.json();
+      alert("Name change request submitted successfully!");
+
+      // Reset form
+      setFormData({
+        firstName: "",
+        middleName: "",
+        lastName: "",
+        reasonForChange: "",
+        proofOfReason: null,
+      });
+      setFileName("");
+      setShowForm(false);
+    } catch (error) {
+      console.error("Error submitting request:", error);
+      setErrorMessage("Failed to submit request. Try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const hasPendingRequest = requests.some((req) => req.status === "Pending");
@@ -140,7 +141,6 @@ export default function NameChange() {
           Name Change Application
         </h1>
         <div className="flex space-x-2">
-          {/* Action Buttons, could be for admins or if the user has a request */}
           {!showForm && hasRejectedRequest && (
             <button
               onClick={() => setShowForm(true)}
@@ -162,6 +162,7 @@ export default function NameChange() {
         </div>
       </div>
 
+      {/* Employee Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         <div>
           <label className="text-sm font-medium text-gray-700">Employee Code</label>
@@ -192,6 +193,12 @@ export default function NameChange() {
         </div>
       </div>
 
+      {/* Error Message */}
+      {errorMessage && (
+        <div className="mb-4 text-red-600 font-semibold">{errorMessage}</div>
+      )}
+
+      {/* Requests list OR form */}
       {loading ? (
         <div className="text-center py-10 text-gray-500">
           <p>Loading request history...</p>
@@ -217,24 +224,31 @@ export default function NameChange() {
               </div>
               <div className="flex-grow">
                 <p className="font-semibold text-lg text-gray-900">
-                  Request Status: <span className={`font-bold ${
-                    request.status === "Approved" ? "text-green-600" :
-                    request.status === "Pending" ? "text-yellow-600" :
-                    "text-red-600"
-                  }`}>{request.status}</span>
+                  Request Status:{" "}
+                  <span
+                    className={`font-bold ${
+                      request.status === "Approved"
+                        ? "text-green-600"
+                        : request.status === "Pending"
+                        ? "text-yellow-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {request.status}
+                  </span>
                 </p>
                 <p className="text-sm text-gray-600">
-                  Submitted on: {request.submissionDate}
+                  Submitted on:{" "}
+                  {new Date(request.submitted_at).toLocaleDateString()}
                 </p>
                 <p className="mt-2 text-sm text-gray-700">
-                  Proposed Name: {request.firstName} {request.middleName} {request.lastName}
+                  Proposed Name: {request.first_name} {request.middle_name}{" "}
+                  {request.last_name}
                 </p>
-                <p className="text-sm text-gray-700">
-                  Reason: {request.reason}
-                </p>
+                <p className="text-sm text-gray-700">Reason: {request.reason}</p>
                 {request.status === "Rejected" && (
                   <p className="mt-2 text-sm font-semibold text-red-500">
-                    Rejection Reason: {request.rejectionReason}
+                    Rejection Reason: {request.rejection_reason}
                   </p>
                 )}
               </div>
@@ -242,6 +256,7 @@ export default function NameChange() {
           ))}
         </div>
       ) : (
+        // Submit form
         <form onSubmit={handleSubmit} className="space-y-6">
           <h2 className="text-xl font-semibold text-gray-800">
             Submit New Name Change Request
@@ -249,74 +264,71 @@ export default function NameChange() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
-                <label htmlFor="firstName" className="text-sm font-medium text-gray-700">
+                <label className="text-sm font-medium text-gray-700">
                   First Name
                 </label>
                 <input
                   type="text"
-                  id="firstName"
                   name="firstName"
                   value={formData.firstName}
                   onChange={handleChange}
                   className="mt-1 w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter new first name"
                   required
                 />
               </div>
               <div>
-                <label htmlFor="middleName" className="text-sm font-medium text-gray-700">
+                <label className="text-sm font-medium text-gray-700">
                   Middle Name
                 </label>
                 <input
                   type="text"
-                  id="middleName"
                   name="middleName"
                   value={formData.middleName}
                   onChange={handleChange}
                   className="mt-1 w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter new middle name"
                 />
               </div>
               <div>
-                <label htmlFor="lastName" className="text-sm font-medium text-gray-700">
+                <label className="text-sm font-medium text-gray-700">
                   Last Name
                 </label>
                 <input
                   type="text"
-                  id="lastName"
                   name="lastName"
                   value={formData.lastName}
                   onChange={handleChange}
                   className="mt-1 w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter new last name"
                   required
                 />
               </div>
               <div>
-                <label htmlFor="reasonForChange" className="text-sm font-medium text-gray-700">
-                  Reason for change
+                <label className="text-sm font-medium text-gray-700">
+                  Reason
                 </label>
                 <textarea
-                  id="reasonForChange"
                   name="reasonForChange"
                   value={formData.reasonForChange}
                   onChange={handleChange}
                   rows="4"
                   className="mt-1 w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Briefly explain the reason for the name change"
                   required
                 />
               </div>
             </div>
 
             <div className="flex flex-col space-y-4">
-              <label className="text-sm font-medium text-gray-700">Proof of reason</label>
+              <label className="text-sm font-medium text-gray-700">
+                Proof of reason
+              </label>
               <div className="border border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center h-full bg-gray-50">
                 <Upload className="h-12 w-12 text-gray-400" />
                 <p className="mt-2 text-sm text-gray-600">
                   Drag & drop a file here, or
                 </p>
-                <label htmlFor="file-upload" className="mt-1 cursor-pointer font-semibold text-blue-600 hover:text-blue-500">
+                <label
+                  htmlFor="file-upload"
+                  className="mt-1 cursor-pointer font-semibold text-blue-600 hover:text-blue-500"
+                >
                   Choose File
                   <input
                     id="file-upload"
@@ -329,12 +341,14 @@ export default function NameChange() {
                 </label>
                 {fileName && (
                   <p className="mt-2 text-sm text-gray-500">
-                    File selected: <span className="font-medium text-gray-700">{fileName}</span>
+                    File selected:{" "}
+                    <span className="font-medium text-gray-700">{fileName}</span>
                   </p>
                 )}
               </div>
             </div>
           </div>
+
           <div className="flex justify-end space-x-4">
             <button
               type="button"
