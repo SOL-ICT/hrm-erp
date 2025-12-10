@@ -16,7 +16,6 @@ return Application::configure(basePath: dirname(__DIR__))
         // Add CORS handling for API routes
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
-            \App\Http\Middleware\LogRBACRequests::class,
         ]);
 
         // Trust proxies if needed (optional, but helpful for development)
