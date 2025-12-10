@@ -331,6 +331,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // Attendance Export Module - HR & Payroll Management Extension
     require __DIR__ . '/modules/attendance/attendance-export-routes.php';
+
+    // Staff Dashboard Routes (authenticated staff users)
+    require __DIR__ . '/modules/staff/staff-profile.php';
+    require __DIR__ . '/modules/staff/staff-change-request.php';
+    require __DIR__ . '/modules/staff/leave-apply.php';
+    require __DIR__ . '/modules/staff/offer-acceptance.php';
 });
 
 /*

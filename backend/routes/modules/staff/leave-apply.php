@@ -10,4 +10,10 @@ Route::middleware(['auth:sanctum'])->prefix('staff')->group(function () {
 
     // View personal leave history
     Route::get('/leave-applications', [LeaveApplyController::class, 'index']);
+
+    Route::get('/profile', [LeaveApplyController::class, 'getProfile']);
+    Route::get('/leave-balance', [LeaveApplyController::class, 'getLeaveBalance']);
+    
+    // Admin route (you may want to add additional middleware for admin check)
+    Route::post('/process-carry-over', [LeaveApplyController::class, 'processCarryOver']);
 });

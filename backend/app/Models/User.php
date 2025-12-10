@@ -192,4 +192,14 @@ class User extends Authenticatable
 
         return null;
     }
+
+    /**
+     * Get offer acceptance logs for actions performed by this user
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function offerActionsPerformed()
+    {
+        return $this->hasMany(StaffOfferAcceptanceLog::class, 'actioned_by');
+    }
 }

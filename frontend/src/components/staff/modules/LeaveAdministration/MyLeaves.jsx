@@ -1,5 +1,3 @@
-"use client"
-
 import React, { useState, useEffect } from 'react';
 import { Mail, PhoneCall, Info, Eye, Trash2 } from 'lucide-react';
 import { PieChart } from 'react-minimal-pie-chart';
