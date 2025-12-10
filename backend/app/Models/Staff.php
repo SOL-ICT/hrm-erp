@@ -150,6 +150,16 @@ class Staff extends Model
         return $this->belongsTo(User::class, 'control_approved_by');
     }
 
+    /**
+     * Get all offer acceptance logs for this staff member
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function offerLogs()
+    {
+        return $this->hasMany(StaffOfferAcceptanceLog::class, 'staff_id');
+    }
+
     public function onboardedBy()
     {
         return $this->belongsTo(User::class, 'onboarded_by');

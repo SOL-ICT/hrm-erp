@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
+import CalendarReact from 'react-calendar';
+import 'react-calendar/dist/Calendar.css'; 
 import { useAuth } from "@/contexts/AuthContext";
+import LeaveOverviewCard from './components/LeaveOverviewCard';
 import { 
   Calendar, 
   Clock, 
@@ -21,7 +24,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 
-export default function StaffDashboard() {
+export default function StaffDashboard({ setActiveComponent }) {
   const [isClockInModalOpen, setIsClockInModalOpen] = useState(false);
   const [isApplyLeaveModalOpen, setIsApplyLeaveModalOpen] = useState(false);
   const [leaveType, setLeaveType] = useState('single');
@@ -88,12 +91,12 @@ export default function StaffDashboard() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          <button 
+          {/* <button 
             onClick={() => setIsApplyLeaveModalOpen(true)}
             className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
           >
             Apply Leaves
-          </button>
+          </button> */}
           
           <div className="flex items-center space-x-3">
             <div className="flex items-center border border-gray-200 rounded-md">
@@ -212,8 +215,8 @@ export default function StaffDashboard() {
             <h4 className="text-lg font-semibold text-gray-900">Calendar</h4>
           </div>
           <div className="p-6">
-            <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
-              <span className="text-gray-600">Calendar Placeholder</span>
+            <div className="mt-5 text-center text-xs text-gray-500">
+              <CalendarReact />
             </div>
           </div>
         </div>
@@ -247,59 +250,23 @@ export default function StaffDashboard() {
         {/* Leave Balance */}
         <div className="xl:col-span-5 bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-            <h4 className="text-lg font-semibold text-gray-900">Leave Balance</h4>
-            <button className="bg-blue-500 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-600">
-              Apply For Leave
-            </button>
+            <h4 className="text-lg font-semibold text-gray-900"></h4>
+            <button 
+            //i want the button to take the user to the leave application form
+            onClick={() => setActiveComponent("leave-application-entry")}
+            className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+          >
+            Apply Leaves
+          </button>
           </div>
-          <div className="p-6">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 text-gray-700">Balance</th>
-                    <th className="text-left py-2 text-gray-700">Used</th>
-                    <th className="text-center py-2 text-gray-700">Available</th>
-                    <th className="text-center py-2 text-gray-700">Allowance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaveBalance.map((leave, index) => (
-                    <tr key={index} className="border-b border-gray-100">
-                      <td className="py-3 flex items-center">
-                        <span className={`w-3 h-3 ${leave.color} rounded-full mr-3`}></span>
-                        <span className="font-medium text-gray-900">{leave.type}</span>
-                      </td>
-                      <td className="py-3 font-medium text-gray-900">{leave.used}</td>
-                      <td className="py-3 text-center text-gray-700">{leave.available}</td>
-                      <td className="py-3 text-center text-gray-700">{leave.allowance}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="grid grid-cols-3 border-t border-gray-200 mt-4">
-              <div className="text-center py-4 border-r border-gray-200">
-                <h5 className="font-medium text-gray-900 mb-1">Vacation</h5>
-                <span className="text-lg font-semibold text-blue-600">8 <span className="text-gray-500">/</span> 16</span>
-              </div>
-              <div className="text-center py-4 border-r border-gray-200">
-                <h5 className="font-medium text-gray-900 mb-1">Sick leave</h5>
-                <span className="text-lg font-semibold text-red-600">4.5 <span className="text-gray-500">/</span> 10</span>
-              </div>
-              <div className="text-center py-4">
-                <h5 className="font-medium text-gray-900 mb-1">Unpaid leave</h5>
-                <span className="text-lg font-semibold text-gray-900">5 <span className="text-gray-500">/</span> 365</span>
-              </div>
-            </div>
-          </div>
+           <LeaveOverviewCard />
         </div>
       </div>
 
       {/* Job Applications and Birthdays Row */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Recent Job Applications */}
-        <div className="xl:col-span-2 bg-white rounded-lg shadow">
+        {/* <div className="xl:col-span-2 bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200 flex justify-between items-center">
             <h4 className="text-lg font-semibold text-gray-900">Recent Job Application</h4>
             <div className="relative">
@@ -363,7 +330,7 @@ export default function StaffDashboard() {
               </table>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Upcoming Birthdays */}
         <div className="bg-white rounded-lg shadow">
@@ -452,76 +419,6 @@ export default function StaffDashboard() {
         </div>
       )}
 
-      {/* Apply Leave Modal */}
-      {isApplyLeaveModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full">
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-              <h5 className="text-lg font-semibold text-gray-900">Apply Leaves</h5>
-              <button onClick={() => setIsApplyLeaveModalOpen(false)}>
-                <X className="w-5 h-5 text-gray-700" />
-              </button>
-            </div>
-            <div className="p-6">
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Leaves Dates</label>
-                <select 
-                  className="w-full p-2 border border-gray-200 rounded text-gray-900"
-                  value={leaveType}
-                  onChange={(e) => setLeaveType(e.target.value)}
-                >
-                  <option value="single">Single Leaves</option>
-                  <option value="multiple">Multiple Leaves</option>
-                </select>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Date Range:</label>
-                <div className="flex items-center border border-gray-200 rounded">
-                  <input type="text" placeholder="select dates" className="flex-1 p-2 rounded-l text-gray-900" />
-                  <div className="p-2 bg-gray-50 border-l">
-                    <Calendar className="w-4 h-4 text-gray-600" />
-                  </div>
-                </div>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Leaves Types</label>
-                <select className="w-full p-2 border border-gray-200 rounded text-gray-900">
-                  <option>Select</option>
-                  <option>Half Day Leave</option>
-                  <option>Casual Leaves</option>
-                  <option>Sick Leaves</option>
-                  <option>Maternity Leaves</option>
-                  <option>Paternity Leaves</option>
-                  <option>Annual Leaves</option>
-                  <option>Unpaid Leaves</option>
-                  <option>Other Leaves</option>
-                </select>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Reason:</label>
-                <textarea className="w-full p-2 border border-gray-200 rounded text-gray-900" rows="5" defaultValue="Some text here..."></textarea>
-              </div>
-            </div>
-            <div className="p-6 border-t border-gray-200 flex justify-between items-center">
-              <div className="flex items-center">
-                <span className="text-sm font-medium text-gray-700">Selected Days:</span>
-                <span className="ml-2 bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs">{selectedDays}</span>
-              </div>
-              <div className="flex space-x-3">
-                <button 
-                  onClick={() => setIsApplyLeaveModalOpen(false)}
-                  className="px-4 py-2 border border-gray-200 rounded hover:bg-gray-50 text-gray-700"
-                >
-                  Close
-                </button>
-                <button className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                  Submit
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
