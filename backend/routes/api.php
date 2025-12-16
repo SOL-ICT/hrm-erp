@@ -254,7 +254,7 @@ Route::get('/test-db-clients', function () {
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth:sanctum', 'log.activity'])->group(function () {
+Route::middleware(['auth:sanctum'])->group(function () {
 
     // Core routes
     Route::put('/user/preferences', [AuthController::class, 'updatePreferences']);
