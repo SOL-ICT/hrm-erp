@@ -281,6 +281,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     require __DIR__ . '/modules/client-contract-management/client-contracts.php';
     require __DIR__ . '/modules/client-contract-management/salary-structure.php';
 
+    // Client Policies (Fidelity Insurance)
+    require __DIR__ . '/modules/clients/client-policies.php';
 
     // Recruitment Management Module
     require __DIR__ . '/modules/recruitment-management/recruitment-requests.php';
@@ -305,6 +307,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     require __DIR__ . '/modules/administration/utilities.php';
     require __DIR__ . '/modules/administration/rbac.php';
     require __DIR__ . '/modules/administration/user-management.php';
+    require __DIR__ . '/modules/administration/leave-approval.php';
 
     // Candidate Staff Management Module
     require __DIR__ . '/modules/candidate-staff-management/candidates.php';
@@ -331,6 +334,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // Attendance Export Module - HR & Payroll Management Extension
     require __DIR__ . '/modules/attendance/attendance-export-routes.php';
+
+    // Claims Management Module
+    require __DIR__ . '/modules/claims/claims-resolution.php';
 
     // Staff Dashboard Routes (authenticated staff users)
     require __DIR__ . '/modules/staff/staff-profile.php';

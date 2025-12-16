@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { rbacAPI } from "../../../../services/rbacAPI";
 
-const RBACManagement = () => {
+const RBACManagement = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -193,17 +193,21 @@ const RBACManagement = () => {
   };
 
   const loadRolePermissions = async (roleId) => {
+    console.log("🔄 Loading permissions for role:", roleId);
     try {
       const data = await rbacAPI.getRolePermissions(roleId);
+      console.log("📦 Loaded permissions data:", data);
+      
       if (data.success) {
         const permissions = new Set();
         Object.values(data.data.permissions).forEach((modulePerms) => {
           modulePerms.forEach((perm) => permissions.add(perm.id));
         });
+        console.log("✅ Processed permissions Set:", Array.from(permissions));
         setSelectedPermissions(permissions);
       }
     } catch (error) {
-      console.error("Error loading role permissions:", error);
+      console.error("❌ Error loading role permissions:", error);
     }
   };
 
@@ -211,19 +215,38 @@ const RBACManagement = () => {
     if (!selectedRole) return;
 
     setSaving(true);
+    setError(null);
+    setSuccess(null);
+    
+    console.log("🔄 Saving permissions for role:", selectedRole.id);
+    console.log("📦 Permissions to save:", Array.from(selectedPermissions));
+    
     try {
       const data = await rbacAPI.updateRolePermissions(
         selectedRole.id,
         Array.from(selectedPermissions)
       );
+      
+      console.log("✅ Save response:", data);
+      
       if (data.success) {
-        // Show success message
+        setSuccess("Role permissions updated successfully");
+        
+        // Reload the permissions from backend to reflect the saved state
+        console.log("🔄 Reloading permissions from backend...");
+        await loadRolePermissions(selectedRole.id);
+        
+        // Auto-dismiss success message after 3 seconds
+        setTimeout(() => setSuccess(null), 3000);
+        
         console.log("Role permissions updated successfully");
       } else {
-        console.error("Failed to update permissions:", data.message);
+        setError(data.message || "Failed to update permissions");
+        console.error("❌ Failed to update permissions:", data.message);
       }
     } catch (error) {
-      console.error("Error saving permissions:", error);
+      setError("An error occurred while saving permissions");
+      console.error("❌ Error saving permissions:", error);
     } finally {
       setSaving(false);
     }
@@ -456,6 +479,36 @@ const RBACManagement = () => {
           </div>
         </div>
       </div>
+
+      {/* Success/Error Messages */}
+      {success && (
+        <div className="bg-green-50 border-l-4 border-green-400 p-4 mx-6 mt-4">
+          <div className="flex items-center">
+            <CheckCircle className="w-5 h-5 text-green-400 mr-3" />
+            <p className="text-sm font-medium text-green-800">{success}</p>
+            <button
+              onClick={() => setSuccess(null)}
+              className="ml-auto text-green-600 hover:text-green-800"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 mx-6 mt-4">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-400 mr-3" />
+            <p className="text-sm font-medium text-red-800">{error}</p>
+            <button
+              onClick={() => setError(null)}
+              className="ml-auto text-red-600 hover:text-red-800"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="bg-white border-b border-gray-200 px-6">

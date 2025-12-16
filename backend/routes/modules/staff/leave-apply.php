@@ -11,6 +11,9 @@ Route::middleware(['auth:sanctum'])->prefix('staff')->group(function () {
     // View personal leave history
     Route::get('/leave-applications', [LeaveApplyController::class, 'index']);
 
+    // Delete leave application
+    Route::delete('/leave-applications/{id}', [LeaveApplyController::class, 'destroy']);
+
     Route::get('/profile', [LeaveApplyController::class, 'getProfile']);
     Route::get('/leave-balance', [LeaveApplyController::class, 'getLeaveBalance']);
     

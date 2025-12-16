@@ -74,6 +74,7 @@ class Kernel extends HttpKernel
         'throttle'         => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified'         => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'rbac'             => \App\Http\Middleware\RBACMiddleware::class,
-        'log.activity' => \App\Http\Middleware\LogActivity::class,
+        'log.activity'     => \App\Http\Middleware\LogActivity::class,
+        'sol.rbac'         => \App\Http\Middleware\SOLRBACMiddleware::class,
     ];
 }
