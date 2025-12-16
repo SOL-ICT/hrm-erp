@@ -9,7 +9,7 @@ WORKDIR /app
 FROM base AS deps
 RUN apk add --no-cache python3 make g++
 COPY package*.json ./
-RUN npm cache clean --force && npm ci
+RUN npm cache clean --force && npm ci --include=dev
 
 # Build the application
 FROM base AS builder

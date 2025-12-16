@@ -48,4 +48,10 @@ class LogActivity
         }
         return $input;
     }
+    
+    public function terminate($request, $response)
+    {
+        // Middleware doesn't need terminate phase
+        // All logging happens in handle() method
+    }
 }
