@@ -29,6 +29,20 @@ const HRPayrollDashboard = lazy(() =>
   import("./modules/hr-payroll-management/HRPayrollDashboard")
 );
 
+// Claims Management
+const ClaimsDashboard = lazy(() =>
+  import("./modules/claims-management/ClaimsDashboard")
+);
+const ClaimsResolution = lazy(() =>
+  import("./modules/claims-management/submodules/claims-resolution/ClaimsResolution")
+);
+const ClaimsResolutionList = lazy(() =>
+  import("./modules/claims-management/submodules/claims-resolution-list/ClaimsResolutionList")
+);
+const PolicyManagement = lazy(() =>
+  import("./modules/claims-management/submodules/policy-management/PolicyManagement")
+);
+
 // HR & Payroll Management Submodules
 const EmployeeRecord = lazy(() =>
   import(
@@ -53,6 +67,11 @@ const PayrollProcessingPage = lazy(() =>
   import(
     "./modules/hr-payroll-management/submodules/payroll-processing/PayrollProcessingPage"
   )
+);
+
+// Leave Approval Component
+const LeaveApproval = lazy(() =>
+  import("./modules/hr-payroll/LeaveApproval")
 );
 
 // Direct submodule imports
@@ -283,6 +302,43 @@ const AdminRouter = ({
             />
           );
 
+        // CLAIMS MANAGEMENT SUBMODULES
+        case "claims-resolution":
+          return (
+            <SmartRouteCache routeKey="claims-resolution">
+              <ClaimsResolution
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        case "claims-resolution-list":
+          return (
+            <SmartRouteCache routeKey="claims-resolution-list">
+              <ClaimsResolutionList
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        case "policy-management":
+          return (
+            <SmartRouteCache routeKey="policy-management">
+              <PolicyManagement
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
         // Placeholder for other recruitment submodules
         case "interview":
         case "reports":
@@ -476,6 +532,9 @@ const AdminRouter = ({
             />
           );
 
+        case "leave-management":
+          return <LeaveApproval {...commonProps} />;
+
         // SOL MASTER handling
         default:
           if (activeSubmodule?.includes("sol")) {
@@ -550,8 +609,11 @@ const AdminRouter = ({
         // Show HR & Payroll Management Dashboard
         return <HRPayrollDashboard {...commonProps} />;
 
-      // Placeholder for other modules - show coming soon
       case "claims":
+        // Show Claims Dashboard
+        return <ClaimsDashboard {...commonProps} />;
+
+      // Placeholder for other modules - show coming soon
       case "requisition-management":
       case "procurement-management":
       case "billing-receivable-management":

@@ -20,6 +20,20 @@ interface StaffMember {
   department?: string;
 }
 
+interface LoginCredentials {
+  id: number;
+  email: string;
+  staff_id: number;
+  access_token: string;
+  username: string;
+  display_name: string;
+}
+
+interface APIError {
+  message: string;
+  status?: number;
+}
+
 interface FormData {
   email: string;
   clientId: string;
@@ -42,7 +56,8 @@ export default function StaffRegistrationPage() {
   // Data states
   const [clients, setClients] = useState<Client[]>([]);
   const [foundStaff, setFoundStaff] = useState<StaffMember | null>(null);
-  const [loginCredentials, setLoginCredentials] = useState<any>(null);
+  const [loginCredentials, setLoginCredentials] =
+    useState<LoginCredentials | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
@@ -59,7 +74,7 @@ export default function StaffRegistrationPage() {
       if (response.success) {
         setClients(response.data);
       }
-    } catch (error: any) {
+    } catch (error) {
       setError("Failed to load clients");
     } finally {
       setLoading(false);
@@ -86,8 +101,9 @@ export default function StaffRegistrationPage() {
         setStep(2);
         setSuccess(response.message);
       }
-    } catch (error: any) {
-      setError(error.message || "Staff record not found");
+    } catch (error) {
+      const apiError = error as APIError;
+      setError(apiError.message || "Staff record not found");
     } finally {
       setLoading(false);
     }
@@ -134,24 +150,12 @@ export default function StaffRegistrationPage() {
           router.push("/login");
         }, 5000);
       }
-    } catch (error: any) {
-      setError(error.message || "Failed to create account");
+    } catch (error) {
+      const apiError = error as APIError;
+      setError(apiError.message || "Failed to create account");
     } finally {
       setLoading(false);
     }
-  };
-
-  const resetForm = () => {
-    setStep(1);
-    setFormData({
-      email: "",
-      clientId: "",
-      password: "",
-      passwordConfirmation: "",
-    });
-    setFoundStaff(null);
-    setError("");
-    setSuccess("");
   };
 
   return (

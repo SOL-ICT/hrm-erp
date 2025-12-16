@@ -28,16 +28,20 @@ export const AuthProvider = ({ children }) => {
     const baseUrl = getBaseApiUrl();
     const fullUrl = url.startsWith("/") ? `${baseUrl}${url}` : url;
 
+    // Skip deduplication if this is a retry request
+    const skipDeduplication = options._retry === true;
+    delete options._retry; // Remove internal flag
+
     // Create a unique key for this request to prevent duplicates
     const requestKey = `${options.method || "GET"}:${fullUrl}:${JSON.stringify(
       options.body || {}
     )}`;
 
-    // If the same request is already pending, return the existing promise
-    if (pendingRequests.has(requestKey)) {
-      console.log("🔄 Deduplicating request:", fullUrl);
-      return pendingRequests.get(requestKey);
-    }
+    // Deduplication temporarily disabled due to response body consumption issues
+    // if (!skipDeduplication && pendingRequests.has(requestKey)) {
+    //   console.log("🔄 Deduplicating request:", fullUrl);
+    //   return pendingRequests.get(requestKey);
+    // }
 
     console.log("🔒 Making authenticated API request to:", fullUrl);
 
@@ -83,19 +87,22 @@ export const AuthProvider = ({ children }) => {
 
     try {
       // Create the request promise
+      console.log("🌐 Executing fetch:", fullUrl, "Method:", options.method || "GET");
+      console.log("🌐 Request options:", JSON.stringify({
+        method: options.method,
+        hasBody: !!options.body,
+        bodyPreview: options.body ? options.body.substring(0, 200) : null
+      }));
+      
       const requestPromise = fetch(fullUrl, {
         credentials: "include", // Important for session auth
         ...options,
         headers,
       });
 
-      // Store the pending request to prevent duplicates
-      pendingRequests.set(requestKey, requestPromise);
-
       const response = await requestPromise;
-
-      // Clean up the pending request
-      pendingRequests.delete(requestKey);
+      
+      console.log("✅ Fetch response received:", response.status, response.statusText);
 
       // Log response status for debugging
       if (!response.ok) {
@@ -106,8 +113,6 @@ export const AuthProvider = ({ children }) => {
 
       return response;
     } catch (error) {
-      // Clean up the pending request on error
-      pendingRequests.delete(requestKey);
       console.error(`Network error for ${fullUrl}:`, error.message);
       throw error;
     }

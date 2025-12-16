@@ -142,6 +142,7 @@ const RBACManagement = ({ currentTheme, preferences }) => {
       submodules: [
         { id: "claims-resolution", name: "Claims Resolution" },
         { id: "claims-resolution-list", name: "Claims Resolution List" },
+        { id: "policy-management", name: "Policy Management" },
       ],
     },
     {

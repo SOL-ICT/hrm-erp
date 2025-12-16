@@ -29,7 +29,7 @@ class AttendanceFileProcessingService
                 'file_size' => $file->getSize(),
                 'file_type' => $file->getClientOriginalExtension(),
                 'uploaded_by' => $uploadedBy,
-                'status' => 'processing',
+                'processing_status' => 'processing',
                 'processing_started_at' => now()
             ]);
 
@@ -42,7 +42,7 @@ class AttendanceFileProcessingService
 
             // Update upload status
             $upload->update([
-                'status' => $results['success'] ? 'completed' : 'failed',
+                'processing_status' => $results['success'] ? 'completed' : 'failed',
                 'records_processed' => $results['processed'],
                 'records_failed' => $results['failed'],
                 'error_details' => $results['errors'] ?? null,
@@ -132,11 +132,25 @@ class AttendanceFileProcessingService
             for ($row = 2; $row <= $highestRow; $row++) {
                 $rowData = $worksheet->rangeToArray("A{$row}:Z{$row}")[0];
 
+                // Skip completely empty rows
+                $isEmpty = true;
+                foreach ($rowData as $cell) {
+                    if (!empty(trim($cell))) {
+                        $isEmpty = false;
+                        break;
+                    }
+                }
+
+                if ($isEmpty) {
+                    continue; // Skip empty row, don't count as error
+                }
+
                 $result = $this->processAttendanceRow($rowData, $columnMap, $upload, $row);
 
                 if ($result['success']) {
                     $processed++;
-                } else {
+                } elseif (!isset($result['skip_count']) || !$result['skip_count']) {
+                    // Only count as failed if it's not a skipped instruction row
                     $failed++;
                     $errors[] = "Row {$row}: " . $result['error'];
                 }
@@ -195,11 +209,25 @@ class AttendanceFileProcessingService
             while (($rowData = fgetcsv($handle)) !== false) {
                 $rowNumber++;
 
+                // Skip completely empty rows
+                $isEmpty = true;
+                foreach ($rowData as $cell) {
+                    if (!empty(trim($cell))) {
+                        $isEmpty = false;
+                        break;
+                    }
+                }
+
+                if ($isEmpty) {
+                    continue; // Skip empty row, don't count as error
+                }
+
                 $result = $this->processAttendanceRow($rowData, $columnMap, $upload, $rowNumber);
 
                 if ($result['success']) {
                     $processed++;
-                } else {
+                } elseif (!isset($result['skip_count']) || !$result['skip_count']) {
+                    // Only count as failed if it's not a skipped instruction row
                     $failed++;
                     $errors[] = "Row {$rowNumber}: " . $result['error'];
                 }
@@ -260,7 +288,7 @@ class AttendanceFileProcessingService
             }
 
             // Days worked (alternative to hours)
-            if (in_array($header, ['days', 'days_worked', 'days worked', 'work_days', 'work days', 'attendance_days', 'attendance days'])) {
+            if (in_array($header, ['days', 'days_worked', 'days worked', 'days_present', 'days present', 'work_days', 'work days', 'attendance_days', 'attendance days'])) {
                 $map['days'] = $index;
             }
 
@@ -276,7 +304,10 @@ class AttendanceFileProcessingService
         $hasDate = isset($map['date']);
         $hasTimeData = isset($map['hours']) || isset($map['days']);
 
-        return ($hasEmployeeId && $hasName && $hasDate && $hasTimeData) ? $map : [];
+        // Date is optional if we have days data (monthly summary format)
+        $isValid = $hasEmployeeId && $hasName && $hasTimeData && ($hasDate || isset($map['days']));
+
+        return $isValid ? $map : [];
     }
 
     /**
@@ -285,6 +316,19 @@ class AttendanceFileProcessingService
     private function processAttendanceRow(array $rowData, array $columnMap, AttendanceUpload $upload, int $rowNumber): array
     {
         try {
+            // First, check if this row contains instruction/comment keywords in ANY cell
+            $instructionKeywords = ['INSTRUCTIONS:', 'TEMPLATE COVERAGE:', 'Only fill', 'Do NOT', 'Enter the', 'Save the', 'Template generated', 'Export date:', 'Staff count:', 'Pay Grade', 'highlighted in blue', 'payroll processing', 'employees'];
+            
+            foreach ($rowData as $cellValue) {
+                $cellText = trim(strtolower($cellValue ?? ''));
+                foreach ($instructionKeywords as $keyword) {
+                    if (stripos($cellText, strtolower($keyword)) !== false) {
+                        // This is an instruction/comment row, skip it silently
+                        return ['success' => false, 'error' => 'Skipped instruction/comment row', 'skip_count' => true];
+                    }
+                }
+            }
+
             // Extract data from row
             $employeeId = trim($rowData[$columnMap['employee_id']] ?? '');
             $name = trim($rowData[$columnMap['name']] ?? '');
@@ -299,14 +343,21 @@ class AttendanceFileProcessingService
                 return ['success' => false, 'error' => 'Missing employee name'];
             }
 
-            if (empty($dateValue)) {
+            // Date is optional for monthly summary format
+            // If no date column exists, we'll use the current month
+            if (empty($dateValue) && !isset($columnMap['days'])) {
                 return ['success' => false, 'error' => 'Missing date'];
             }
 
-            // Parse date
-            $date = $this->parseDate($dateValue);
-            if (!$date) {
-                return ['success' => false, 'error' => 'Invalid date format'];
+            // Parse date (or use first day of current month for monthly summary)
+            if (!empty($dateValue)) {
+                $date = $this->parseDate($dateValue);
+                if (!$date) {
+                    return ['success' => false, 'error' => 'Invalid date format'];
+                }
+            } else {
+                // Monthly summary format - use first day of current month
+                $date = now()->startOfMonth();
             }
 
             // Get hours/days worked

@@ -78,4 +78,14 @@ class Client extends Model
     {
         return $this->hasMany(RecruitmentRequest::class);
     }
+
+    public function policies(): HasMany
+    {
+        return $this->hasMany(ClientPolicy::class);
+    }
+
+    public function activePolicy()
+    {
+        return $this->hasOne(ClientPolicy::class)->where('status', 'active')->latest();
+    }
 }

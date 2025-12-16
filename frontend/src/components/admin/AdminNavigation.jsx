@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { useRBAC } from "@/contexts/RBACContext";
 
 const AdminNavigation = ({
   currentTheme,
@@ -39,18 +40,18 @@ const AdminNavigation = ({
       description: "Client relationships and contracts",
       submodules: [
         { id: "client-master", name: "Master Setup" },
-        { id: "client-service-location", name: "Service Location" },
-        { id: "salary-structure", name: "Job Function Setup" },
+        { id: "service-location", name: "Service Location" },
+        { id: "job-function-setup", name: "Job Function Setup" },
       ],
     },
     {
-      id: "recruitment-management",
+      id: "recruitment",
       name: "Recruitment Mgt.",
       icon: "👥",
       type: "module",
       description: "Recruitment and candidate management",
       submodules: [
-        { id: "recruitment-request", name: "Vacancy Declaration" },
+        { id: "vacancy-declaration", name: "Vacancy Declaration" },
         { id: "check-blacklist", name: "Check Blacklist" },
         {
           id: "screening-management",
@@ -79,7 +80,7 @@ const AdminNavigation = ({
       ],
     },
     {
-      id: "hr-payroll-management",
+      id: "hr-payroll",
       name: "HR & Payroll Mgt.",
       icon: "💼",
       type: "module",
@@ -103,12 +104,13 @@ const AdminNavigation = ({
       submodules: [
         { id: "claims-resolution", name: "Claims Resolution" },
         { id: "claims-resolution-list", name: "Claims Resolution List" },
+        { id: "policy-management", name: "Policy Management" },
       ],
     },
     {
-      id: "requisition-management",
+      id: "requisition",
       name: "Requisition Mgt.",
-      icon: "�",
+      icon: "📝",
       type: "module",
       description: "Staff requisition and approvals",
       submodules: [
@@ -118,7 +120,7 @@ const AdminNavigation = ({
       ],
     },
     {
-      id: "procurement-management",
+      id: "procurement",
       name: "Procurement Mgt.",
       icon: "📦",
       type: "module",
@@ -156,6 +158,51 @@ const AdminNavigation = ({
       ],
     },
   ];
+
+  const { canAccessModule, hasAnyPermission, loading: rbacLoading } = useRBAC();
+
+  // Enhance navigation config with permission status (show all but mark as disabled)
+  const enhancedNavigationConfig = navigationConfig.map((module) => {
+    // Dashboard is always accessible for authenticated admin users
+    const moduleAccessible =
+      module.id === "dashboard" || canAccessModule(module.id);
+
+    // If module has submodules, enhance those with permission status too
+    if (module.submodules) {
+      const enhancedSubmodules = module.submodules.map((submodule) => ({
+        ...submodule,
+        accessible: hasAnyPermission(module.id, submodule.id),
+        disabled: !hasAnyPermission(module.id, submodule.id),
+      }));
+
+      return {
+        ...module,
+        submodules: enhancedSubmodules,
+        accessible: moduleAccessible,
+        disabled: !moduleAccessible,
+        hasAccessibleSubmodules: enhancedSubmodules.some(
+          (sub) => sub.accessible
+        ),
+      };
+    }
+
+    return {
+      ...module,
+      accessible: moduleAccessible,
+      disabled: !moduleAccessible,
+    };
+  });
+
+  // Debug log
+  console.log("RBAC loading state:", rbacLoading);
+  console.log(
+    "Enhanced navigation config:",
+    enhancedNavigationConfig.map((m) => ({
+      id: m.id,
+      accessible: m.accessible,
+      disabled: m.disabled,
+    }))
+  );
 
   // Check if module is active
   const isModuleActive = (moduleId) => {
@@ -229,19 +276,30 @@ const AdminNavigation = ({
         style={{ height: "calc(100vh - 120px)" }}
       >
         <div className="space-y-1">
-          {navigationConfig.map((module) => (
+          {enhancedNavigationConfig.map((module) => (
             <div key={module.id}>
               {/* Module Header - Compact */}
               <button
-                onClick={() => handleModuleClick(module)}
+                onClick={() =>
+                  module.disabled ? null : handleModuleClick(module)
+                }
                 onMouseEnter={() => setHoveredModule(module.id)}
                 onMouseLeave={() => setHoveredModule(null)}
+                disabled={module.disabled}
                 className={`w-full flex items-center justify-between p-2 rounded-lg transition-all duration-200 group ${
-                  isModuleActive(module.id)
+                  module.disabled
+                    ? "opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800 text-gray-400"
+                    : isModuleActive(module.id)
                     ? `bg-blue-600 ${currentTheme.textPrimary} shadow-lg border border-blue-400/30`
                     : `${currentTheme.textSecondary} ${currentTheme.hover}`
                 }`}
-                title={isCollapsed ? module.name : ""}
+                title={
+                  isCollapsed
+                    ? module.disabled
+                      ? `${module.name} (No Access)`
+                      : module.name
+                    : ""
+                }
               >
                 <div className="flex items-center space-x-2">
                   <span className="text-md">{module.icon}</span>
@@ -269,14 +327,24 @@ const AdminNavigation = ({
                       <div key={submodule.id}>
                         <button
                           onClick={() =>
-                            handleSubmoduleClick(module.id, submodule)
+                            submodule.disabled
+                              ? null
+                              : handleSubmoduleClick(module.id, submodule)
                           }
+                          disabled={submodule.disabled}
                           className={`w-full flex items-center justify-between p-1.5 text-[11px] rounded-md transition-all duration-150 ${
-                            activeSubmodule === submodule.id ||
-                            expandedSubmodule === submodule.id
+                            submodule.disabled
+                              ? "opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-700 text-gray-400"
+                              : activeSubmodule === submodule.id ||
+                                expandedSubmodule === submodule.id
                               ? `bg-blue-600 ${currentTheme.textPrimary} border-l-2 border-blue-400`
                               : `${currentTheme.textSecondary} ${currentTheme.hover} hover:border-l-2 hover:border-blue-300`
                           }`}
+                          title={
+                            submodule.disabled
+                              ? `${submodule.name} (No Access)`
+                              : submodule.name
+                          }
                         >
                           <span>{submodule.name}</span>
                           {submodule.submodules && (

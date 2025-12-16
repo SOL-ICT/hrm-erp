@@ -103,4 +103,50 @@ class LeaveApplyController extends Controller
             ], 500);
         }
     }
+
+    // Delete leave application
+    public function destroy($id)
+    {
+        try {
+            // Check if user is authenticated
+            if (!Auth::check()) {
+                return response()->json(['message' => 'Unauthenticated'], 401);
+            }
+
+            // Check if leave application exists and belongs to authenticated user
+            $leave = DB::table('leave_applications')
+                ->where('id', $id)
+                ->where('staff_id', Auth::id())
+                ->first();
+
+            if (!$leave) {
+                return response()->json([
+                    'message' => 'Leave application not found or unauthorized'
+                ], 404);
+            }
+
+            // Only allow deletion of pending applications
+            if ($leave->status !== 'pending') {
+                return response()->json([
+                    'message' => 'Can only delete pending leave applications'
+                ], 403);
+            }
+
+            // Delete the leave application
+            DB::table('leave_applications')
+                ->where('id', $id)
+                ->where('staff_id', Auth::id())
+                ->delete();
+
+            return response()->json([
+                'message' => 'Leave application deleted successfully'
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error deleting leave application',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

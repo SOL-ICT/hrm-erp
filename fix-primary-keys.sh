@@ -101,18 +101,44 @@ for table in "${TABLES_WITHOUT_PK[@]}"; do
         # Check if id is already auto_increment
         IS_AUTO_INC=$($DOCKER_MYSQL -e "SHOW COLUMNS FROM \`$table\` WHERE Field='id' AND Extra LIKE '%auto_increment%';" -N 2>/dev/null | wc -l)
         
-        if [ "$IS_AUTO_INC" -eq 0 ]; then
-            echo "  → Adding AUTO_INCREMENT to 'id' column"
-            $DOCKER_MYSQL -e "ALTER TABLE \`$table\` MODIFY COLUMN id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT;" 2>/dev/null
-        fi
+        # Check if id already has primary key
+        HAS_PK_ON_ID=$($DOCKER_MYSQL -e "SHOW KEYS FROM \`$table\` WHERE Key_name = 'PRIMARY' AND Column_name = 'id';" -N 2>/dev/null | wc -l)
         
-        echo "  → Adding PRIMARY KEY to 'id' column"
-        $DOCKER_MYSQL -e "ALTER TABLE \`$table\` ADD PRIMARY KEY (id);" 2>/dev/null
-        
-        if [ $? -eq 0 ]; then
-            echo -e "  ${GREEN}✅ PRIMARY KEY added successfully!${NC}"
+        if [ "$IS_AUTO_INC" -eq 0 ] && [ "$HAS_PK_ON_ID" -gt 0 ]; then
+            # Has PK but no AUTO_INCREMENT - modify to add it
+            echo "  → Adding AUTO_INCREMENT to existing PRIMARY KEY 'id' column"
+            $DOCKER_MYSQL -e "ALTER TABLE \`$table\` MODIFY COLUMN id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY;" 2>/dev/null
+            
+            if [ $? -eq 0 ]; then
+                echo -e "  ${GREEN}✅ AUTO_INCREMENT added successfully!${NC}"
+            else
+                echo -e "  ${RED}❌ Failed to add AUTO_INCREMENT${NC}"
+            fi
+            
+        elif [ "$IS_AUTO_INC" -eq 0 ] && [ "$HAS_PK_ON_ID" -eq 0 ]; then
+            # No PK and no AUTO_INCREMENT - add both
+            echo "  → Adding AUTO_INCREMENT and PRIMARY KEY to 'id' column"
+            $DOCKER_MYSQL -e "ALTER TABLE \`$table\` MODIFY COLUMN id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, ADD PRIMARY KEY (id);" 2>/dev/null
+            
+            if [ $? -eq 0 ]; then
+                echo -e "  ${GREEN}✅ AUTO_INCREMENT and PRIMARY KEY added successfully!${NC}"
+            else
+                echo -e "  ${RED}❌ Failed to add AUTO_INCREMENT and PRIMARY KEY${NC}"
+            fi
+            
+        elif [ "$IS_AUTO_INC" -gt 0 ] && [ "$HAS_PK_ON_ID" -eq 0 ]; then
+            # Has AUTO_INCREMENT but no PK - add PK
+            echo "  → Adding PRIMARY KEY to 'id' column (already has AUTO_INCREMENT)"
+            $DOCKER_MYSQL -e "ALTER TABLE \`$table\` ADD PRIMARY KEY (id);" 2>/dev/null
+            
+            if [ $? -eq 0 ]; then
+                echo -e "  ${GREEN}✅ PRIMARY KEY added successfully!${NC}"
+            else
+                echo -e "  ${RED}❌ Failed to add PRIMARY KEY${NC}"
+            fi
+            
         else
-            echo -e "  ${RED}❌ Failed to add PRIMARY KEY (may already exist or have conflicts)${NC}"
+            echo -e "  ${GREEN}✅ 'id' already has both PRIMARY KEY and AUTO_INCREMENT${NC}"
         fi
         
     else
