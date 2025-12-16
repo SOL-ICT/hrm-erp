@@ -17,7 +17,9 @@ class RBACAPIService extends APIService {
 
   // Get permissions for a specific role
   async getRolePermissions(roleId) {
-    return this.makeRequest(`/admin/rbac/roles/${roleId}/permissions`);
+    // Add cache-busting timestamp to prevent browser caching
+    const timestamp = new Date().getTime();
+    return this.makeRequest(`/admin/rbac/roles/${roleId}/permissions?_=${timestamp}`);
   }
 
   // Update permissions for a role
