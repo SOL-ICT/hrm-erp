@@ -45,7 +45,7 @@ const AdminNavigation = ({
       ],
     },
     {
-      id: "recruitment",
+      id: "recruitment-management",
       name: "Recruitment Mgt.",
       icon: "👥",
       type: "module",
@@ -80,7 +80,7 @@ const AdminNavigation = ({
       ],
     },
     {
-      id: "hr-payroll",
+      id: "hr-payroll-management",
       name: "HR & Payroll Mgt.",
       icon: "💼",
       type: "module",
@@ -108,7 +108,7 @@ const AdminNavigation = ({
       ],
     },
     {
-      id: "requisition",
+      id: "requisition-management",
       name: "Requisition Mgt.",
       icon: "📝",
       type: "module",
@@ -120,11 +120,11 @@ const AdminNavigation = ({
       ],
     },
     {
-      id: "procurement",
+      id: "procurement-management",
       name: "Procurement Mgt.",
-      icon: "📦",
+      icon: "🛒",
       type: "module",
-      description: "Procurement and vendor management",
+      description: "Procurement management",
       submodules: [
         { id: "vendor-management", name: "Vendor Management" },
         { id: "purchase-orders", name: "Purchase Orders" },
