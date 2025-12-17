@@ -318,12 +318,12 @@ const RBACManagement = ({ currentTheme, preferences }) => {
         const submoduleSlugToId = {};
         const moduleToSubmoduleId = {}; // For single modules like dashboard
 
-        // Map frontend module IDs to backend module slugs
+        // Map frontend module IDs to backend module slugs (now they match, no translation needed)
         const frontendToBackendModuleMap = {
-          "recruitment-management": "recruitment",
-          "hr-payroll-management": "hr-payroll",
-          "requisition-management": "requisition",
-          "procurement-management": "procurement",
+          "recruitment-management": "recruitment-management",
+          "hr-payroll-management": "hr-payroll-management",
+          "requisition-management": "requisition-management",
+          "procurement-management": "procurement-management",
           "business-development": "business-development",
           "client-contract-management": "client-contract-management",
           dashboard: "dashboard",
