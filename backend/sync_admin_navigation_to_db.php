@@ -88,6 +88,7 @@ $navigationConfig = [
         'submodules' => [
             ['id' => 'claims-resolution', 'name' => 'Claims Resolution', 'route' => '/admin/claims/claims-resolution', 'sort_order' => 1],
             ['id' => 'claims-resolution-list', 'name' => 'Claims Resolution List', 'route' => '/admin/claims/claims-resolution-list', 'sort_order' => 2],
+            ['id' => 'policy-management', 'name' => 'Policy Management', 'route' => '/admin/claims/policy-management', 'sort_order' => 3],
         ]
     ],
     [
