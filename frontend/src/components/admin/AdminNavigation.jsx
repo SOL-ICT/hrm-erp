@@ -40,8 +40,8 @@ const AdminNavigation = ({
       description: "Client relationships and contracts",
       submodules: [
         { id: "client-master", name: "Master Setup" },
-        { id: "service-location", name: "Service Location" },
-        { id: "job-function-setup", name: "Job Function Setup" },
+        { id: "client-service-location", name: "Service Location" },
+        { id: "salary-structure", name: "Job Function Setup" },
       ],
     },
     {
@@ -51,7 +51,7 @@ const AdminNavigation = ({
       type: "module",
       description: "Recruitment and candidate management",
       submodules: [
-        { id: "vacancy-declaration", name: "Vacancy Declaration" },
+        { id: "recruitment-request", name: "Vacancy Declaration" },
         { id: "check-blacklist", name: "Check Blacklist" },
         {
           id: "screening-management",
