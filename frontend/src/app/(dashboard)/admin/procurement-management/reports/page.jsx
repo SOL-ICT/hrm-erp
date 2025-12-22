@@ -1,15 +1,18 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle, 
+  Button, 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui';
 import { BarChart3, TrendingUp, Package, FileText, Download } from 'lucide-react';
 import { purchaseRequestAPI } from '@/services/api/purchaseRequestAPI';
 import { procurementAPI } from '@/services/api/procurementAPI';
