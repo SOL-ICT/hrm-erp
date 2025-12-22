@@ -90,6 +90,16 @@ export const Input = ({
   </div>
 );
 
+// Label Component
+export const Label = ({ children, htmlFor, className = "" }) => (
+  <label
+    htmlFor={htmlFor}
+    className={`text-sm font-medium text-gray-700 dark:text-slate-300 ${className}`}
+  >
+    {children}
+  </label>
+);
+
 // TextArea Component
 export const TextArea = ({
   placeholder,
@@ -106,6 +116,9 @@ export const TextArea = ({
     className={`w-full rounded-md border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 text-sm placeholder:text-gray-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y ${className}`}
   />
 );
+
+// Textarea alias for compatibility
+export const Textarea = TextArea;
 
 // Select Components
 export const Select = ({ children, value, onValueChange, className = "" }) => (
@@ -263,6 +276,12 @@ export const DialogHeader = ({ children }) => (
 
 export const DialogTitle = ({ children }) => (
   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{children}</h2>
+);
+
+export const DialogFooter = ({ children, className = "" }) => (
+  <div className={`flex justify-end space-x-2 pt-4 ${className}`}>
+    {children}
+  </div>
 );
 
 // Alert Components

@@ -1,17 +1,18 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { 
+  Card, 
+  CardContent, 
+  Button, 
+  Input, 
+  Textarea, 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter 
+} from '@/components/ui';
 import { Banknote, Search, CheckCircle } from 'lucide-react';
 import { advanceAPI } from '@/services/api/advanceAPI';
 import { AdvanceCard } from '@/components/procurement-advance';
