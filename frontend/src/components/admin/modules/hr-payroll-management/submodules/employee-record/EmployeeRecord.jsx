@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useClients } from "../../../../../../hooks/useClients";
+import { useAllActiveClients } from "../../../../../../hooks/useClients";
 import {
   ArrowLeft,
   Building2,
@@ -24,12 +24,12 @@ import employeeRecordAPI from "../../../../../../services/modules/hr-payroll-man
 import { apiService } from "../../../../../../services/apiService";
 
 const EmployeeRecord = ({ currentTheme, onBack }) => {
-  // Use the proven useClients hook instead of custom API
+  // Use the proven useAllActiveClients hook for dropdown
   const {
     clients,
     loading: clientsLoading,
     error: clientsError,
-  } = useClients();
+  } = useAllActiveClients();
 
   const [selectedClient, setSelectedClient] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState("all");
