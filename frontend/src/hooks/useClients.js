@@ -29,16 +29,26 @@ export const useClients = (initialParams = {}) => {
     setError(null);
 
     try {
-      const queryParams = new URLSearchParams({
-        per_page: params.perPage || 15,
-        search: params.search || "",
-        filter: params.filter || "all",
-        sort_by: params.sortBy || "created_at",
-        sort_order: params.sortOrder || "desc",
-        page: params.page || 1,
-      });
-
-      const data = await makeRequest(`/clients?${queryParams}`);
+      // If no pagination parameters are provided, fetch all active clients
+      // This is used by dropdowns and other components that need all clients
+      const shouldFetchAll = !params.perPage && !params.page && !params.search && !params.filter;
+      
+      let data;
+      if (shouldFetchAll) {
+        // Fetch all active clients without pagination
+        data = await makeRequest(`/clients/all/active`);
+      } else {
+        // Fetch paginated clients with filters
+        const queryParams = new URLSearchParams({
+          per_page: params.perPage || 15,
+          search: params.search || "",
+          filter: params.filter || "all",
+          sort_by: params.sortBy || "created_at",
+          sort_order: params.sortOrder || "desc",
+          page: params.page || 1,
+        });
+        data = await makeRequest(`/clients?${queryParams}`);
+      }
 
       // API service already handles response parsing and errors
 

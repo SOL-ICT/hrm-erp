@@ -43,6 +43,63 @@ const PolicyManagement = lazy(() =>
   import("./modules/claims-management/submodules/policy-management/PolicyManagement")
 );
 
+// Requisition Management
+const RequisitionManagementDashboard = lazy(() =>
+  import("./modules/RequisitionManagement/RequisitionManagementDashboard")
+);
+const CreateRequisition = lazy(() =>
+  import("../staff/modules/RequisitionManagement/CreateRequisition")
+);
+const ApproveRequisition = lazy(() =>
+  import("./modules/RequisitionManagement/ApproveRequisition")
+);
+const RequisitionHistory = lazy(() =>
+  import("./modules/RequisitionManagement/RequisitionHistory")
+);
+const InventoryManagement = lazy(() =>
+  import("./modules/RequisitionManagement/InventoryManagement")
+);
+
+// Procurement Management
+const ProcurementManagementDashboard = lazy(() =>
+  import("./modules/ProcurementManagement/ProcurementManagementDashboard")
+);
+const PurchaseRequests = lazy(() =>
+  import("./modules/ProcurementManagement/PurchaseRequests")
+);
+const ProcurementLogging = lazy(() =>
+  import("./modules/ProcurementManagement/ProcurementLogging")
+);
+const VendorManagement = lazy(() =>
+  import("./modules/ProcurementManagement/VendorManagement")
+);
+const ProcurementReports = lazy(() =>
+  import("./modules/ProcurementManagement/ProcurementReports")
+);
+
+// Staff Advance Management
+const StaffAdvanceManagementDashboard = lazy(() =>
+  import("./modules/StaffAdvanceManagement/StaffAdvanceManagementDashboard")
+);
+const MyAdvances = lazy(() =>
+  import("./modules/StaffAdvanceManagement/MyAdvances")
+);
+const AdvanceApprovals = lazy(() =>
+  import("./modules/StaffAdvanceManagement/AdvanceApprovals")
+);
+const Disbursement = lazy(() =>
+  import("./modules/StaffAdvanceManagement/Disbursement")
+);
+const RetirementSubmission = lazy(() =>
+  import("./modules/StaffAdvanceManagement/RetirementSubmission")
+);
+const ComplianceReview = lazy(() =>
+  import("./modules/StaffAdvanceManagement/ComplianceReview")
+);
+const BudgetAllocation = lazy(() =>
+  import("./modules/StaffAdvanceManagement/BudgetAllocation")
+);
+
 // HR & Payroll Management Submodules
 const EmployeeRecord = lazy(() =>
   import(
@@ -147,6 +204,7 @@ const AdminRouter = ({
   activeSubSubmodule,
   currentTheme,
   preferences,
+  onModuleChange,
 }) => {
   const renderModule = () => {
     const commonProps = {
@@ -154,6 +212,7 @@ const AdminRouter = ({
       preferences,
       activeSubmodule,
       activeSubSubmodule,
+      onModuleChange,
     };
 
     // HANDLE SUB-SUBMODULES FIRST (for nested navigation like Screening Management)
@@ -535,6 +594,177 @@ const AdminRouter = ({
         case "leave-management":
           return <LeaveApproval {...commonProps} />;
 
+        // REQUISITION MANAGEMENT SUBMODULES
+        case "create-requisition":
+          return (
+            <SmartRouteCache routeKey="create-requisition">
+              <CreateRequisition
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        case "approve-requisition":
+          return (
+            <SmartRouteCache routeKey="approve-requisition">
+              <ApproveRequisition
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        case "requisition-history":
+          return (
+            <SmartRouteCache routeKey="requisition-history">
+              <RequisitionHistory
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        case "inventory-management":
+          return (
+            <SmartRouteCache routeKey="inventory-management">
+              <InventoryManagement
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        // PROCUREMENT MANAGEMENT SUBMODULES
+        case "purchase-requests":
+          return (
+            <SmartRouteCache routeKey="purchase-requests">
+              <PurchaseRequests
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        case "procurement-logging":
+          return (
+            <SmartRouteCache routeKey="procurement-logging">
+              <ProcurementLogging
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        case "vendor-management":
+          return (
+            <SmartRouteCache routeKey="vendor-management">
+              <VendorManagement
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        case "procurement-reports":
+          return (
+            <SmartRouteCache routeKey="procurement-reports">
+              <ProcurementReports
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        // STAFF ADVANCE MANAGEMENT SUBMODULES
+        case "my-advances":
+          return (
+            <SmartRouteCache routeKey="my-advances">
+              <MyAdvances
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        case "advance-approvals":
+          return (
+            <SmartRouteCache routeKey="advance-approvals">
+              <AdvanceApprovals
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        case "disbursement":
+          return (
+            <SmartRouteCache routeKey="disbursement">
+              <Disbursement
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        case "retirement-submission":
+          return (
+            <SmartRouteCache routeKey="retirement-submission">
+              <RetirementSubmission
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        case "compliance-review":
+          return (
+            <SmartRouteCache routeKey="compliance-review">
+              <ComplianceReview
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
+        case "budget-allocation":
+          return (
+            <SmartRouteCache routeKey="budget-allocation">
+              <BudgetAllocation
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
+          );
+
         // SOL MASTER handling
         default:
           if (activeSubmodule?.includes("sol")) {
@@ -613,9 +843,19 @@ const AdminRouter = ({
         // Show Claims Dashboard
         return <ClaimsDashboard {...commonProps} />;
 
-      // Placeholder for other modules - show coming soon
+      // Requisition Management Module - Dashboard
       case "requisition-management":
+        return <RequisitionManagementDashboard {...commonProps} />;
+
+      // Procurement Management Module - Dashboard
       case "procurement-management":
+        return <ProcurementManagementDashboard {...commonProps} />;
+
+      // Staff Advance Management Module - Dashboard
+      case "staff-advance-management":
+        return <StaffAdvanceManagementDashboard {...commonProps} />;
+
+      // Placeholder for other modules - show coming soon
       case "billing-receivable-management":
       case "financial-accounting":
       case "fixed-assets-management":

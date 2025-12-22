@@ -264,6 +264,7 @@ const AdminLayout = () => {
                 activeSubSubmodule={activeSubSubmodule}
                 currentTheme={currentTheme}
                 preferences={preferences}
+                onModuleChange={handleModuleChange}
               />
             </Suspense>
           </div>

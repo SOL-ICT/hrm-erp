@@ -16,6 +16,7 @@ import {
   Star,
   Bell,
   FileCheck,
+  Package,
 } from "lucide-react";
 
 // We've added a `componentKey` to each menu item and child.
@@ -62,6 +63,11 @@ const menuItems = [
       { title: "Staff Misc. Information Change", componentKey: "staff-misc-change" },
       { title: "Request Approval Record", componentKey: "request-approval-record" },
     ],
+  },
+  {
+    title: "Requisition Management",
+    icon: <Package className="h-5 w-5" />,
+    children: [{ title: "Create Requisition", componentKey: "create-requisition" }],
   },
   {
     title: "Training & Development",

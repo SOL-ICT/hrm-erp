@@ -7,7 +7,7 @@ export class APIService {
 
     // Try to get token from localStorage on initialization
     if (typeof window !== "undefined") {
-      this.authToken = localStorage.getItem("auth_token");
+      this.authToken = localStorage.getItem("token");
     }
   }
 
@@ -15,9 +15,9 @@ export class APIService {
     this.authToken = token;
     if (typeof window !== "undefined") {
       if (token) {
-        localStorage.setItem("auth_token", token);
+        localStorage.setItem("token", token);
       } else {
-        localStorage.removeItem("auth_token");
+        localStorage.removeItem("token");
       }
     }
   }
@@ -90,10 +90,9 @@ export class APIService {
         if (!response.ok) {
           if (response.status === 401) {
             // Only redirect to login if we're not already on login page
-            // and if this isn't from an aborted request
             const currentPath =
               typeof window !== "undefined" ? window.location.pathname : "";
-            if (currentPath !== "/login" && !error?.name?.includes("Abort")) {
+            if (currentPath !== "/login") {
               console.warn("Authentication expired, redirecting to login");
               this.setAuthToken(null);
               if (typeof window !== "undefined") {

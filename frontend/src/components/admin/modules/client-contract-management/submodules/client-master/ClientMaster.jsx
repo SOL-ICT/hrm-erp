@@ -111,6 +111,13 @@ const ClientMaster = ({ currentTheme, onClose }) => {
     fetchClients();
   }, []);
 
+  // Fetch clients when currentPage changes
+  useEffect(() => {
+    if (currentPage > 1) { // Skip on initial load
+      fetchClients({ page: currentPage, search: searchTerm, filter });
+    }
+  }, [currentPage]);
+
   // Handle search and filter changes
   const handleSearch = (term) => {
     setSearchTerm(term);

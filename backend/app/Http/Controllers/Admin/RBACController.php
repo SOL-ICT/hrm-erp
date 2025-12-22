@@ -388,7 +388,14 @@ class RBACController extends Controller
 
         // Add role-based permissions
         foreach ($rolePermissions as $permission) {
-            $key = "{$permission->module_slug}.{$permission->submodule_slug}.{$permission->permission_slug}";
+            // Check if permission slug already includes submodule prefix
+            if (strpos($permission->permission_slug, $permission->submodule_slug . '.') === 0) {
+                // Permission slug already prefixed (e.g., 'inventory-management.read')
+                $key = "{$permission->module_slug}.{$permission->permission_slug}";
+            } else {
+                // Permission slug is simple (e.g., 'read')
+                $key = "{$permission->module_slug}.{$permission->submodule_slug}.{$permission->permission_slug}";
+            }
             $permissions[$key] = true;
         }
 

@@ -1,0 +1,298 @@
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+
+class StoreInventorySeeder extends Seeder
+{
+    /**
+     * Run the database seeds.
+     *
+     * Seeds sample inventory items across different categories
+     * for the requisition management system.
+     */
+    public function run(): void
+    {
+        $now = Carbon::now();
+        
+        $inventoryItems = [
+            // Office Supplies
+            [
+                'code' => 'OFF-001',
+                'name' => 'A4 Paper (Ream)',
+                'category' => 'Office Supplies',
+                'description' => '80gsm, 500 sheets per ream, suitable for printing and photocopying',
+                'total_stock' => 50,
+                'available_stock' => 47,
+                'reserved_stock' => 3,
+                'unit_price' => 2500.00,
+                'location' => 'Shelf A-3',
+                'last_restocked' => $now->copy()->subDays(5),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'OFF-002',
+                'name' => 'Blue Pen (Pack of 12)',
+                'category' => 'Office Supplies',
+                'description' => 'Blue ballpoint pens, pack of 12',
+                'total_stock' => 30,
+                'available_stock' => 28,
+                'reserved_stock' => 2,
+                'unit_price' => 1200.00,
+                'location' => 'Shelf A-1',
+                'last_restocked' => $now->copy()->subDays(10),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'OFF-003',
+                'name' => 'Stapler with Pins',
+                'category' => 'Office Supplies',
+                'description' => 'Heavy duty stapler with 1 box of staples included',
+                'total_stock' => 15,
+                'available_stock' => 14,
+                'reserved_stock' => 1,
+                'unit_price' => 3500.00,
+                'location' => 'Shelf A-2',
+                'last_restocked' => $now->copy()->subDays(30),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'OFF-004',
+                'name' => 'Notebook (80 leaves)',
+                'category' => 'Office Supplies',
+                'description' => 'A4 size hardcover notebook, 80 leaves',
+                'total_stock' => 60,
+                'available_stock' => 58,
+                'reserved_stock' => 2,
+                'unit_price' => 400.00,
+                'location' => 'Shelf A-4',
+                'last_restocked' => $now->copy()->subDays(7),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'OFF-005',
+                'name' => 'Whiteboard Marker (Pack of 4)',
+                'category' => 'Office Supplies',
+                'description' => 'Assorted colors - black, blue, red, green',
+                'total_stock' => 35,
+                'available_stock' => 33,
+                'reserved_stock' => 2,
+                'unit_price' => 1500.00,
+                'location' => 'Shelf A-5',
+                'last_restocked' => $now->copy()->subDays(20),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'OFF-006',
+                'name' => 'Paper Clips (Box)',
+                'category' => 'Office Supplies',
+                'description' => '100 pieces per box, standard size',
+                'total_stock' => 25,
+                'available_stock' => 25,
+                'reserved_stock' => 0,
+                'unit_price' => 300.00,
+                'location' => 'Shelf A-1',
+                'last_restocked' => $now->copy()->subDays(15),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'OFF-007',
+                'name' => 'Sticky Notes (Pack)',
+                'category' => 'Office Supplies',
+                'description' => '3x3 inches, yellow, 100 sheets per pad, 3 pads per pack',
+                'total_stock' => 40,
+                'available_stock' => 38,
+                'reserved_stock' => 2,
+                'unit_price' => 800.00,
+                'location' => 'Shelf A-2',
+                'last_restocked' => $now->copy()->subDays(12),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'OFF-008',
+                'name' => 'Folder (A4)',
+                'category' => 'Office Supplies',
+                'description' => 'Plastic folder with fastener, assorted colors',
+                'total_stock' => 50,
+                'available_stock' => 48,
+                'reserved_stock' => 2,
+                'unit_price' => 250.00,
+                'location' => 'Shelf A-4',
+                'last_restocked' => $now->copy()->subDays(8),
+                'is_active' => true,
+            ],
+            
+            // IT Equipment
+            [
+                'code' => 'IT-001',
+                'name' => 'Wireless Mouse',
+                'category' => 'IT Equipment',
+                'description' => 'USB wireless optical mouse with battery included',
+                'total_stock' => 12,
+                'available_stock' => 10,
+                'reserved_stock' => 2,
+                'unit_price' => 15000.00,
+                'location' => 'IT Storage B-2',
+                'last_restocked' => $now->copy()->subDays(25),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'IT-002',
+                'name' => 'USB Flash Drive (32GB)',
+                'category' => 'IT Equipment',
+                'description' => 'USB 3.0 flash drive, 32GB capacity',
+                'total_stock' => 20,
+                'available_stock' => 18,
+                'reserved_stock' => 2,
+                'unit_price' => 5000.00,
+                'location' => 'IT Storage B-1',
+                'last_restocked' => $now->copy()->subDays(14),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'IT-003',
+                'name' => 'HDMI Cable (2m)',
+                'category' => 'IT Equipment',
+                'description' => 'HDMI 2.0 cable, 2 meters length',
+                'total_stock' => 8,
+                'available_stock' => 7,
+                'reserved_stock' => 1,
+                'unit_price' => 8000.00,
+                'location' => 'IT Storage B-3',
+                'last_restocked' => $now->copy()->subDays(45),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'IT-004',
+                'name' => 'Keyboard (USB)',
+                'category' => 'IT Equipment',
+                'description' => 'Wired USB keyboard, standard layout',
+                'total_stock' => 10,
+                'available_stock' => 9,
+                'reserved_stock' => 1,
+                'unit_price' => 12000.00,
+                'location' => 'IT Storage B-2',
+                'last_restocked' => $now->copy()->subDays(35),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'IT-005',
+                'name' => 'Laptop Charger (Universal)',
+                'category' => 'IT Equipment',
+                'description' => 'Universal laptop charger, multiple tips included',
+                'total_stock' => 6,
+                'available_stock' => 6,
+                'reserved_stock' => 0,
+                'unit_price' => 25000.00,
+                'location' => 'IT Storage B-4',
+                'last_restocked' => $now->copy()->subDays(60),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'IT-006',
+                'name' => 'Ethernet Cable (5m)',
+                'category' => 'IT Equipment',
+                'description' => 'Cat6 ethernet cable, 5 meters',
+                'total_stock' => 15,
+                'available_stock' => 15,
+                'reserved_stock' => 0,
+                'unit_price' => 3000.00,
+                'location' => 'IT Storage B-1',
+                'last_restocked' => $now->copy()->subDays(40),
+                'is_active' => true,
+            ],
+            
+            // Facilities
+            [
+                'code' => 'FAC-001',
+                'name' => 'Hand Sanitizer (500ml)',
+                'category' => 'Facilities',
+                'description' => '70% alcohol-based hand sanitizer',
+                'total_stock' => 25,
+                'available_stock' => 20,
+                'reserved_stock' => 5,
+                'unit_price' => 800.00,
+                'location' => 'Shelf C-1',
+                'last_restocked' => $now->copy()->subDays(3),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'FAC-002',
+                'name' => 'Tissue Paper (Pack)',
+                'category' => 'Facilities',
+                'description' => '2-ply facial tissue, 100 sheets per pack',
+                'total_stock' => 40,
+                'available_stock' => 35,
+                'reserved_stock' => 5,
+                'unit_price' => 500.00,
+                'location' => 'Shelf C-2',
+                'last_restocked' => $now->copy()->subDays(6),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'FAC-003',
+                'name' => 'Air Freshener',
+                'category' => 'Facilities',
+                'description' => 'Automatic air freshener refill, lavender scent',
+                'total_stock' => 18,
+                'available_stock' => 16,
+                'reserved_stock' => 2,
+                'unit_price' => 1500.00,
+                'location' => 'Shelf C-3',
+                'last_restocked' => $now->copy()->subDays(10),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'FAC-004',
+                'name' => 'Trash Bags (Roll of 20)',
+                'category' => 'Facilities',
+                'description' => 'Heavy duty trash bags, 50L capacity',
+                'total_stock' => 30,
+                'available_stock' => 28,
+                'reserved_stock' => 2,
+                'unit_price' => 1200.00,
+                'location' => 'Shelf C-4',
+                'last_restocked' => $now->copy()->subDays(18),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'FAC-005',
+                'name' => 'Cleaning Spray (500ml)',
+                'category' => 'Facilities',
+                'description' => 'Multi-surface cleaning spray, antibacterial',
+                'total_stock' => 22,
+                'available_stock' => 20,
+                'reserved_stock' => 2,
+                'unit_price' => 1000.00,
+                'location' => 'Shelf C-5',
+                'last_restocked' => $now->copy()->subDays(9),
+                'is_active' => true,
+            ],
+            [
+                'code' => 'FAC-006',
+                'name' => 'Paper Towels (Roll)',
+                'category' => 'Facilities',
+                'description' => 'Kitchen paper towels, 2-ply, perforated',
+                'total_stock' => 35,
+                'available_stock' => 33,
+                'reserved_stock' => 2,
+                'unit_price' => 600.00,
+                'location' => 'Shelf C-2',
+                'last_restocked' => $now->copy()->subDays(11),
+                'is_active' => true,
+            ],
+        ];
+        
+        foreach ($inventoryItems as &$item) {
+            $item['created_at'] = $now;
+            $item['updated_at'] = $now;
+        }
+        
+        DB::table('store_inventory')->insert($inventoryItems);
+        
+        $this->command->info('✓ Seeded ' . count($inventoryItems) . ' inventory items across Office Supplies, IT Equipment, and Facilities categories');
+    }
+}
