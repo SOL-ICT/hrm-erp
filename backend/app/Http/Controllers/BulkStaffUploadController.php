@@ -945,6 +945,7 @@ class BulkStaffUploadController extends Controller
             'mobile_phone' => $row['mobile_phone'] ?? null,
             'gender' => $row['gender'] ?? null,
             'date_of_birth' => $row['date_of_birth'] ?? null,
+            'onboarding_method' => 'bulk_upload',
             
             // Employment details
             'appointment_status' => $row['appointment_status'] ?? 'probation',
@@ -995,9 +996,10 @@ class BulkStaffUploadController extends Controller
             }
 
             // Personal Info - CORRECTED to match actual database schema
-            if (!empty($row['marital_status']) || !empty($row['nationality']) || !empty($row['current_address'])) {
+            if (!empty($row['marital_status']) || !empty($row['nationality']) || !empty($row['current_address']) || !empty($row['date_of_birth'])) {
                 StaffPersonalInfo::create([
                     'staff_id' => $staff->id,
+                    'date_of_birth' => $row['date_of_birth'] ?? null,
                     'middle_name' => $row['middle_name'] ?? null,
                     'marital_status' => $row['marital_status'] ?? null,
                     'nationality' => $row['nationality'] ?? 'Nigerian',
@@ -1011,7 +1013,6 @@ class BulkStaffUploadController extends Controller
                     'state_of_residence' => null,
                     'lga_of_residence' => null,
                     'country' => 'Nigeria',
-                    // NOTE: date_of_birth, gender, genotype, next_of_kin fields don't exist in staff_personal_info
                 ]);
                 Log::info('Created personal info record for staff', ['staff_id' => $staff->id]);
             }

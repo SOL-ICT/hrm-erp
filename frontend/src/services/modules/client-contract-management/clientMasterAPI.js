@@ -38,6 +38,18 @@ const clientMasterAPI = {
     }
   },
 
+  // Get ALL active clients (not paginated) for dropdowns
+  getAllActiveClients: async () => {
+    try {
+      const response = await apiService.makeRequest("/clients/all/active");
+      console.log("Fetched all active clients:", response); // Debug log
+      return response;
+    } catch (error) {
+      console.error("Error fetching all active clients:", error.message);
+      throw new Error(`Failed to fetch all active clients: ${error.message}`);
+    }
+  },
+
   // Get client by ID
   getById: async (id) => {
     try {

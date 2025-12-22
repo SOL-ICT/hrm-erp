@@ -28,6 +28,17 @@ const StaffDetailView = ({ staff, onBack, onSave }) => {
   const [staffData, setStaffData] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Helper function to format date for display
+  const formatDateForDisplay = (dateString) => {
+    if (!dateString) return 'Not specified';
+    try {
+      const date = new Date(dateString);
+      return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD format
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
+
   // Load complete staff data when component mounts
   useEffect(() => {
     loadStaffDetails();
@@ -80,23 +91,16 @@ const StaffDetailView = ({ staff, onBack, onSave }) => {
             custom_fields: apiData.custom_fields
           },
           
-          // Personal information (from staff_personal_info table)
-          personal: apiData.personal_info ? {
-            middle_name: apiData.personal_info.middle_name,
-            marital_status: apiData.personal_info.marital_status,
-            nationality: apiData.personal_info.nationality,
-            state_of_origin: apiData.personal_info.state_of_origin,
-            local_government_of_origin: apiData.personal_info.local_government_of_origin,
-            current_address: apiData.personal_info.current_address,
-            permanent_address: apiData.personal_info.permanent_address,
-            nearby_landmark: apiData.personal_info.nearby_landmark,
-            mobile_phone: apiData.personal_info.mobile_phone,
-            personal_email: apiData.personal_info.personal_email,
-            blood_group: apiData.personal_info.blood_group,
-            state_of_residence: apiData.personal_info.state_of_residence,
-            lga_of_residence: apiData.personal_info.lga_of_residence,
-            country: apiData.personal_info.country
-          } : {},
+          // Personal information (from staff_personal_info table and candidate based on onboarding method)
+          personal: {
+            ...(apiData.personal_info || {}),
+            // If onboarded from candidate, use candidate's date_of_birth and phone as fallback
+            date_of_birth: apiData.onboarding_method === 'from_candidate' 
+              ? (apiData.personal_info?.date_of_birth || apiData.candidate?.date_of_birth)
+              : (apiData.personal_info?.date_of_birth),
+            mobile_phone: apiData.personal_info?.mobile_phone || 
+              (apiData.onboarding_method === 'from_candidate' ? apiData.candidate?.phone : null)
+          },
           
           // Banking information (from staff_banking table)
           banking: apiData.banking_info ? {
@@ -428,6 +432,25 @@ const StaffDetailView = ({ staff, onBack, onSave }) => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Date of Birth
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="date"
+                        value={staffData.personal.date_of_birth || ""}
+                        onChange={(e) => setStaffData({
+                          ...staffData,
+                          personal: { ...staffData.personal, date_of_birth: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <p className="text-gray-900">{formatDateForDisplay(staffData.personal.date_of_birth)}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Mobile Phone
                     </label>
                     {isEditing ? (
@@ -441,7 +464,7 @@ const StaffDetailView = ({ staff, onBack, onSave }) => {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     ) : (
-                      <p className="text-gray-900">{staffData.personal.mobile_phone}</p>
+                      <p className="text-gray-900">{staffData.personal.mobile_phone || 'Not specified'}</p>
                     )}
                   </div>
 
@@ -494,6 +517,101 @@ const StaffDetailView = ({ staff, onBack, onSave }) => {
                       </select>
                     ) : (
                       <p className="text-gray-900">{staffData.personal.blood_group}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Entry Date
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="date"
+                        value={staffData.basic.entry_date || ""}
+                        onChange={(e) => setStaffData({
+                          ...staffData,
+                          basic: { ...staffData.basic, entry_date: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <p className="text-gray-900">{staffData.basic.entry_date || 'Not specified'}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nationality
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={staffData.personal.nationality || ""}
+                        onChange={(e) => setStaffData({
+                          ...staffData,
+                          personal: { ...staffData.personal, nationality: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <p className="text-gray-900">{staffData.personal.nationality || 'Not specified'}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      State of Origin
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={staffData.personal.state_of_origin || ""}
+                        onChange={(e) => setStaffData({
+                          ...staffData,
+                          personal: { ...staffData.personal, state_of_origin: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <p className="text-gray-900">{staffData.personal.state_of_origin || 'Not specified'}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      LGA of Origin
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={staffData.personal.local_government_of_origin || ""}
+                        onChange={(e) => setStaffData({
+                          ...staffData,
+                          personal: { ...staffData.personal, local_government_of_origin: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <p className="text-gray-900">{staffData.personal.local_government_of_origin || 'Not specified'}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Personal Email
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="email"
+                        value={staffData.personal.personal_email || ""}
+                        onChange={(e) => setStaffData({
+                          ...staffData,
+                          personal: { ...staffData.personal, personal_email: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <p className="text-gray-900">{staffData.personal.personal_email || 'Not specified'}</p>
                     )}
                   </div>
                 </div>
@@ -552,35 +670,113 @@ const StaffDetailView = ({ staff, onBack, onSave }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Payment Mode</label>
-                    <p className="text-gray-900 capitalize">{staffData.banking.payment_mode || 'N/A'}</p>
+                    {isEditing ? (
+                      <select
+                        value={staffData.banking.payment_mode || ""}
+                        onChange={(e) => setStaffData({
+                          ...staffData,
+                          banking: { ...staffData.banking, payment_mode: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select...</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                        <option value="cash">Cash</option>
+                        <option value="cheque">Cheque</option>
+                      </select>
+                    ) : (
+                      <p className="text-gray-900 capitalize">{staffData.banking.payment_mode || 'Not specified'}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
-                    <p className="text-gray-900">{staffData.banking.bank_name || 'N/A'}</p>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={staffData.banking.bank_name || ""}
+                        onChange={(e) => setStaffData({
+                          ...staffData,
+                          banking: { ...staffData.banking, bank_name: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <p className="text-gray-900">{staffData.banking.bank_name || 'Not specified'}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
-                    <p className="text-gray-900">{staffData.banking.account_number || 'N/A'}</p>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={staffData.banking.account_number || ""}
+                        onChange={(e) => setStaffData({
+                          ...staffData,
+                          banking: { ...staffData.banking, account_number: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <p className="text-gray-900">{staffData.banking.account_number || 'Not specified'}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Wages Type</label>
-                    <p className="text-gray-900">{staffData.banking.wages_type || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Weekday OT Rate</label>
-                    <p className="text-gray-900">{staffData.banking.weekday_ot_rate ? `₦${staffData.banking.weekday_ot_rate}` : 'N/A'}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Holiday OT Rate</label>
-                    <p className="text-gray-900">{staffData.banking.holiday_ot_rate ? `₦${staffData.banking.holiday_ot_rate}` : 'N/A'}</p>
+                    {isEditing ? (
+                      <select
+                        value={staffData.banking.wages_type || ""}
+                        onChange={(e) => setStaffData({
+                          ...staffData,
+                          banking: { ...staffData.banking, wages_type: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select...</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="daily">Daily</option>
+                        <option value="hourly">Hourly</option>
+                      </select>
+                    ) : (
+                      <p className="text-gray-900">{staffData.banking.wages_type || 'Not specified'}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Entitled to Overtime</label>
-                    <p className="text-gray-900 capitalize">{staffData.banking.entitled_to_ot || 'N/A'}</p>
+                    {isEditing ? (
+                      <select
+                        value={staffData.banking.entitled_to_ot || ""}
+                        onChange={(e) => setStaffData({
+                          ...staffData,
+                          banking: { ...staffData.banking, entitled_to_ot: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select...</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                      </select>
+                    ) : (
+                      <p className="text-gray-900 capitalize">{staffData.banking.entitled_to_ot || 'Not specified'}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Pension Deduction</label>
-                    <p className="text-gray-900 capitalize">{staffData.banking.pension_deduction || 'N/A'}</p>
+                    {isEditing ? (
+                      <select
+                        value={staffData.banking.pension_deduction || ""}
+                        onChange={(e) => setStaffData({
+                          ...staffData,
+                          banking: { ...staffData.banking, pension_deduction: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select...</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                      </select>
+                    ) : (
+                      <p className="text-gray-900 capitalize">{staffData.banking.pension_deduction || 'Not specified'}</p>
+                    )}
                   </div>
                 </div>
               </div>

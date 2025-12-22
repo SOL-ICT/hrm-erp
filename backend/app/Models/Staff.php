@@ -79,6 +79,11 @@ class Staff extends Model
         return $this->belongsTo(Client::class);
     }
 
+    public function candidate()
+    {
+        return $this->belongsTo(Candidate::class);
+    }
+
     public function serviceLocation()
     {
         return $this->belongsTo(ServiceLocation::class);
