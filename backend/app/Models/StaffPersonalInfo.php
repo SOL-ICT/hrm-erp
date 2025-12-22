@@ -13,6 +13,7 @@ class StaffPersonalInfo extends Model
 
     protected $fillable = [
         'staff_id',
+        'date_of_birth',
         'middle_name',
         'marital_status',
         'nationality',
@@ -30,7 +31,7 @@ class StaffPersonalInfo extends Model
     ];
 
     protected $casts = [
-        // date_of_birth removed - it's in staff table, not here
+        'date_of_birth' => 'date'
     ];
 
     /**

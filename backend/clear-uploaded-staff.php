@@ -11,10 +11,11 @@ $app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
 
 echo "=== Clear Uploaded Staff Records ===\n\n";
 
-// Get the 48 staff records (IDs 18-65)
-$staffIds = range(18, 65);
+// Keep staff IDs 1-17, delete everything after ID 17
+$staffIds = Staff::where('id', '>', 17)->pluck('id')->toArray();
 
-echo "Found " . count($staffIds) . " staff records to delete (IDs 18-65)\n\n";
+echo "Found " . count($staffIds) . " staff records to delete (keeping IDs 1-17)\n";
+echo "Staff IDs to delete: " . implode(', ', $staffIds) . "\n\n";
 
 DB::beginTransaction();
 
@@ -38,12 +39,14 @@ try {
 
         echo "Deleting Staff ID {$staffId} - {$staff->first_name} {$staff->last_name} ({$staff->staff_id})...\n";
 
-        // Delete user account
+        // Delete user account (keep user IDs 1-11)
         $user = User::where('staff_profile_id', $staffId)->first();
-        if ($user) {
+        if ($user && $user->id > 11) {
             $user->delete();
             $deletedUsers++;
             echo "  ✓ Deleted user account (ID: {$user->id})\n";
+        } elseif ($user) {
+            echo "  ⚠ Skipped user account (ID: {$user->id}) - keeping IDs 1-11\n";
         }
 
         // Delete related records

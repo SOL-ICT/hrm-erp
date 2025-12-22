@@ -169,7 +169,8 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const response = await clientMasterAPI.getAll();
+      // Load ALL active clients for dropdown (not paginated)
+      const response = await clientMasterAPI.getAllActiveClients();
 
       // Handle different response structures
       let clientsData = [];
