@@ -76,35 +76,12 @@ const ClientMaster = ({ currentTheme, onClose }) => {
   const [errors, setErrors] = useState({});
   const [submitLoading, setSubmitLoading] = useState(false);
 
-  // Filter clients based on search and filter criteria
+  // Filter clients - only do local filtering if no pagination is being used
   useEffect(() => {
-    let filtered = clients;
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (client) =>
-          client.organisation_name
-            ?.toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          client.cac_registration_number
-            ?.toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          client.phone?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Status filter
-    if (filter !== "all") {
-      filtered = filtered.filter((client) => {
-        if (filter === "active") return client.status === "active";
-        if (filter === "inactive") return client.status === "inactive";
-        return true;
-      });
-    }
-
-    setFilteredClients(filtered);
-  }, [searchTerm, filter, clients]);
+    // For paginated results, just display what the API returns
+    // The backend handles search and filtering
+    setFilteredClients(clients);
+  }, [clients]);
 
   // Initialize data on component mount
   useEffect(() => {
@@ -113,9 +90,7 @@ const ClientMaster = ({ currentTheme, onClose }) => {
 
   // Fetch clients when currentPage changes
   useEffect(() => {
-    if (currentPage > 1) { // Skip on initial load
-      fetchClients({ page: currentPage, search: searchTerm, filter });
-    }
+    fetchClients({ page: currentPage, search: searchTerm, filter });
   }, [currentPage]);
 
   // Handle search and filter changes
