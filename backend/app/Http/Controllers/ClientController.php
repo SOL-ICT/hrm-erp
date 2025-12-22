@@ -69,6 +69,30 @@ class ClientController extends Controller
     }
 
     /**
+     * Get all active clients without pagination (for dropdowns)
+     */
+    public function getAllActive()
+    {
+        try {
+            $clients = Client::select('id', 'organisation_name', 'prefix', 'status')
+                ->where('status', 'active')
+                ->orderBy('organisation_name', 'asc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $clients
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Error fetching all active clients: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch clients'
+            ], 500);
+        }
+    }
+
+    /**
      * Store invoice export template for a client
      */
     public function storeInvoiceExportTemplate(Request $request, $clientId)

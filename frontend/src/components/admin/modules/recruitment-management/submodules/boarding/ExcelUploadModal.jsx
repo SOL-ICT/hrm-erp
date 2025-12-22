@@ -198,6 +198,7 @@ const ExcelUploadModal = ({ isOpen, onClose, onSuccess, currentTheme }) => {
       formData.append("excel_file", uploadFile);
       formData.append("client_id", selectedClient);
       formData.append("recruitment_request_id", selectedTicket);
+      formData.append("offer_already_accepted", "1"); // Staff being uploaded have already accepted offers
 
       const response = await bulkStaffUploadAPI.processUpload(formData);
 
@@ -631,12 +632,12 @@ const ExcelUploadModal = ({ isOpen, onClose, onSuccess, currentTheme }) => {
                 </h4>
                 <div className="text-sm text-green-600 space-y-1">
                   <p>
-                    Successfully processed {uploadResults.successful} staff
+                    Successfully processed {uploadResults.successful_records} staff
                     records
                   </p>
-                  {uploadResults.failed > 0 && (
+                  {uploadResults.failed_records > 0 && (
                     <p className="text-red-600">
-                      Failed to process {uploadResults.failed} records
+                      Failed to process {uploadResults.failed_records} records
                     </p>
                   )}
                 </div>

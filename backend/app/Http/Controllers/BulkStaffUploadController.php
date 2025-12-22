@@ -134,7 +134,7 @@ class BulkStaffUploadController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'file' => 'required|file|mimes:xlsx,xls|max:10240',
+                'excel_file' => 'required|file|mimes:xlsx,xls|max:10240',
                 'recruitment_request_id' => 'required|exists:recruitment_requests,id',
             ]);
 
@@ -157,7 +157,7 @@ class BulkStaffUploadController extends Controller
                 ], 403);
             }
 
-            $file = $request->file('file');
+            $file = $request->file('excel_file');
             $spreadsheet = IOFactory::load($file->getRealPath());
             $sheet = $spreadsheet->getSheetByName('Staff Data') ?? $spreadsheet->getActiveSheet();
 
@@ -250,7 +250,7 @@ class BulkStaffUploadController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'file' => 'required|file|mimes:xlsx,xls|max:10240',
+                'excel_file' => 'required|file|mimes:xlsx,xls|max:10240',
                 'recruitment_request_id' => 'required|exists:recruitment_requests,id',
                 'offer_already_accepted' => 'required|boolean',
             ]);
@@ -275,7 +275,7 @@ class BulkStaffUploadController extends Controller
 
             DB::beginTransaction();
             try {
-                $file = $request->file('file');
+                $file = $request->file('excel_file');
                 $spreadsheet = IOFactory::load($file->getRealPath());
                 $sheet = $spreadsheet->getSheetByName('Staff Data') ?? $spreadsheet->getActiveSheet();
 
@@ -309,14 +309,17 @@ class BulkStaffUploadController extends Controller
                             continue;
                         }
 
+                        // Use the validated and modified data from validation
+                        $validatedRow = $validation['data'];
+
                         // Prepare staff data
-                        $staffData = $this->prepareStaffData($mappedRow, $ticket, $request->offer_already_accepted);
+                        $staffData = $this->prepareStaffData($validatedRow, $ticket, $request->offer_already_accepted);
 
                         // Board staff using service
                         $staff = $this->boardingService->boardStaff($staffData, $user, $ticket);
 
                         // Create related records if data provided
-                        $this->createRelatedRecords($staff, $mappedRow);
+                        $this->createRelatedRecords($staff, $validatedRow);
 
                         $successCount++;
                         $createdStaff[] = [
@@ -811,7 +814,8 @@ class BulkStaffUploadController extends Controller
 
         return [
             'valid' => empty($errors),
-            'errors' => $errors
+            'errors' => $errors,
+            'data' => $row  // Return modified row data
         ];
     }
 
@@ -876,11 +880,60 @@ class BulkStaffUploadController extends Controller
     }
 
     /**
+     * Map employment type from Excel to database ENUM values
+     */
+    private function mapEmploymentType(?string $type): string
+    {
+        if (empty($type)) {
+            return 'full_time'; // default
+        }
+
+        $type = strtolower(trim($type));
+        
+        // Map common variations to ENUM values
+        if (strpos($type, 'full') !== false || strpos($type, 'employment') !== false) {
+            return 'full_time';
+        } elseif (strpos($type, 'part') !== false) {
+            return 'part_time';
+        } elseif (strpos($type, 'contract') !== false) {
+            return 'contract';
+        } elseif (strpos($type, 'intern') !== false) {
+            return 'internship';
+        } elseif (strpos($type, 'temp') !== false) {
+            return 'temporary';
+        }
+
+        return 'full_time'; // default
+    }
+
+    /**
      * Prepare staff data for boarding
      */
     private function prepareStaffData(array $row, RecruitmentRequest $ticket, bool $offerAccepted): array
     {
+        // Get or create default staff type based on client
+        // Client 1: Use "Professional", Others: Use "Associate"
+        $staffTypeName = ($ticket->client_id == 1) ? 'Professional' : 'Associate';
+        
+        $staffType = \App\Models\ClientStaffType::where('client_id', $ticket->client_id)
+            ->where('title', $staffTypeName)
+            ->where('is_active', true)
+            ->first();
+
+        // If staff type doesn't exist, create it
+        if (!$staffType) {
+            $typeCode = ($ticket->client_id == 1) ? 'PROF' : 'ASSOC';
+            $staffType = \App\Models\ClientStaffType::create([
+                'client_id' => $ticket->client_id,
+                'type_code' => $typeCode,
+                'title' => $staffTypeName,
+                'is_active' => true,
+            ]);
+        }
+
         return [
+            'client_id' => $ticket->client_id,
+            'staff_type_id' => $staffType->id,
             'employee_code' => $row['employee_code'],
             'staff_id' => $row['staff_id'],
             'first_name' => $row['first_name'],
@@ -892,6 +945,20 @@ class BulkStaffUploadController extends Controller
             'mobile_phone' => $row['mobile_phone'] ?? null,
             'gender' => $row['gender'] ?? null,
             'date_of_birth' => $row['date_of_birth'] ?? null,
+            
+            // Employment details
+            'appointment_status' => $row['appointment_status'] ?? 'probation',
+            'employment_type' => $this->mapEmploymentType($row['employment_type'] ?? null),
+            'department' => $row['department'] ?? null,
+            'job_title' => $row['last_position'] ?? null, // Use last position as job title if available
+            
+            // Legal IDs that go in staff table
+            'tax_id_no' => $row['tax_id_no'] ?? null,
+            'pf_no' => $row['pension_pin'] ?? null,
+            'pfa_code' => $row['pfa_name'] ?? null,
+            'bv_no' => $row['bvn'] ?? null,
+            'nhf_account_no' => $row['nhf_account_no'] ?? null,
+            
             'offer_already_accepted' => $offerAccepted,
         ];
     }
@@ -904,9 +971,22 @@ class BulkStaffUploadController extends Controller
         try {
             // Banking - CORRECTED to match actual database schema
             if (!empty($row['bank_name']) || !empty($row['account_number'])) {
+                // Map payment mode values to enum
+                $paymentMode = 'bank_transfer'; // default
+                if (!empty($row['payment_mode'])) {
+                    $mode = strtolower(trim($row['payment_mode']));
+                    if (strpos($mode, 'cash') !== false) {
+                        $paymentMode = 'cash';
+                    } elseif (strpos($mode, 'cheque') !== false || strpos($mode, 'check') !== false) {
+                        $paymentMode = 'cheque';
+                    } else {
+                        $paymentMode = 'bank_transfer'; // for "Credit Transfer", "Bank Transfer", etc.
+                    }
+                }
+                
                 StaffBanking::create([
                     'staff_id' => $staff->id,
-                    'payment_mode' => $row['payment_mode'] ?? 'bank_transfer',
+                    'payment_mode' => $paymentMode,
                     'bank_name' => $row['bank_name'] ?? null,
                     'account_number' => $row['account_number'] ?? null,
                     // NOTE: account_name, bvn, sort_code don't exist in staff_banking table

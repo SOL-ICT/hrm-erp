@@ -110,13 +110,14 @@ const AdminNavigation = ({
     {
       id: "requisition-management",
       name: "Requisition Mgt.",
-      icon: "📝",
+      icon: "📦",
       type: "module",
       description: "Staff requisition and approvals",
       submodules: [
         { id: "create-requisition", name: "Create Requisition" },
         { id: "approve-requisition", name: "Approve Requisition" },
         { id: "requisition-history", name: "Requisition History" },
+        { id: "inventory-management", name: "Inventory Management" },
       ],
     },
     {
@@ -124,11 +125,27 @@ const AdminNavigation = ({
       name: "Procurement Mgt.",
       icon: "🛒",
       type: "module",
-      description: "Procurement management",
+      description: "Purchase requests and inventory restocking",
       submodules: [
+        { id: "purchase-requests", name: "Purchase Requests" },
+        { id: "procurement-logging", name: "Procurement Logging" },
         { id: "vendor-management", name: "Vendor Management" },
-        { id: "purchase-orders", name: "Purchase Orders" },
-        { id: "inventory-tracking", name: "Inventory Tracking" },
+        { id: "procurement-reports", name: "Reports" },
+      ],
+    },
+    {
+      id: "staff-advance-management",
+      name: "Staff Advance Mgt.",
+      icon: "💰",
+      type: "module",
+      description: "Cash advances and retirement management",
+      submodules: [
+        { id: "my-advances", name: "My Advances" },
+        { id: "advance-approvals", name: "Advance Approvals" },
+        { id: "disbursement", name: "Disbursement" },
+        { id: "retirement-submission", name: "Retirement Submission" },
+        { id: "compliance-review", name: "Compliance Review" },
+        { id: "budget-allocation", name: "Budget Allocation" },
       ],
     },
     {

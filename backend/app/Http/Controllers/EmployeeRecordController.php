@@ -145,7 +145,7 @@ class EmployeeRecordController extends Controller
     {
         try {
             $staff = Staff::with([
-                'client:id,client_name',
+                'client:id,organisation_name',
                 'serviceLocation:id,location_name',
                 'personalInfo',
                 'bankingInfo',

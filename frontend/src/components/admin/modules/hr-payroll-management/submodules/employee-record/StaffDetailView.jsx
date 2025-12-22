@@ -37,175 +37,114 @@ const StaffDetailView = ({ staff, onBack, onSave }) => {
     try {
       setLoading(true);
       
-      // TODO: Replace with actual API call
-      // const response = await employeeRecordAPI.getStaffDetails(staff.id);
+      // Make actual API call to fetch staff details
+      const response = await employeeRecordAPI.getStaffDetails(staff.id);
       
-      // Mock comprehensive data structure based on database schema
-      const mockData = {
-        // Basic staff info (from staff table)
-        basic: {
-          id: staff.id,
-          candidate_id: staff.candidate_id,
-          client_id: staff.client_id,
-          staff_type_id: staff.staff_type_id,
-          employee_code: staff.employee_code,
-          staff_id: staff.staff_id,
-          email: staff.email,
-          first_name: staff.first_name,
-          last_name: staff.last_name,
-          entry_date: staff.entry_date,
-          end_date: staff.end_date,
-          appointment_status: staff.appointment_status,
-          employment_type: staff.employment_type,
-          status: staff.status,
-          job_title: staff.job_title,
-          department: staff.department,
-          location: staff.location,
-          supervisor_id: staff.supervisor_id,
-          leave_category_level: staff.leave_category_level,
-          appraisal_category: staff.appraisal_category,
-          tax_id_no: staff.tax_id_no,
-          pf_no: staff.pf_no,
-          pf_administrator: staff.pf_administrator,
-          pfa_code: staff.pfa_code,
-          bv_no: staff.bv_no,
-          nhf_account_no: staff.nhf_account_no,
-          client_assigned_code: staff.client_assigned_code,
-          deployment_code: staff.deployment_code,
-          onboarding_method: staff.onboarding_method,
-          custom_fields: staff.custom_fields
-        },
+      if (response.success) {
+        // Transform API response to match component expectations
+        const apiData = response.data;
+        const transformedData = {
+          // Basic staff info (from staff table)
+          basic: {
+            id: apiData.id,
+            candidate_id: apiData.candidate_id,
+            client_id: apiData.client_id,
+            staff_type_id: apiData.staff_type_id,
+            employee_code: apiData.employee_code,
+            staff_id: apiData.staff_id,
+            email: apiData.email,
+            first_name: apiData.first_name,
+            middle_name: apiData.middle_name,
+            last_name: apiData.last_name,
+            gender: apiData.gender,
+            entry_date: apiData.entry_date,
+            end_date: apiData.end_date,
+            appointment_status: apiData.appointment_status,
+            employment_type: apiData.employment_type,
+            status: apiData.status,
+            job_title: apiData.job_title,
+            department: apiData.department,
+            location: apiData.location,
+            supervisor_id: apiData.supervisor_id,
+            leave_category_level: apiData.leave_category_level,
+            appraisal_category: apiData.appraisal_category,
+            tax_id_no: apiData.tax_id_no,
+            pf_no: apiData.pf_no,
+            pf_administrator: apiData.pf_administrator,
+            pfa_code: apiData.pfa_code,
+            bv_no: apiData.bv_no,
+            nhf_account_no: apiData.nhf_account_no,
+            client_assigned_code: apiData.client_assigned_code,
+            deployment_code: apiData.deployment_code,
+            onboarding_method: apiData.onboarding_method,
+            custom_fields: apiData.custom_fields
+          },
+          
+          // Personal information (from staff_personal_info table)
+          personal: apiData.personal_info ? {
+            middle_name: apiData.personal_info.middle_name,
+            marital_status: apiData.personal_info.marital_status,
+            nationality: apiData.personal_info.nationality,
+            state_of_origin: apiData.personal_info.state_of_origin,
+            local_government_of_origin: apiData.personal_info.local_government_of_origin,
+            current_address: apiData.personal_info.current_address,
+            permanent_address: apiData.personal_info.permanent_address,
+            nearby_landmark: apiData.personal_info.nearby_landmark,
+            mobile_phone: apiData.personal_info.mobile_phone,
+            personal_email: apiData.personal_info.personal_email,
+            blood_group: apiData.personal_info.blood_group,
+            state_of_residence: apiData.personal_info.state_of_residence,
+            lga_of_residence: apiData.personal_info.lga_of_residence,
+            country: apiData.personal_info.country
+          } : {},
+          
+          // Banking information (from staff_banking table)
+          banking: apiData.banking_info ? {
+            payment_mode: apiData.banking_info.payment_mode,
+            bank_name: apiData.banking_info.bank_name,
+            account_number: apiData.banking_info.account_number,
+            wages_type: apiData.banking_info.wages_type,
+            weekday_ot_rate: apiData.banking_info.weekday_ot_rate,
+            holiday_ot_rate: apiData.banking_info.holiday_ot_rate,
+            entitled_to_ot: apiData.banking_info.entitled_to_ot,
+            pension_deduction: apiData.banking_info.pension_deduction
+          } : {},
+          
+          // Education records (from staff_education table)
+          education: apiData.education || [],
+          
+          // Work experience (from staff_experience table)  
+          experience: apiData.experience || [],
+          
+          // Emergency contacts (from staff_emergency_contacts table)
+          emergency_contacts: apiData.emergency_contacts || [],
+          
+          // Guarantors (from staff_guarantors table)
+          guarantors: apiData.guarantors || [],
+          
+          // Legal IDs (from staff_legal_ids table)
+          legal_ids: apiData.legal_ids ? {
+            national_id_no: apiData.legal_ids.national_id_no,
+            tax_id_no: apiData.legal_ids.tax_id_no,
+            pension_pin: apiData.legal_ids.pension_pin,
+            pfa_name: apiData.legal_ids.pfa_name,
+            bank_verification_no: apiData.legal_ids.bank_verification_no,
+            nhf_account_no: apiData.legal_ids.nhf_account_no
+          } : {},
+          
+          // References (from staff_references table)
+          references: apiData.references || [],
+          
+          // Client and location info
+          client: apiData.client || {},
+          location: apiData.service_location || {}
+        };
         
-        // Personal information (from staff_personal_info table)
-        personal: {
-          middle_name: "Michael",
-          marital_status: "single",
-          nationality: "Nigerian",
-          state_of_origin: "Lagos",
-          local_government_of_origin: "Lagos Island",
-          current_address: "123 Victoria Island, Lagos",
-          permanent_address: "456 Mainland, Lagos",
-          nearby_landmark: "Near City Mall",
-          mobile_phone: "+234-801-234-5678",
-          personal_email: "john.doe.personal@email.com",
-          blood_group: "O+",
-          state_of_residence: "Lagos",
-          lga_of_residence: "Victoria Island",
-          country: "Nigeria"
-        },
-        
-        // Banking information (from staff_banking table)
-        banking: {
-          payment_mode: "bank_transfer",
-          bank_name: "First Bank",
-          account_number: "1234567890",
-          wages_type: "Monthly",
-          weekday_ot_rate: 1500.00,
-          holiday_ot_rate: 2000.00,
-          entitled_to_ot: "yes",
-          pension_deduction: "yes"
-        },
-        
-        // Education records (from staff_education table)
-        education: [
-          {
-            id: 1,
-            institution_name: "University of Lagos",
-            certificate_type: "Bachelor's Degree",
-            specialization: "Computer Science",
-            start_year: 2018,
-            end_year: 2022,
-            graduation_year: 2022,
-            score_class: "Second Class Upper",
-            year_obtained: 2022,
-            education_order: 1
-          }
-        ],
-        
-        // Work experience (from staff_experience table)
-        experience: [
-          {
-            id: 1,
-            employer_name: "Tech Solutions Ltd",
-            designation: "Junior Developer",
-            start_date: "2022-08-01",
-            end_date: "2023-12-31",
-            job_description: "Developed web applications using React and Node.js",
-            reason_for_leaving: "Career advancement",
-            last_salary: 150000.00,
-            experience_order: 1
-          }
-        ],
-        
-        // Emergency contacts (from staff_emergency_contacts table)
-        emergency_contacts: [
-          {
-            id: 1,
-            contact_type: "emergency",
-            name: "Jane Doe",
-            relationship: "Sister",
-            phone_number: "+234-802-345-6789",
-            email: "jane.doe@email.com",
-            address: "789 Surulere, Lagos",
-            gender: "female",
-            date_of_birth: "1995-03-15",
-            is_primary: true,
-            contact_order: 1
-          }
-        ],
-        
-        // Guarantors (from staff_guarantors table)
-        guarantors: [
-          {
-            id: 1,
-            name: "Dr. Smith Johnson",
-            address: "101 Ikoyi, Lagos",
-            date_of_birth: "1970-05-20",
-            phone_number: "+234-803-456-7890",
-            email: "smith.johnson@email.com",
-            bank_details: "GTBank - 0123456789",
-            employer_details: "Lagos University Teaching Hospital",
-            relationship_to_applicant: "Family Doctor",
-            guarantor_order: 1
-          }
-        ],
-        
-        // Legal IDs (from staff_legal_ids table)
-        legal_ids: {
-          national_id_no: "12345678901",
-          tax_id_no: "TIN123456789",
-          pension_pin: "PEN987654321",
-          pfa_name: "Stanbic IBTC Pension",
-          bank_verification_no: "12345678901",
-          nhf_account_no: "NHF123456789"
-        },
-        
-        // References (from staff_references table)
-        references: [
-          {
-            id: 1,
-            name: "Prof. Mary Williams",
-            address: "University of Lagos, Akoka",
-            phone_number: "+234-804-567-8901",
-            email: "mary.williams@unilag.edu.ng",
-            reference_order: 1
-          }
-        ],
-        
-        // Client and location info
-        client: {
-          id: staff.client_id,
-          organisation_name: "ABC Corporation"
-        },
-        location: {
-          id: 1,
-          location_name: "Lagos Office",
-          city: "Lagos",
-          state: "Lagos"
-        }
-      };
-      
-      setStaffData(mockData);
+        setStaffData(transformedData);
+      } else {
+        console.error("Failed to fetch staff details:", response.message);
+        setStaffData(null);
+      }
     } catch (error) {
       console.error("Error loading staff details:", error);
     } finally {
@@ -273,16 +212,16 @@ const StaffDetailView = ({ staff, onBack, onSave }) => {
             <div className="h-6 border-l border-gray-300" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                {staffData.basic.first_name} {staffData.personal.middle_name} {staffData.basic.last_name}
+                {staffData.basic.first_name} {staffData.personal.middle_name ? staffData.personal.middle_name + ' ' : ''}{staffData.basic.last_name}
               </h1>
               <div className="flex items-center space-x-4 mt-1">
                 <span className="flex items-center text-sm text-gray-600">
                   <Building2 className="w-4 h-4 mr-1" />
-                  {staffData.client.organisation_name}
+                  {staffData.client.client_name || staffData.client.organisation_name || 'N/A'}
                 </span>
                 <span className="flex items-center text-sm text-gray-600">
                   <Briefcase className="w-4 h-4 mr-1" />
-                  {staffData.basic.job_title}
+                  {staffData.basic.job_title || 'N/A'}
                 </span>
                 <span className={`text-xs px-2 py-1 rounded ${
                   staffData.basic.status === 'active' 
@@ -605,17 +544,329 @@ const StaffDetailView = ({ staff, onBack, onSave }) => {
             </div>
           )}
 
-          {/* Other tabs content will be implemented similarly */}
-          {activeTab !== "personal" && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
-              <div className="text-center">
-                <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {tabs.find(t => t.id === activeTab)?.name} Tab
-                </h3>
-                <p className="text-gray-600">
-                  This section will display detailed {tabs.find(t => t.id === activeTab)?.name.toLowerCase()} information and will be fully implemented with editable fields.
-                </p>
+          {/* Banking Tab */}
+          {activeTab === "banking" && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold mb-4">Banking Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Mode</label>
+                    <p className="text-gray-900 capitalize">{staffData.banking.payment_mode || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
+                    <p className="text-gray-900">{staffData.banking.bank_name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
+                    <p className="text-gray-900">{staffData.banking.account_number || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Wages Type</label>
+                    <p className="text-gray-900">{staffData.banking.wages_type || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Weekday OT Rate</label>
+                    <p className="text-gray-900">{staffData.banking.weekday_ot_rate ? `₦${staffData.banking.weekday_ot_rate}` : 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Holiday OT Rate</label>
+                    <p className="text-gray-900">{staffData.banking.holiday_ot_rate ? `₦${staffData.banking.holiday_ot_rate}` : 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Entitled to Overtime</label>
+                    <p className="text-gray-900 capitalize">{staffData.banking.entitled_to_ot || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Pension Deduction</label>
+                    <p className="text-gray-900 capitalize">{staffData.banking.pension_deduction || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Education Tab */}
+          {activeTab === "education" && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold mb-4">Education Records</h3>
+                {staffData.education && staffData.education.length > 0 ? (
+                  <div className="space-y-4">
+                    {staffData.education.map((edu, index) => (
+                      <div key={edu.id || index} className="border border-gray-200 rounded-lg p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Institution</label>
+                            <p className="text-gray-900">{edu.institution_name || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Certificate Type</label>
+                            <p className="text-gray-900">{edu.certificate_type || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Specialization</label>
+                            <p className="text-gray-900">{edu.specialization || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Start Year</label>
+                            <p className="text-gray-900">{edu.start_year || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">End Year</label>
+                            <p className="text-gray-900">{edu.end_year || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Graduation Year</label>
+                            <p className="text-gray-900">{edu.graduation_year || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Score/Class</label>
+                            <p className="text-gray-900">{edu.score_class || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Year Obtained</label>
+                            <p className="text-gray-900">{edu.year_obtained || 'N/A'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-4">No education records found</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Experience Tab */}
+          {activeTab === "experience" && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold mb-4">Work Experience</h3>
+                {staffData.experience && staffData.experience.length > 0 ? (
+                  <div className="space-y-4">
+                    {staffData.experience.map((exp, index) => (
+                      <div key={exp.id || index} className="border border-gray-200 rounded-lg p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Employer</label>
+                            <p className="text-gray-900">{exp.employer_name || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
+                            <p className="text-gray-900">{exp.designation || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                            <p className="text-gray-900">{exp.start_date || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                            <p className="text-gray-900">{exp.end_date || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Last Salary</label>
+                            <p className="text-gray-900">{exp.last_salary ? `₦${exp.last_salary}` : 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Leaving</label>
+                            <p className="text-gray-900">{exp.reason_for_leaving || 'N/A'}</p>
+                          </div>
+                          <div className="col-span-full">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Job Description</label>
+                            <p className="text-gray-900">{exp.job_description || 'N/A'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-4">No work experience records found</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Emergency Contacts Tab */}
+          {activeTab === "emergency" && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold mb-4">Emergency Contacts</h3>
+                {staffData.emergency_contacts && staffData.emergency_contacts.length > 0 ? (
+                  <div className="space-y-4">
+                    {staffData.emergency_contacts.map((contact, index) => (
+                      <div key={contact.id || index} className="border border-gray-200 rounded-lg p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                            <p className="text-gray-900">{contact.name || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Relationship</label>
+                            <p className="text-gray-900 capitalize">{contact.relationship || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                            <p className="text-gray-900">{contact.phone_number || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <p className="text-gray-900">{contact.email || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                            <p className="text-gray-900 capitalize">{contact.gender || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                            <p className="text-gray-900">{contact.date_of_birth || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Contact Type</label>
+                            <p className="text-gray-900 capitalize">{contact.contact_type || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Primary Contact</label>
+                            <p className="text-gray-900">{contact.is_primary ? 'Yes' : 'No'}</p>
+                          </div>
+                          <div className="col-span-full">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                            <p className="text-gray-900">{contact.address || 'N/A'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-4">No emergency contacts found</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Guarantors Tab */}
+          {activeTab === "guarantors" && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold mb-4">Guarantors</h3>
+                {staffData.guarantors && staffData.guarantors.length > 0 ? (
+                  <div className="space-y-4">
+                    {staffData.guarantors.map((guarantor, index) => (
+                      <div key={guarantor.id || index} className="border border-gray-200 rounded-lg p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                            <p className="text-gray-900">{guarantor.name || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                            <p className="text-gray-900">{guarantor.phone_number || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <p className="text-gray-900">{guarantor.email || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Relationship</label>
+                            <p className="text-gray-900">{guarantor.relationship_to_applicant || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                            <p className="text-gray-900">{guarantor.date_of_birth || 'N/A'}</p>
+                          </div>
+                          <div className="col-span-full">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                            <p className="text-gray-900">{guarantor.address || 'N/A'}</p>
+                          </div>
+                          <div className="col-span-full">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Bank Details</label>
+                            <p className="text-gray-900">{guarantor.bank_details || 'N/A'}</p>
+                          </div>
+                          <div className="col-span-full">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Employer Details</label>
+                            <p className="text-gray-900">{guarantor.employer_details || 'N/A'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-4">No guarantors found</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Legal IDs Tab */}
+          {activeTab === "legal" && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold mb-4">Legal Identification Numbers</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">National ID Number</label>
+                    <p className="text-gray-900">{staffData.legal_ids.national_id_no || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tax ID Number</label>
+                    <p className="text-gray-900">{staffData.legal_ids.tax_id_no || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Pension PIN</label>
+                    <p className="text-gray-900">{staffData.legal_ids.pension_pin || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">PFA Name</label>
+                    <p className="text-gray-900">{staffData.legal_ids.pfa_name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Bank Verification Number</label>
+                    <p className="text-gray-900">{staffData.legal_ids.bank_verification_no || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">NHF Account Number</label>
+                    <p className="text-gray-900">{staffData.legal_ids.nhf_account_no || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* References Tab */}
+          {activeTab === "references" && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold mb-4">References</h3>
+                {staffData.references && staffData.references.length > 0 ? (
+                  <div className="space-y-4">
+                    {staffData.references.map((ref, index) => (
+                      <div key={ref.id || index} className="border border-gray-200 rounded-lg p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                            <p className="text-gray-900">{ref.name || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                            <p className="text-gray-900">{ref.phone_number || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <p className="text-gray-900">{ref.email || 'N/A'}</p>
+                          </div>
+                          <div className="col-span-full">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                            <p className="text-gray-900">{ref.address || 'N/A'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-4">No references found</p>
+                )}
               </div>
             </div>
           )}

@@ -15,6 +15,7 @@ import Profile from "./Profile";
 import MiscApplicationChange from "./modules/StaffChangeRequest/MiscApplicationChange";
 import Settings from "./modules/Settings/Settings";
 import OfferAcceptance from "./modules/OfferAcceptance/OfferAcceptance";
+import CreateRequisition from "./modules/RequisitionManagement/CreateRequisition";
 
 // Placeholder component for pages that are not yet developed
 const UnderDevelopment = ({ moduleName }) => (
@@ -83,6 +84,8 @@ export default function StaffLayout() {
         return <NameChange />;
       case "misc-change-application":
         return <MiscApplicationChange />;
+      case "create-requisition":
+        return <CreateRequisition />;
       case "my-profile":
         return <Profile />;
       case "settings":

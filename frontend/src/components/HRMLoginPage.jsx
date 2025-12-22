@@ -20,34 +20,32 @@ const HRMLoginPage = () => {
     rememberMe: false,
   });
 
-  // Load saved theme from localStorage, default to 'dark'
-  const [settings, setSettings] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('login_theme');
-      const savedColor = localStorage.getItem('login_primary_color');
-      return {
-        theme: savedTheme || "dark",
-        primaryColor: savedColor || "#0949b3",
-        backgroundImage: "gradient2",
-        language: "en",
-        deviceType: "auto",
-      };
-    }
-    return {
-      theme: "dark",
-      primaryColor: "#0949b3",
-      backgroundImage: "gradient2",
-      language: "en",
-      deviceType: "auto",
-    };
+  // Always start with default values on both server and client
+  const [settings, setSettings] = useState({
+    theme: "dark",
+    primaryColor: "#0949b3",
+    backgroundImage: "gradient2",
+    language: "en",
+    deviceType: "auto",
   });
+
+  // Load saved theme from localStorage after mount (client-side only)
+  React.useEffect(() => {
+    const savedTheme = localStorage.getItem('login_theme');
+    const savedColor = localStorage.getItem('login_primary_color');
+    if (savedTheme || savedColor) {
+      setSettings(prev => ({
+        ...prev,
+        theme: savedTheme || prev.theme,
+        primaryColor: savedColor || prev.primaryColor,
+      }));
+    }
+  }, []);
 
   // Save theme preference whenever it changes
   React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('login_theme', settings.theme);
-      localStorage.setItem('login_primary_color', settings.primaryColor);
-    }
+    localStorage.setItem('login_theme', settings.theme);
+    localStorage.setItem('login_primary_color', settings.primaryColor);
   }, [settings.theme, settings.primaryColor]);
 
   const themes = {

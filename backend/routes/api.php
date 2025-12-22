@@ -338,6 +338,20 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Claims Management Module
     require __DIR__ . '/modules/claims/claims-resolution.php';
 
+    // Requisition Management Module
+    require __DIR__ . '/modules/requisition-management/inventory.php';
+    require __DIR__ . '/modules/requisition-management/requisitions.php';
+
+    // Procurement Management Module
+    require __DIR__ . '/modules/procurement-management/purchase-requests.php';
+    require __DIR__ . '/modules/procurement-management/procurements.php';
+    require __DIR__ . '/modules/procurement-management/vendors.php';
+
+    // Staff Advance Management Module
+    require __DIR__ . '/modules/staff-advance-management/budgets.php';
+    require __DIR__ . '/modules/staff-advance-management/advances.php';
+    require __DIR__ . '/modules/staff-advance-management/retirements.php';
+
     // Staff Dashboard Routes (authenticated staff users)
     require __DIR__ . '/modules/staff/staff-profile.php';
     require __DIR__ . '/modules/staff/staff-change-request.php';

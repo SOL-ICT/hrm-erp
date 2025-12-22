@@ -19,5 +19,14 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        // Procurement & Advance Management Seeders
+        $this->call([
+            BudgetAllocationSeeder::class,
+            AdvanceSeeder::class,
+            RetirementSeeder::class,
+            PurchaseRequestSeeder::class,
+            ProcurementLogSeeder::class,
+        ]);
     }
 }
