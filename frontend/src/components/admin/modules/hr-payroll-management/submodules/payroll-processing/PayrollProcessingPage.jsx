@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useClients } from "@/hooks/useClients";
+import { useAllActiveClients } from "@/hooks/useClients";
 import { Calculator, Users, Settings } from "lucide-react";
 
 // Import tab components
@@ -27,7 +27,7 @@ export default function PayrollProcessingPage({
   onBack,
 }) {
   const { user } = useAuth();
-  const { clients, loading: clientsLoading } = useClients();
+  const { clients, loading: clientsLoading } = useAllActiveClients();
 
   // Tab state
   const [activeTab, setActiveTab] = useState("runs");

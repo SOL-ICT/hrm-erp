@@ -10,7 +10,7 @@ import {
   TabsTrigger,
   Progress,
 } from "@/components/ui";
-import { useClients } from "@/hooks/useClients";
+import { useAllActiveClients } from "@/hooks/useClients";
 import { invoiceApiService } from "@/services/modules/invoicing";
 import AttendancePreviewModal from "../modals/AttendancePreviewModal";
 import {
@@ -43,7 +43,7 @@ const EnhancedUploadTab = ({
   clients: propClients,
 }) => {
   // Use prop clients if provided, otherwise fetch from hook
-  const { clients: hookClients } = useClients();
+  const { clients: hookClients } = useAllActiveClients();
   const clients = propClients || hookClients;
 
   // Upload state

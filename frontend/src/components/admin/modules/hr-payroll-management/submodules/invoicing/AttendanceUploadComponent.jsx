@@ -24,7 +24,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui";
-import { useClients } from "@/hooks/useClients";
+import { useAllActiveClients } from "@/hooks/useClients";
 import { invoiceApiService } from "../../services/modules/invoicing";
 import AttendanceCalculationPreview from "./AttendanceCalculationPreview";
 import {
@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 
 const AttendanceUploadComponent = () => {
-  const { clients } = useClients();
+  const { clients } = useAllActiveClients();
   const [selectedClient, setSelectedClient] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);

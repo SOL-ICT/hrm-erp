@@ -19,7 +19,7 @@ import {
   FileCheck,
 } from "lucide-react";
 import { salaryStructureAPI } from "../../../../../../services/modules/client-contract-management/salary-structure";
-import { useClients } from "../../../../../../hooks/useClients";
+import { useAllActiveClients } from "../../../../../../hooks/useClients";
 import JobStructureMaster from "./JobStructureMaster";
 import PayDetailsMaster from "./PayDetailsMaster";
 import OfferLetterTemplateManager from "./OfferLetterTemplateManager";
@@ -29,7 +29,7 @@ const SalaryStructure = ({ currentTheme, onBack }) => {
   const [selectedClient, setSelectedClient] = useState(null);
   const [selectedJobCategory, setSelectedJobCategory] = useState(null);
   const [selectedPayGrade, setSelectedPayGrade] = useState(null);
-  const { clients, loading: clientsLoading } = useClients();
+  const { clients, loading: clientsLoading } = useAllActiveClients();
 
   // Debug: Log clients when they change
   useEffect(() => {

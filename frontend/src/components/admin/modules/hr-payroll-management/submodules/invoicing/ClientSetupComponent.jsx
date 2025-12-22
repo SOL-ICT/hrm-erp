@@ -18,7 +18,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui";
-import { useClients } from "@/hooks/useClients";
+import { useAllActiveClients } from "@/hooks/useClients";
 import {
   Settings,
   Calculator,
@@ -34,9 +34,7 @@ const ClientSetupComponent = () => {
   const {
     clients,
     loading: clientsLoading,
-    updateClient,
-    createClient,
-  } = useClients();
+  } = useAllActiveClients();
   const [selectedClient, setSelectedClient] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({

@@ -85,7 +85,7 @@ const ClientMaster = ({ currentTheme, onClose }) => {
 
   // Initialize data on component mount
   useEffect(() => {
-    fetchClients();
+    fetchClients({ page: 1 });
   }, []);
 
   // Fetch clients when currentPage changes
