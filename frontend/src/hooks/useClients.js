@@ -29,26 +29,16 @@ export const useClients = (initialParams = {}) => {
     setError(null);
 
     try {
-      // If no pagination parameters are provided, fetch all active clients
-      // This is used by dropdowns and other components that need all clients
-      const shouldFetchAll = !params.perPage && !params.page && !params.search && !params.filter;
-      
-      let data;
-      if (shouldFetchAll) {
-        // Fetch all active clients without pagination
-        data = await makeRequest(`/clients/all/active`);
-      } else {
-        // Fetch paginated clients with filters
-        const queryParams = new URLSearchParams({
-          per_page: params.perPage || 15,
-          search: params.search || "",
-          filter: params.filter || "all",
-          sort_by: params.sortBy || "created_at",
-          sort_order: params.sortOrder || "desc",
-          page: params.page || 1,
-        });
-        data = await makeRequest(`/clients?${queryParams}`);
-      }
+      // Fetch paginated clients with filters
+      const queryParams = new URLSearchParams({
+        per_page: params.perPage || 15,
+        search: params.search || "",
+        filter: params.filter || "all",
+        sort_by: params.sortBy || "created_at",
+        sort_order: params.sortOrder || "desc",
+        page: params.page || 1,
+      });
+      const data = await makeRequest(`/clients?${queryParams}`);
 
       // API service already handles response parsing and errors
 
@@ -57,9 +47,14 @@ export const useClients = (initialParams = {}) => {
         setClients(Array.isArray(data.data) ? data.data : []);
         // Set pagination from backend response
         setPagination(
-          data.pagination || {
+          data.pagination ? {
+            current_page: data.pagination.current_page || 1,
+            total_pages: data.pagination.total_pages || 1,
+            per_page: data.pagination.per_page || 15,
+            total: data.pagination.total || 0,
+          } : {
             current_page: params.page || 1,
-            last_page: 1,
+            total_pages: 1,
             per_page: params.perPage || 15,
             total: Array.isArray(data.data) ? data.data.length : 0,
           }
@@ -428,6 +423,47 @@ export const useUtilityData = () => {
     statesLgas,
     loading,
     refetch: fetchUtilityData,
+  };
+};
+
+// Separate hook for getting all active clients (for dropdowns)
+export const useAllActiveClients = () => {
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const { isAuthenticated } = useAuth();
+  const { makeRequest } = useOptimizedAPI();
+
+  const fetchAllActiveClients = async () => {
+    if (!isAuthenticated) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const data = await makeRequest("/clients/all/active");
+      if (data.success) {
+        setClients(Array.isArray(data.data) ? data.data : []);
+      } else {
+        setError(data.message || "Failed to fetch clients");
+      }
+    } catch (err) {
+      setError("Network error occurred");
+      console.error("Error fetching all active clients:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllActiveClients();
+  }, [isAuthenticated]);
+
+  return {
+    clients,
+    loading,
+    error,
+    refetch: fetchAllActiveClients,
   };
 };
 

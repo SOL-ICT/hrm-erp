@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use App\Http\Requests\ClientContractIndexRequest;
+use App\Models\ClientContract;
 use Exception;
 
 class ClientContractController extends Controller
@@ -28,15 +29,19 @@ class ClientContractController extends Controller
                 'clean_params' => $params
             ]);
 
-            $query = DB::table('view_client_contracts_with_details');
+            $query = ClientContract::with(['client' => function($q) {
+                $q->select('id', 'organisation_name', 'slug', 'prefix', 'status');
+            }]);
 
             // Apply search filter
             if (!empty($params['search'])) {
                 $search = $params['search'];
                 $query->where(function ($q) use ($search) {
                     $q->where('contract_code', 'LIKE', "%{$search}%")
-                        ->orWhere('contract_type', 'LIKE', "%{$search}%")
-                        ->orWhere('client_name', 'LIKE', "%{$search}%");
+                        ->orWhere('service_type', 'LIKE', "%{$search}%")
+                        ->orWhereHas('client', function($clientQuery) use ($search) {
+                            $clientQuery->where('organisation_name', 'LIKE', "%{$search}%");
+                        });
                 });
             }
 
@@ -47,22 +52,13 @@ class ClientContractController extends Controller
 
             // Apply status filter with proper validation
             if (!empty($params['status']) && $params['status'] !== 'all') {
-                switch ($params['status']) {
-                    case 'expiring':
-                        $query->where('contract_status', 'Expiring Soon');
-                        break;
-                    case 'expired':
-                        $query->where('contract_status', 'Expired');
-                        break;
-                    case 'active':
-                    case 'inactive':
-                        $query->where('status', $params['status']);
-                        break;
+                if (in_array($params['status'], ['active', 'inactive'])) {
+                    $query->where('status', $params['status']);
                 }
             }
 
             // Apply sorting
-            $query->orderBy($params['sort_by'], $params['sort_order']);
+            $query->orderBy($params['sort_by'] ?? 'created_at', $params['sort_order'] ?? 'desc');
 
             // Paginate results
             $contracts = $query->paginate($params['per_page']);
