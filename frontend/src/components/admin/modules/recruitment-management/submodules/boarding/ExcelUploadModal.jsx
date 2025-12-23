@@ -595,8 +595,37 @@ const ExcelUploadModal = ({ isOpen, onClose, onSuccess, currentTheme }) => {
                 </div>
               </div>
 
-              {/* Validation Errors */}
-              {previewData.errors && previewData.errors.length > 0 && (
+              {/* Invalid Records Details */}
+              {previewData.invalid_records && previewData.invalid_records.length > 0 && (
+                <div
+                  className={`p-4 rounded-lg border ${
+                    currentTheme === "dark"
+                      ? "bg-red-900 border-red-700"
+                      : "bg-red-50 border-red-200"
+                  }`}
+                >
+                  <h4 className="font-medium text-red-800 mb-3">
+                    Invalid Records (First {previewData.invalid_records.length} shown)
+                  </h4>
+                  <div className="space-y-3">
+                    {previewData.invalid_records.map((record, index) => (
+                      <div key={index} className="border-l-4 border-red-500 pl-3">
+                        <div className="font-medium text-red-900">
+                          Row {record.row_number}: {record.data.employee_code} - {record.data.first_name} {record.data.last_name}
+                        </div>
+                        <ul className="text-sm text-red-700 mt-1 space-y-1">
+                          {record.errors.map((error, errIndex) => (
+                            <li key={errIndex}>• {error}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Validation Errors Summary */}
+              {previewData.error_summary && previewData.error_summary.length > 0 && (
                 <div
                   className={`p-4 rounded-lg border ${
                     currentTheme === "dark"
@@ -605,10 +634,10 @@ const ExcelUploadModal = ({ isOpen, onClose, onSuccess, currentTheme }) => {
                   }`}
                 >
                   <h4 className="font-medium text-red-800 mb-2">
-                    Validation Errors
+                    Error Summary
                   </h4>
                   <ul className="text-sm text-red-700 space-y-1">
-                    {previewData.errors.map((error, index) => (
+                    {previewData.error_summary.slice(0, 10).map((error, index) => (
                       <li key={index}>• {error}</li>
                     ))}
                   </ul>
