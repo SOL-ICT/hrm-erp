@@ -21,6 +21,7 @@ import {
   Building2,
 } from "lucide-react";
 import employeeRecordAPI from "../../../../../../services/modules/hr-payroll-management/employeeRecordAPI";
+import JobDetailsTab from "./JobDetailsTab";
 
 const StaffDetailView = ({ staff, onBack, onSave }) => {
   const [activeTab, setActiveTab] = useState("personal");
@@ -141,7 +142,16 @@ const StaffDetailView = ({ staff, onBack, onSave }) => {
           
           // Client and location info
           client: apiData.client || {},
-          location: apiData.service_location || {}
+          location: apiData.service_location || {},
+          
+          // Job Details (job_structure, service_location, sol_office, pay_grade)
+          jobDetails: {
+            job_structure: apiData.job_structure || null,
+            service_location: apiData.service_location || null,
+            sol_office: apiData.sol_office || null,
+            pay_grade: apiData.pay_grade_structure || null,
+            recruitment_request: apiData.recruitment_request || null
+          }
         };
         
         setStaffData(transformedData);
@@ -169,6 +179,7 @@ const StaffDetailView = ({ staff, onBack, onSave }) => {
 
   const tabs = [
     { id: "personal", name: "Personal Info", icon: User },
+    { id: "job-details", name: "Job Details", icon: Briefcase },
     { id: "banking", name: "Banking", icon: CreditCard },
     { id: "education", name: "Education", icon: GraduationCap },
     { id: "experience", name: "Experience", icon: Briefcase },
@@ -295,6 +306,13 @@ const StaffDetailView = ({ staff, onBack, onSave }) => {
       <div className="flex-1 overflow-auto">
         <div className="p-6">
           {/* Personal Info Tab */}
+          {activeTab === "job-details" && (
+            <JobDetailsTab 
+              staffData={staffData} 
+              isEditing={isEditing}
+            />
+          )}
+
           {activeTab === "personal" && (
             <div className="space-y-6">
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

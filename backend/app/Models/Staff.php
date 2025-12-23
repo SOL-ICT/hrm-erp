@@ -52,6 +52,10 @@ class Staff extends Model
         'position',
         'hire_date',
         'salary',
+        // New job details columns
+        'job_structure_id',
+        'sol_office_id',
+        'date_of_join',
         // Recruitment Boarding Enhancement
         'recruitment_request_id',
         'boarding_approval_status',
@@ -92,6 +96,16 @@ class Staff extends Model
     public function payGradeStructure()
     {
         return $this->belongsTo(PayGradeStructure::class);
+    }
+
+    public function jobStructure()
+    {
+        return $this->belongsTo(JobStructure::class, 'job_structure_id');
+    }
+
+    public function solOffice()
+    {
+        return $this->belongsTo(SolOffice::class, 'sol_office_id');
     }
 
     public function roles()

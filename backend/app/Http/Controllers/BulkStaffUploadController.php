@@ -288,13 +288,21 @@ class BulkStaffUploadController extends Controller
                 }
 
                 $headers = $data[$headerRow];
-                $dataRows = array_slice($data, $headerRow + 1);
+                
+                // Extract data rows starting from the row after header
+                // Important: toArray returns 1-indexed array, so we need to filter by key
+                $dataRows = array_filter($data, function($key) use ($headerRow) {
+                    return $key > $headerRow;
+                }, ARRAY_FILTER_USE_KEY);
+                
                 $fieldMapping = $this->mapHeaders($headers);
 
                 $successCount = 0;
                 $failedCount = 0;
+                $updatedCount = 0;
                 $errors = [];
                 $createdStaff = [];
+                $updatedStaff = [];
 
                 foreach ($dataRows as $rowIndex => $row) {
                     if (empty(array_filter($row))) continue;
@@ -312,22 +320,41 @@ class BulkStaffUploadController extends Controller
                         // Use the validated and modified data from validation
                         $validatedRow = $validation['data'];
 
-                        // Prepare staff data
-                        $staffData = $this->prepareStaffData($validatedRow, $ticket, $request->offer_already_accepted);
+                        // Check if staff already exists (UPDATE mode)
+                        $existingStaff = $this->findExistingStaff($validatedRow);
 
-                        // Board staff using service
-                        $staff = $this->boardingService->boardStaff($staffData, $user, $ticket);
+                        if ($existingStaff) {
+                            // UPDATE MODE: Only fill NULL/empty fields
+                            $updated = $this->updateExistingStaff($existingStaff, $validatedRow, $ticket);
+                            
+                            if ($updated) {
+                                $updatedCount++;
+                                $updatedStaff[] = [
+                                    'id' => $existingStaff->id,
+                                    'employee_code' => $existingStaff->employee_code,
+                                    'name' => $existingStaff->first_name . ' ' . $existingStaff->last_name,
+                                    'status' => 'updated',
+                                ];
+                            }
+                        } else {
+                            // INSERT MODE: Create new staff
+                            // Prepare staff data
+                            $staffData = $this->prepareStaffData($validatedRow, $ticket, $request->offer_already_accepted);
 
-                        // Create related records if data provided
-                        $this->createRelatedRecords($staff, $validatedRow);
+                            // Board staff using service
+                            $staff = $this->boardingService->boardStaff($staffData, $user, $ticket);
 
-                        $successCount++;
-                        $createdStaff[] = [
-                            'id' => $staff->id,
-                            'employee_code' => $staff->employee_code,
-                            'name' => $staff->first_name . ' ' . $staff->last_name,
-                            'status' => $staff->boarding_approval_status,
-                        ];
+                            // Create related records if data provided
+                            $this->createRelatedRecords($staff, $validatedRow);
+
+                            $successCount++;
+                            $createdStaff[] = [
+                                'id' => $staff->id,
+                                'employee_code' => $staff->employee_code,
+                                'name' => $staff->first_name . ' ' . $staff->last_name,
+                                'status' => $staff->boarding_approval_status,
+                            ];
+                        }
                     } catch (\Exception $e) {
                         $failedCount++;
                         $errors[] = "Row " . ($rowIndex + 1) . ": " . $e->getMessage();
@@ -338,11 +365,13 @@ class BulkStaffUploadController extends Controller
 
                 return response()->json([
                     'success' => true,
-                    'message' => "Bulk upload completed: {$successCount} staff boarded successfully",
+                    'message' => "Bulk upload completed: {$successCount} staff created, {$updatedCount} staff updated",
                     'data' => [
-                        'successful_records' => $successCount,
+                        'created_records' => $successCount,
+                        'updated_records' => $updatedCount,
                         'failed_records' => $failedCount,
                         'created_staff' => $createdStaff,
+                        'updated_staff' => $updatedStaff,
                         'errors' => $errors,
                         'ticket_status' => [
                             'filled' => $ticket->fresh()->staff_accepted_offer ?? 0,
@@ -931,9 +960,17 @@ class BulkStaffUploadController extends Controller
             ]);
         }
 
+        // Determine sol_office_id from ticket or service location
+        $solOfficeId = $ticket->sol_office_id;
+        if (!$solOfficeId && $ticket->service_location_id) {
+            $serviceLocation = \App\Models\ServiceLocation::find($ticket->service_location_id);
+            $solOfficeId = $serviceLocation?->sol_office_id;
+        }
+
         return [
             'client_id' => $ticket->client_id,
             'staff_type_id' => $staffType->id,
+            'recruitment_request_id' => $ticket->id,
             'employee_code' => $row['employee_code'],
             'staff_id' => $row['staff_id'],
             'first_name' => $row['first_name'],
@@ -951,7 +988,12 @@ class BulkStaffUploadController extends Controller
             'appointment_status' => $row['appointment_status'] ?? 'probation',
             'employment_type' => $this->mapEmploymentType($row['employment_type'] ?? null),
             'department' => $row['department'] ?? null,
-            'job_title' => $row['last_position'] ?? null, // Use last position as job title if available
+            
+            // Job details from recruitment request
+            'job_structure_id' => $ticket->job_structure_id,
+            'job_title' => $row['last_position'] ?? $ticket->jobStructure->job_title ?? null,
+            'service_location_id' => $ticket->service_location_id,
+            'sol_office_id' => $solOfficeId,
             
             // Legal IDs that go in staff table
             'tax_id_no' => $row['tax_id_no'] ?? null,
@@ -1118,5 +1160,192 @@ class BulkStaffUploadController extends Controller
         if ($this->hierarchyService->canBoardWithoutApproval($user)) return true;
 
         return false;
+    }
+
+    /**
+     * Find existing staff by employee_code or staff_id
+     */
+    private function findExistingStaff(array $row)
+    {
+        $query = Staff::query();
+
+        // Try to find by employee_code first (primary identifier)
+        if (!empty($row['employee_code'])) {
+            $staff = $query->where('employee_code', $row['employee_code'])->first();
+            if ($staff) {
+                return $staff;
+            }
+        }
+
+        // Fallback to staff_id
+        if (!empty($row['staff_id'])) {
+            $staff = Staff::where('staff_id', $row['staff_id'])->first();
+            if ($staff) {
+                return $staff;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Update existing staff - only fill NULL/empty fields
+     */
+    private function updateExistingStaff(Staff $staff, array $row, RecruitmentRequest $ticket): bool
+    {
+        try {
+            $updated = false;
+            $updateData = [];
+
+            // Determine sol_office_id from ticket or service location if not set
+            if (!$staff->sol_office_id) {
+                $solOfficeId = $ticket->sol_office_id;
+                if (!$solOfficeId && $ticket->service_location_id) {
+                    $serviceLocation = \App\Models\ServiceLocation::find($ticket->service_location_id);
+                    $solOfficeId = $serviceLocation?->sol_office_id;
+                }
+                if ($solOfficeId) {
+                    $updateData['sol_office_id'] = $solOfficeId;
+                }
+            }
+
+            // Only update NULL or empty fields from the staff table
+            $fieldsToUpdate = [
+                'first_name', 'middle_name', 'last_name', 'email', 'gender',
+                'pay_grade_structure_id', 'job_structure_id', 'service_location_id',
+                'department', 'tax_id_no', 'pf_no', 'pfa_code', 'bv_no', 'nhf_account_no',
+                'recruitment_request_id'
+            ];
+
+            foreach ($fieldsToUpdate as $field) {
+                if (empty($staff->{$field}) && !empty($row[$field])) {
+                    $updateData[$field] = $row[$field];
+                    $updated = true;
+                }
+            }
+
+            // Special handling for job_structure_id and related job_title
+            if (empty($staff->job_structure_id) && !empty($ticket->job_structure_id)) {
+                $updateData['job_structure_id'] = $ticket->job_structure_id;
+                if (empty($staff->job_title)) {
+                    $updateData['job_title'] = $row['last_position'] ?? $ticket->jobStructure->job_title ?? null;
+                }
+                $updated = true;
+            }
+
+            // Special handling for service_location_id
+            if (empty($staff->service_location_id) && !empty($ticket->service_location_id)) {
+                $updateData['service_location_id'] = $ticket->service_location_id;
+                $updated = true;
+            }
+
+            // Update staff table if there are changes
+            if (!empty($updateData)) {
+                $staff->update($updateData);
+                Log::info('Updated existing staff', ['staff_id' => $staff->id, 'fields' => array_keys($updateData)]);
+            }
+
+            // Update related tables only if they don't exist
+            $this->updateRelatedRecords($staff, $row);
+
+            return $updated;
+        } catch (\Exception $e) {
+            Log::error('Error updating existing staff', [
+                'staff_id' => $staff->id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Update related records for existing staff - only if they don't exist
+     */
+    private function updateRelatedRecords(Staff $staff, array $row)
+    {
+        try {
+            // Update staff_personal_info only if missing
+            $personalInfo = StaffPersonalInfo::where('staff_id', $staff->id)->first();
+            if (!$personalInfo && (!empty($row['marital_status']) || !empty($row['nationality']) || !empty($row['date_of_birth']))) {
+                StaffPersonalInfo::create([
+                    'staff_id' => $staff->id,
+                    'date_of_birth' => $row['date_of_birth'] ?? null,
+                    'marital_status' => $row['marital_status'] ?? null,
+                    'nationality' => $row['nationality'] ?? 'Nigerian',
+                    'state_of_origin' => $row['state_of_origin'] ?? null,
+                    'local_government_of_origin' => $row['local_government_of_origin'] ?? null,
+                    'current_address' => $row['current_address'] ?? null,
+                    'mobile_phone' => $row['mobile_phone'] ?? null,
+                ]);
+            } elseif ($personalInfo) {
+                // Update only NULL fields in existing personal info
+                $personalUpdateData = [];
+                if (empty($personalInfo->date_of_birth) && !empty($row['date_of_birth'])) {
+                    $personalUpdateData['date_of_birth'] = $row['date_of_birth'];
+                }
+                if (empty($personalInfo->mobile_phone) && !empty($row['mobile_phone'])) {
+                    $personalUpdateData['mobile_phone'] = $row['mobile_phone'];
+                }
+                if (empty($personalInfo->state_of_origin) && !empty($row['state_of_origin'])) {
+                    $personalUpdateData['state_of_origin'] = $row['state_of_origin'];
+                }
+                if (!empty($personalUpdateData)) {
+                    $personalInfo->update($personalUpdateData);
+                }
+            }
+
+            // Update staff_banking only if missing
+            $banking = StaffBanking::where('staff_id', $staff->id)->first();
+            if (!$banking && (!empty($row['bank_name']) || !empty($row['account_number']))) {
+                $paymentMode = 'bank_transfer';
+                if (!empty($row['payment_mode'])) {
+                    $mode = strtolower(trim($row['payment_mode']));
+                    if (strpos($mode, 'cash') !== false) {
+                        $paymentMode = 'cash';
+                    } elseif (strpos($mode, 'cheque') !== false || strpos($mode, 'check') !== false) {
+                        $paymentMode = 'cheque';
+                    }
+                }
+                
+                StaffBanking::create([
+                    'staff_id' => $staff->id,
+                    'payment_mode' => $paymentMode,
+                    'bank_name' => $row['bank_name'] ?? null,
+                    'account_number' => $row['account_number'] ?? null,
+                ]);
+            }
+
+            // Don't duplicate education or experience - skip if any exist
+            $hasEducation = StaffEducation::where('staff_id', $staff->id)->exists();
+            $hasExperience = StaffExperience::where('staff_id', $staff->id)->exists();
+
+            if (!$hasEducation && !empty($row['highest_institution']) && !empty($row['highest_qualification'])) {
+                StaffEducation::create([
+                    'staff_id' => $staff->id,
+                    'institution_name' => $row['highest_institution'],
+                    'certificate_type' => $row['highest_qualification'],
+                    'specialization' => $row['field_of_study'] ?? null,
+                    'end_year' => $row['graduation_year'] ?? null,
+                    'graduation_year' => $row['graduation_year'] ?? null,
+                    'education_order' => 1,
+                ]);
+            }
+
+            if (!$hasExperience && !empty($row['last_employer']) && !empty($row['last_position'])) {
+                StaffExperience::create([
+                    'staff_id' => $staff->id,
+                    'employer_name' => $row['last_employer'],
+                    'designation' => $row['last_position'],
+                    'start_date' => $row['experience_start_date'] ?? now()->subYear(),
+                    'end_date' => $row['experience_end_date'] ?? null,
+                    'experience_order' => 1,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error updating related records', [
+                'staff_id' => $staff->id,
+                'error' => $e->getMessage()
+            ]);
+        }
     }
 }
