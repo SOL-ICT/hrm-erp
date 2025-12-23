@@ -25,10 +25,19 @@ if (!$controlUser) {
 
 echo "Control User: {$controlUser->name} (ID: {$controlUser->id})\n\n";
 
-// Get all pending staff
-$pendingStaff = Staff::where('boarding_approval_status', 'pending_control_approval')
-    ->where('client_id', 1)
-    ->get();
+// Get client_id from command line argument or approve for all clients
+$clientId = isset($argv[1]) ? (int)$argv[1] : null;
+
+if ($clientId) {
+    echo "Filtering for Client ID: {$clientId}\n";
+    $pendingStaff = Staff::where('boarding_approval_status', 'pending_control_approval')
+        ->where('client_id', $clientId)
+        ->get();
+} else {
+    echo "Processing all clients...\n";
+    $pendingStaff = Staff::where('boarding_approval_status', 'pending_control_approval')
+        ->get();
+}
 
 echo "Found {$pendingStaff->count()} staff awaiting approval\n\n";
 
@@ -83,7 +92,7 @@ foreach ($pendingStaff as $staff) {
             'name' => trim($staff->first_name . ' ' . $staff->last_name),
             'email' => $email,
             'username' => $username,
-            'password' => bcrypt('mysolc3ntfi3ld@'), // Default password
+            'password' => bcrypt('12345678'), // Default password - simple for initial login
             'role' => $role,
             'user_type' => 'staff',
             'staff_profile_id' => $staff->id,
