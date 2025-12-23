@@ -642,6 +642,18 @@ const ExcelUploadModal = ({ isOpen, onClose, onSuccess, currentTheme }) => {
                   )}
                 </div>
               </div>
+
+              {/* Show Error Details */}
+              {uploadResults.errors && uploadResults.errors.length > 0 && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <h5 className="font-medium text-red-800 mb-2">Error Details:</h5>
+                  <ul className="text-sm text-red-700 space-y-1 list-disc list-inside">
+                    {uploadResults.errors.map((error, index) => (
+                      <li key={index}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
 

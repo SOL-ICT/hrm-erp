@@ -173,7 +173,9 @@ class BulkStaffUploadController extends Controller
             }
 
             $headers = $data[$headerRow];
-            $dataRows = array_slice($data, $headerRow + 1);
+            $dataRows = array_filter($data, function($key) use ($headerRow) {
+                return $key > $headerRow;
+            }, ARRAY_FILTER_USE_KEY);
 
             // Map headers to field names
             $fieldMapping = $this->mapHeaders($headers);
