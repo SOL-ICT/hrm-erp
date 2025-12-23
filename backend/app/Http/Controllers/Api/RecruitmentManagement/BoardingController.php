@@ -542,11 +542,22 @@ class BoardingController extends Controller
                     $latestResponse = $boardingRequest->offerResponses->first();
                     $startDate = $latestResponse?->preferred_start_date ?? $boardingRequest->proposed_start_date;
 
-                    // Create staff record
+                    // Get recruitment request for additional details
+                    $recruitmentRequest = $boardingRequest->recruitmentRequest;
+                    
+                    // Determine sol_office_id from ticket or service location
+                    $solOfficeId = $recruitmentRequest->sol_office_id;
+                    if (!$solOfficeId && $recruitmentRequest->service_location_id) {
+                        $serviceLocation = \App\Models\ServiceLocation::find($recruitmentRequest->service_location_id);
+                        $solOfficeId = $serviceLocation?->sol_office_id;
+                    }
+
+                    // Create staff record with complete job details
                     $staff = Staff::create([
                         'candidate_id' => $boardingRequest->candidate_id,
                         'client_id' => $boardingRequest->client_id,
                         'staff_type_id' => 1, // Default staff type
+                        'recruitment_request_id' => $recruitmentRequest->id,
                         'employee_code' => $employeeCode,
                         'staff_id' => $staffId,
                         'email' => $boardingRequest->candidate->email,
@@ -556,7 +567,13 @@ class BoardingController extends Controller
                         'appointment_status' => 'probation',
                         'employment_type' => 'full_time',
                         'status' => 'active',
-                        'job_title' => $boardingRequest->recruitmentRequest->job_title,
+                        // Job details from recruitment request
+                        'job_structure_id' => $recruitmentRequest->job_structure_id,
+                        'job_title' => $recruitmentRequest->jobStructure->job_title ?? null,
+                        'service_location_id' => $recruitmentRequest->service_location_id,
+                        'sol_office_id' => $solOfficeId,
+                        'pay_grade_structure_id' => null, // TODO: Add pay grade selection during boarding
+                        // Boarding metadata
                         'onboarding_method' => 'from_candidate',
                         'onboarded_by' => Auth::id() ?? 1
                     ]);
@@ -619,7 +636,20 @@ class BoardingController extends Controller
     private function copyDataToStaffTables($candidateId, $staffId, $offerResponse = null)
     {
         try {
-            // Copy emergency contacts (excluding education as mentioned)
+            // Get candidate data for personal info
+            $candidate = \App\Models\Candidate::find($candidateId);
+            
+            // Create staff personal info with candidate data
+            if ($candidate) {
+                \App\Models\StaffPersonalInfo::create([
+                    'staff_id' => $staffId,
+                    'date_of_birth' => $candidate->date_of_birth,
+                    'mobile_phone' => $candidate->phone,
+                    'personal_email' => $candidate->email,
+                ]);
+            }
+            
+            // Copy emergency contacts
             $emergencyContacts = DB::table('candidate_emergency_contacts')
                 ->where('candidate_id', $candidateId)
                 ->get();

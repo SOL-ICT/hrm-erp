@@ -269,11 +269,19 @@ class ManualBoardingController extends Controller
             $employeeCode = $this->generateEmployeeCode($client);
             $staffId = $this->generateStaffId($employeeCode);
 
-            // Create staff record
+            // Determine sol_office_id from ticket or service location
+            $solOfficeId = $ticket->sol_office_id;
+            if (!$solOfficeId && $ticket->service_location_id) {
+                $serviceLocation = \App\Models\ServiceLocation::find($ticket->service_location_id);
+                $solOfficeId = $serviceLocation?->sol_office_id;
+            }
+
+            // Create staff record with complete job details
             $staff = Staff::create([
                 'candidate_id' => null, // Manual entry has no candidate
                 'client_id' => $validated['client_id'],
                 'staff_type_id' => $defaultStaffType ? $defaultStaffType->id : 1, // Fallback to ID 1 if null
+                'recruitment_request_id' => $ticket->id,
                 'employee_code' => $employeeCode,
                 'staff_id' => $staffId,
                 'email' => $validated['email'],
@@ -285,11 +293,15 @@ class ManualBoardingController extends Controller
                 'appointment_status' => 'probation',
                 'employment_type' => 'full_time',
                 'status' => 'active',
-                'pay_grade_structure_id' => $validated['pay_grade_structure_id'],
-                'salary_effective_date' => $validated['entry_date'],
+                // Job details from recruitment request
+                'job_structure_id' => $ticket->job_structure_id,
                 'job_title' => $validated['job_title'] ?? $ticket->jobStructure->job_title ?? 'Staff Member',
                 'department' => $validated['department'] ?? null,
                 'service_location_id' => $ticket->service_location_id,
+                'sol_office_id' => $solOfficeId,
+                'pay_grade_structure_id' => $validated['pay_grade_structure_id'],
+                'salary_effective_date' => $validated['entry_date'],
+                // Boarding metadata
                 'onboarding_method' => 'manual_entry',
                 'onboarded_by' => Auth::id() ?? 1
             ]);

@@ -147,7 +147,7 @@ class EmployeeRecordController extends Controller
             $staff = Staff::with([
                 'client:id,organisation_name',
                 'candidate:id,date_of_birth,phone',
-                'serviceLocation:id,location_name',
+                'serviceLocation:id,location_name,city,state',
                 'personalInfo',
                 'bankingInfo',
                 'education',
@@ -155,7 +155,12 @@ class EmployeeRecordController extends Controller
                 'emergencyContacts',
                 'guarantors',
                 'legalIds',
-                'references'
+                'references',
+                // Job Details relationships
+                'jobStructure:id,job_title,job_code,contract_type,contract_nature',
+                'solOffice:id,office_name,office_code,state_name,zone_name,zone',
+                'payGradeStructure:id,grade_name,grade_code',
+                'recruitmentRequest:id,ticket_id,created_at'
             ])->find($staffId);
 
             if (!$staff) {
