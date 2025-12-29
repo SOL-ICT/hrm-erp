@@ -9,6 +9,16 @@ backend/.env.local
 frontend/.env.local
 
 # ==========================================
+# Sensitive Database Files (NEVER COMMIT!)
+# ==========================================
+*.sql
+!database/schema.sql
+binlog.*
+current_state.sql
+production_backup.sql
+recovery_*.sql
+
+# ==========================================
 # Local Documentation (Development Notes - Not for Production)
 # ==========================================
 # Exclude all .md files except essential ones
