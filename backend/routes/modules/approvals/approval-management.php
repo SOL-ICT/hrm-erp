@@ -36,6 +36,10 @@ Route::prefix('admin/approvals')->middleware(['auth:sanctum'])->group(function (
     Route::post('/{id}/escalate', [ApprovalController::class, 'escalate']); // Escalate to higher authority
     Route::delete('/{id}', [ApprovalController::class, 'cancel']); // Cancel approval (requester only)
     
+    // Performance & Caching routes
+    Route::get('/statistics', [ApprovalController::class, 'getStatistics']); // Cached statistics
+    Route::post('/cache/clear', [ApprovalController::class, 'clearCache']); // Clear approval caches
+    
     // Bulk action routes
     Route::post('/bulk-approve', [ApprovalController::class, 'bulkApprove']); // Bulk approve
     Route::post('/bulk-reject', [ApprovalController::class, 'bulkReject']); // Bulk reject

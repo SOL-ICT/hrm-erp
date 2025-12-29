@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class ApprovalController extends Controller
 {
@@ -25,80 +26,69 @@ class ApprovalController extends Controller
     }
 
     /**
-     * Get all approvals with filters
+     * Get all approvals with filters and caching
      * GET /api/admin/approvals
      */
     public function index(Request $request): JsonResponse
     {
         try {
+            // Generate cache key based on request parameters
+            $cacheKey = $this->generateCacheKey('approvals_index', $request->all());
+            $cacheTTL = 300; // 5 minutes
+
+            // Try to get cached data first for GET requests with no mutations
+            if ($request->isMethod('get') && !$request->has('no_cache')) {
+                $cachedData = Cache::get($cacheKey);
+                if ($cachedData) {
+                    return response()->json([
+                        'success' => true,
+                        'data' => $cachedData,
+                        'cached' => true,
+                        'cache_time' => now()->toISOString()
+                    ]);
+                }
+            }
+
             $query = Approval::with([
                 'requester:id,name,email',
-                'currentApprover:id,name,email',
+                'currentApprover:id,name,email', 
                 'workflow:id,workflow_name,workflow_code,total_levels',
                 'approvable'
-            ]);
+            ])
+                ->select([
+                    'id', 'approvable_type', 'approvable_id', 'workflow_id',
+                    'current_level', 'status', 'priority', 'is_overdue',
+                    'requested_at', 'completed_at', 'requested_by', 
+                    'current_approver_id', 'module_name', 'approval_type'
+                ]);
 
-            // Filter by module
-            if ($request->has('module_name')) {
-                $query->where('module_name', $request->module_name);
-            }
+            // Apply filters efficiently
+            $this->applyFilters($query, $request);
 
-            // Filter by approval type
-            if ($request->has('approval_type')) {
-                $query->where('approval_type', $request->approval_type);
-            }
-
-            // Filter by status
-            if ($request->has('status')) {
-                $query->where('status', $request->status);
-            }
-
-            // Filter by priority
-            if ($request->has('priority')) {
-                $query->where('priority', $request->priority);
-            }
-
-            // Filter by overdue
-            if ($request->has('is_overdue')) {
-                $query->where('is_overdue', $request->boolean('is_overdue'));
-            }
-
-            // Filter by date range
-            if ($request->has('from_date')) {
-                $query->whereDate('requested_at', '>=', $request->from_date);
-            }
-            if ($request->has('to_date')) {
-                $query->whereDate('requested_at', '<=', $request->to_date);
-            }
-
-            // Search by approvable ID or requester name
-            if ($request->has('search')) {
-                $search = $request->search;
-                $query->where(function ($q) use ($search) {
-                    $q->where('approvable_id', 'like', "%{$search}%")
-                        ->orWhereHas('requester', function ($q) use ($search) {
-                            $q->where('name', 'like', "%{$search}%");
-                        });
-                });
-            }
-
-            // Order by
+            // Order by with indexes
             $orderBy = $request->input('order_by', 'requested_at');
             $orderDir = $request->input('order_dir', 'desc');
             $query->orderBy($orderBy, $orderDir);
 
-            // Pagination
-            $perPage = $request->input('per_page', 20);
+            // Optimized pagination
+            $perPage = min($request->input('per_page', 20), 100);
             $approvals = $query->paginate($perPage);
+
+            // Cache the results
+            if ($request->isMethod('get')) {
+                Cache::put($cacheKey, $approvals, $cacheTTL);
+            }
 
             return response()->json([
                 'success' => true,
-                'data' => $approvals
+                'data' => $approvals,
+                'cached' => false
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to fetch approvals', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'request_params' => $request->all()
             ]);
 
             return response()->json([
@@ -117,56 +107,84 @@ class ApprovalController extends Controller
     {
         try {
             $userId = Auth::id();
+            
+            // Cache key specific to user and filters
+            $cacheKey = $this->generateCacheKey("pending_approvals_user_{$userId}", $request->all());
+            $cacheTTL = 60; // 1 minute for pending approvals (more dynamic)
+
+            // Check cache first
+            if ($request->isMethod('get') && !$request->has('no_cache')) {
+                $cachedData = Cache::get($cacheKey);
+                if ($cachedData) {
+                    return response()->json([
+                        'success' => true,
+                        'data' => $cachedData['data'],
+                        'summary' => $cachedData['summary'],
+                        'cached' => true
+                    ]);
+                }
+            }
 
             $query = Approval::with([
                 'requester:id,name,email',
                 'workflow:id,workflow_name,workflow_code,total_levels',
                 'approvable'
             ])
+                ->select([
+                    'id', 'approvable_type', 'approvable_id', 'workflow_id',
+                    'current_level', 'status', 'priority', 'is_overdue',
+                    'requested_at', 'requested_by', 'current_approver_id',
+                    'module_name', 'approval_type'
+                ])
                 ->where('current_approver_id', $userId)
                 ->where('status', 'pending');
 
-            // Filter by module
-            if ($request->has('module_name')) {
-                $query->where('module_name', $request->module_name);
-            }
+            // Apply additional filters using helper method
+            $this->applyFilters($query, $request, ['status']); // Exclude status filter
 
-            // Filter by priority
-            if ($request->has('priority')) {
-                $query->where('priority', $request->priority);
-            }
-
-            // Filter by age (days pending)
-            if ($request->has('age_days')) {
-                $ageDays = $request->integer('age_days');
-                $query->whereDate('requested_at', '<=', now()->subDays($ageDays));
-            }
-
-            $query->orderBy('priority', 'asc')
+            // Optimize ordering for pending approvals
+            $query->orderByRaw('CASE 
+                WHEN priority = "critical" THEN 1
+                WHEN priority = "high" THEN 2
+                WHEN priority = "medium" THEN 3
+                ELSE 4 END')
                 ->orderBy('requested_at', 'asc');
 
-            $perPage = $request->input('per_page', 20);
+            $perPage = min($request->input('per_page', 20), 100);
             $approvals = $query->paginate($perPage);
+
+            // Generate summary efficiently
+            $summary = [
+                'total_pending' => $approvals->total(),
+                'overdue_count' => Approval::where('current_approver_id', $userId)
+                    ->where('status', 'pending')
+                    ->where('is_overdue', true)
+                    ->count(),
+                'high_priority_count' => Approval::where('current_approver_id', $userId)
+                    ->where('status', 'pending')
+                    ->where('priority', 'high')
+                    ->count()
+            ];
+
+            $responseData = [
+                'data' => $approvals,
+                'summary' => $summary
+            ];
+
+            // Cache the results
+            Cache::put($cacheKey, $responseData, $cacheTTL);
 
             return response()->json([
                 'success' => true,
                 'data' => $approvals,
-                'summary' => [
-                    'total_pending' => $approvals->total(),
-                    'overdue_count' => Approval::where('current_approver_id', $userId)
-                        ->where('status', 'pending')
-                        ->where('is_overdue', true)
-                        ->count(),
-                    'high_priority_count' => Approval::where('current_approver_id', $userId)
-                        ->where('status', 'pending')
-                        ->where('priority', 'high')
-                        ->count()
-                ]
+                'summary' => $summary,
+                'cached' => false
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to fetch pending approvals', [
                 'user_id' => Auth::id(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'request_params' => $request->all()
             ]);
 
             return response()->json([
@@ -613,6 +631,155 @@ class ApprovalController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to escalate approval',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Helper method to apply filters efficiently
+     */
+    private function applyFilters($query, Request $request, $excludeFilters = [])
+    {
+        // Filter by module
+        if ($request->has('module_name') && !in_array('module_name', $excludeFilters)) {
+            $query->where('module_name', $request->module_name);
+        }
+
+        // Filter by approval type
+        if ($request->has('approval_type') && !in_array('approval_type', $excludeFilters)) {
+            $query->where('approval_type', $request->approval_type);
+        }
+
+        // Filter by status
+        if ($request->has('status') && !in_array('status', $excludeFilters)) {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by priority
+        if ($request->has('priority') && !in_array('priority', $excludeFilters)) {
+            $query->where('priority', $request->priority);
+        }
+
+        // Filter by overdue
+        if ($request->has('is_overdue') && !in_array('is_overdue', $excludeFilters)) {
+            $query->where('is_overdue', $request->boolean('is_overdue'));
+        }
+
+        // Filter by date range
+        if ($request->has('from_date') && !in_array('from_date', $excludeFilters)) {
+            $query->whereDate('requested_at', '>=', $request->from_date);
+        }
+        if ($request->has('to_date') && !in_array('to_date', $excludeFilters)) {
+            $query->whereDate('requested_at', '<=', $request->to_date);
+        }
+
+        // Search by approvable ID or requester name
+        if ($request->has('search') && !in_array('search', $excludeFilters)) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('approvable_id', 'like', "%{$search}%")
+                    ->orWhereHas('requester', function ($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        // Filter by age (days pending)
+        if ($request->has('age_days') && !in_array('age_days', $excludeFilters)) {
+            $ageDays = $request->integer('age_days');
+            $query->whereDate('requested_at', '<=', now()->subDays($ageDays));
+        }
+    }
+
+    /**
+     * Generate cache key for request
+     */
+    private function generateCacheKey(string $prefix, array $params): string
+    {
+        // Sort params for consistent cache keys
+        ksort($params);
+        $hashParams = md5(serialize($params));
+        return "approval_cache:{$prefix}:{$hashParams}";
+    }
+
+    /**
+     * Clear approval caches
+     */
+    public function clearCache(Request $request): JsonResponse
+    {
+        try {
+            $patterns = [
+                'approval_cache:approvals_index:*',
+                'approval_cache:pending_approvals_*',
+                'approval_cache:submitted_approvals_*',
+                'approval_cache:statistics_*'
+            ];
+
+            $cleared = 0;
+            foreach ($patterns as $pattern) {
+                // Simple cache clear - in production, consider using tags
+                Cache::flush(); // This clears all cache - optimize based on your cache strategy
+                $cleared++;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Cleared {$cleared} cache patterns",
+                'cleared_at' => now()->toISOString()
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to clear cache',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get approval statistics with caching
+     */
+    public function getStatistics(Request $request): JsonResponse
+    {
+        try {
+            $userId = Auth::id();
+            $cacheKey = "approval_cache:statistics_user_{$userId}";
+            $cacheTTL = 600; // 10 minutes
+
+            $stats = Cache::remember($cacheKey, $cacheTTL, function () use ($userId) {
+                return [
+                    'pending_count' => Approval::where('current_approver_id', $userId)
+                        ->where('status', 'pending')
+                        ->count(),
+                    'high_priority_count' => Approval::where('current_approver_id', $userId)
+                        ->where('status', 'pending')
+                        ->where('priority', 'high')
+                        ->count(),
+                    'overdue_count' => Approval::where('current_approver_id', $userId)
+                        ->where('status', 'pending')
+                        ->where('is_overdue', true)
+                        ->count(),
+                    'total_completed' => Approval::where('completed_by', $userId)
+                        ->whereIn('status', ['approved', 'rejected'])
+                        ->count(),
+                    'last_updated' => now()->toISOString()
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $stats
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to get approval statistics', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get statistics',
                 'error' => $e->getMessage()
             ], 500);
         }
