@@ -161,6 +161,13 @@ const AdminNavigation = ({
       ],
     },
     {
+      id: "approval-management",
+      name: "Approval Center",
+      icon: "✅",
+      type: "single",
+      description: "Centralized approval management across all modules",
+    },
+    {
       id: "administration",
       name: "Administration",
       icon: "⚙️",

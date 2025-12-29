@@ -299,12 +299,16 @@ class BulkStaffUploadController extends Controller
                 
                 $fieldMapping = $this->mapHeaders($headers);
 
+                // Generate unique batch ID for this upload
+                $uploadBatchId = \Illuminate\Support\Str::uuid()->toString();
+
                 $successCount = 0;
                 $failedCount = 0;
                 $updatedCount = 0;
                 $errors = [];
                 $createdStaff = [];
                 $updatedStaff = [];
+                $batchStaffIds = [];
 
                 foreach ($dataRows as $rowIndex => $row) {
                     if (empty(array_filter($row))) continue;
@@ -342,14 +346,16 @@ class BulkStaffUploadController extends Controller
                             // INSERT MODE: Create new staff
                             // Prepare staff data
                             $staffData = $this->prepareStaffData($validatedRow, $ticket, $request->offer_already_accepted);
+                            $staffData['upload_batch_id'] = $uploadBatchId;
 
-                            // Board staff using service
-                            $staff = $this->boardingService->boardStaff($staffData, $user, $ticket);
+                            // Board staff WITHOUT individual approval (batch approval will be created later)
+                            $staff = $this->boardingService->boardStaffWithoutApproval($staffData, $user, $ticket);
 
                             // Create related records if data provided
                             $this->createRelatedRecords($staff, $validatedRow);
 
                             $successCount++;
+                            $batchStaffIds[] = $staff->id;
                             $createdStaff[] = [
                                 'id' => $staff->id,
                                 'employee_code' => $staff->employee_code,
@@ -361,6 +367,24 @@ class BulkStaffUploadController extends Controller
                         $failedCount++;
                         $errors[] = "Row " . ($rowIndex + 1) . ": " . $e->getMessage();
                     }
+                }
+
+                // Create ONE approval for the entire batch if staff were created
+                if ($successCount > 0) {
+                    $batchApproval = $this->boardingService->createBatchApproval(
+                        $uploadBatchId,
+                        $batchStaffIds,
+                        $user,
+                        $ticket,
+                        $successCount
+                    );
+                    
+                    Log::info('Batch approval created for staff upload', [
+                        'batch_id' => $uploadBatchId,
+                        'approval_id' => $batchApproval->id,
+                        'staff_count' => $successCount,
+                        'user_id' => $user->id,
+                    ]);
                 }
 
                 DB::commit();

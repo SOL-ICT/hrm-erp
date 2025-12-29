@@ -1378,6 +1378,124 @@ class DatabaseFields
         'UPDATED_AT' => 'updated_at',
     ];
 
+    /**
+     * APPROVALS table fields
+     */
+    const APPROVALS = [
+        'ID' => 'id',
+        'APPROVABLE_TYPE' => 'approvable_type',
+        'APPROVABLE_ID' => 'approvable_id',
+        'APPROVAL_TYPE' => 'approval_type',
+        'MODULE_NAME' => 'module_name',
+        'REQUESTED_BY' => 'requested_by',
+        'REQUESTED_AT' => 'requested_at',
+        'CURRENT_APPROVER_ID' => 'current_approver_id',
+        'CURRENT_APPROVAL_LEVEL' => 'current_approval_level',
+        'TOTAL_APPROVAL_LEVELS' => 'total_approval_levels',
+        'STATUS' => 'status',
+        'WORKFLOW_ID' => 'workflow_id',
+        'PRIORITY' => 'priority',
+        'DUE_DATE' => 'due_date',
+        'IS_OVERDUE' => 'is_overdue',
+        'COMPLETED_AT' => 'completed_at',
+        'COMPLETED_BY' => 'completed_by',
+        'REQUEST_DATA' => 'request_data',
+        'CREATED_AT' => 'created_at',
+        'UPDATED_AT' => 'updated_at',
+    ];
+
+    /**
+     * APPROVAL_HISTORY table fields
+     */
+    const APPROVAL_HISTORY = [
+        'ID' => 'id',
+        'APPROVAL_ID' => 'approval_id',
+        'ACTION' => 'action',
+        'ACTION_BY' => 'action_by',
+        'ACTION_AT' => 'action_at',
+        'FROM_STATUS' => 'from_status',
+        'TO_STATUS' => 'to_status',
+        'APPROVAL_LEVEL' => 'approval_level',
+        'COMMENTS' => 'comments',
+        'REJECTION_REASON' => 'rejection_reason',
+        'IP_ADDRESS' => 'ip_address',
+        'USER_AGENT' => 'user_agent',
+        'CREATED_AT' => 'created_at',
+    ];
+
+    /**
+     * APPROVAL_WORKFLOWS table fields
+     */
+    const APPROVAL_WORKFLOWS = [
+        'ID' => 'id',
+        'WORKFLOW_NAME' => 'workflow_name',
+        'WORKFLOW_CODE' => 'workflow_code',
+        'MODULE_NAME' => 'module_name',
+        'APPROVAL_TYPE' => 'approval_type',
+        'WORKFLOW_TYPE' => 'workflow_type',
+        'TOTAL_LEVELS' => 'total_levels',
+        'ACTIVATION_CONDITIONS' => 'activation_conditions',
+        'IS_ACTIVE' => 'is_active',
+        'CREATED_AT' => 'created_at',
+        'UPDATED_AT' => 'updated_at',
+    ];
+
+    /**
+     * APPROVAL_WORKFLOW_LEVELS table fields
+     */
+    const APPROVAL_WORKFLOW_LEVELS = [
+        'ID' => 'id',
+        'WORKFLOW_ID' => 'workflow_id',
+        'LEVEL_NUMBER' => 'level_number',
+        'LEVEL_NAME' => 'level_name',
+        'APPROVER_ROLE_ID' => 'approver_role_id',
+        'APPROVER_USER_ID' => 'approver_user_id',
+        'APPROVER_CRITERIA' => 'approver_criteria',
+        'REQUIRES_ALL_APPROVERS' => 'requires_all_approvers',
+        'MINIMUM_APPROVERS' => 'minimum_approvers',
+        'SLA_HOURS' => 'sla_hours',
+        'ESCALATION_ENABLED' => 'escalation_enabled',
+        'ESCALATION_HOURS' => 'escalation_hours',
+        'ESCALATION_ROLE_ID' => 'escalation_role_id',
+        'SKIP_CONDITIONS' => 'skip_conditions',
+        'CREATED_AT' => 'created_at',
+        'UPDATED_AT' => 'updated_at',
+    ];
+
+    /**
+     * APPROVAL_DELEGATION table fields
+     */
+    const APPROVAL_DELEGATION = [
+        'ID' => 'id',
+        'DELEGATOR_ID' => 'delegator_id',
+        'DELEGATE_ID' => 'delegate_id',
+        'MODULE_NAME' => 'module_name',
+        'APPROVAL_TYPE' => 'approval_type',
+        'START_DATE' => 'start_date',
+        'END_DATE' => 'end_date',
+        'IS_ACTIVE' => 'is_active',
+        'REASON' => 'reason',
+        'CREATED_AT' => 'created_at',
+        'UPDATED_AT' => 'updated_at',
+    ];
+
+    /**
+     * APPROVAL_POLICIES table fields
+     */
+    const APPROVAL_POLICIES = [
+        'ID' => 'id',
+        'POLICY_NAME' => 'policy_name',
+        'POLICY_CODE' => 'policy_code',
+        'MODULE_NAME' => 'module_name',
+        'APPROVAL_TYPE' => 'approval_type',
+        'RULES' => 'rules',
+        'WORKFLOW_ID' => 'workflow_id',
+        'PRIORITY' => 'priority',
+        'IS_ACTIVE' => 'is_active',
+        'CREATED_AT' => 'created_at',
+        'UPDATED_AT' => 'updated_at',
+    ];
+
     // ============================================
     // ENUM VALUE CONSTANTS
     // ============================================

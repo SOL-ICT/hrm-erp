@@ -14,9 +14,17 @@ return new class extends Migration
     {
         echo "Starting cleanup of legacy application tables...\n";
         
+        // Check if required tables exist
+        if (!Schema::hasTable('candidate_job_applications') || 
+            !Schema::hasTable('recruitment_applications') ||
+            !Schema::hasTable('job_applications')) {
+            echo "Required tables do not exist yet. Skipping migration.\n";
+            return;
+        }
+        
         // Step 1: Verify migration was successful by checking record counts
         $candidateAppCount = DB::table('candidate_job_applications')->count();
-        $backupCount = DB::table('recruitment_applications_backup')->count();
+        $backupCount = Schema::hasTable('recruitment_applications_backup') ? DB::table('recruitment_applications_backup')->count() : 0;
         $legacyCount = DB::table('recruitment_applications')->count();
         $emptyJobApps = DB::table('job_applications')->count();
         

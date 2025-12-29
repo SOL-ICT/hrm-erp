@@ -98,7 +98,7 @@ foreach ($pendingStaff as $staff) {
                 'name' => trim($staff->first_name . ' ' . $staff->last_name),
                 'email' => $email,
                 'username' => $username,
-                'password' => bcrypt('mysolc3ntfi3ld@'), // Default password
+                'password' => bcrypt('12345678'), // Default password
                 'role' => 'Staff',
                 'user_type' => 'staff',
                 'staff_profile_id' => $staff->id,
@@ -146,7 +146,7 @@ if (!empty($errors)) {
 }
 
 echo "\nScript completed!\n";
-echo "\nDefault Password for new users: mysolc3ntfi3ld@\n";
+echo "\nDefault Password for new users: 12345678\n";
 echo "\nNext steps:\n";
 echo "1. Users should change their passwords on first login\n";
 echo "2. Check admin dashboard to verify staff boarding status\n";

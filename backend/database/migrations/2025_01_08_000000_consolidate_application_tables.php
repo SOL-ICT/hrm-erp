@@ -12,7 +12,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Step 1: Check if we have any data to migrate
+        // Step 1: Check if tables exist before attempting to query them
+        if (!Schema::hasTable('recruitment_applications') || !Schema::hasTable('job_applications')) {
+            echo "Required tables do not exist yet. Skipping migration.\n";
+            return;
+        }
+        
+        // Step 2: Check if we have any data to migrate
         $legacyCount = DB::table('recruitment_applications')->count();
         $emptyJobApps = DB::table('job_applications')->count();
         

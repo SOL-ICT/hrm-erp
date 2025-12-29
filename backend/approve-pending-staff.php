@@ -139,4 +139,4 @@ if (!empty($errors)) {
 }
 
 echo "\nScript completed!\n";
-echo "\nDefault Password for all users: mysolc3ntfi3ld@\n";
+echo "\nDefault Password for all users: 12345678\n";

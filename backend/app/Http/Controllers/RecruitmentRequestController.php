@@ -10,6 +10,8 @@ use App\Models\SOLOffice;
 use App\Models\User;
 use App\Models\RecruitmentApplication;
 use App\Services\CacheService;
+use App\Services\Approval\ApprovalService;
+use App\Services\RecruitmentHierarchyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -20,6 +22,17 @@ use Illuminate\Support\Facades\Redis;
 
 class RecruitmentRequestController extends Controller
 {
+    protected $approvalService;
+    protected $hierarchyService;
+
+    public function __construct(
+        ApprovalService $approvalService,
+        RecruitmentHierarchyService $hierarchyService
+    ) {
+        $this->approvalService = $approvalService;
+        $this->hierarchyService = $hierarchyService;
+    }
+
     // ========================================
     // CRUD OPERATIONS
     // ========================================
@@ -39,7 +52,9 @@ class RecruitmentRequestController extends Controller
                     'jobStructure:id,job_title,job_code',
                     'serviceLocation:id,location_name,city',
                     'solOffice:id,office_name,office_code',
-                    'createdBy:id,name,email'
+                    'createdBy:id,name,email',
+                    'approval:id,status,current_approver_id,current_approval_level,total_approval_levels,due_date,is_overdue',
+                    'approval.currentApprover:id,first_name,last_name,email'
                 ]);
 
                 // Apply filters
@@ -259,12 +274,50 @@ class RecruitmentRequestController extends Controller
 
             $recruitmentRequest = RecruitmentRequest::create($data);
 
+            // Check if approval is required using centralized approval system
+            $user = Auth::user();
+            $userPermissions = $this->hierarchyService->getUserPermissions($user);
+            $requiresApproval = !($userPermissions['can_create_without_approval'] ?? false);
+
+            if ($requiresApproval) {
+                // Create approval record via centralized system
+                $approval = $this->approvalService->createApproval(
+                    'App\\Models\\Recruitment\\RecruitmentRequest',
+                    $recruitmentRequest->id,
+                    'recruitment_request',
+                    Auth::id(),
+                    [
+                        'ticket_id' => $ticketId,
+                        'client_id' => $recruitmentRequest->client_id,
+                        'job_structure_id' => $recruitmentRequest->job_structure_id,
+                        'number_of_vacancies' => $recruitmentRequest->number_of_vacancies,
+                        'priority' => $request->input('priority_level', 'medium'),
+                    ]
+                );
+
+                // Submit for approval (assigns to approver and sends notification)
+                $this->approvalService->submitForApproval($approval, 'Recruitment request created and submitted for approval');
+
+                Log::info('Recruitment request created with approval', [
+                    'recruitment_request_id' => $recruitmentRequest->id,
+                    'approval_id' => $approval->id,
+                    'user_id' => Auth::id(),
+                ]);
+            } else {
+                Log::info('Recruitment request created without approval requirement', [
+                    'recruitment_request_id' => $recruitmentRequest->id,
+                    'user_id' => Auth::id(),
+                ]);
+            }
+
             // Load relationships for response
             $recruitmentRequest->load([
                 'client:id,organisation_name',
                 'jobStructure:id,job_title,job_code',
                 'serviceLocation:id,location_name,city',
-                'solOffice:id,office_name,office_code'
+                'solOffice:id,office_name,office_code',
+                'approval.currentApprover:id,first_name,last_name,email',
+                'approval.workflow:id,workflow_name,total_levels'
             ]);
 
             DB::commit();
@@ -311,7 +364,11 @@ class RecruitmentRequestController extends Controller
                 'solOffice:id,office_name,office_code,contact_person_name,contact_person_phone',
                 'createdBy:id,name,email',
                 'updatedBy:id,name,email',
-                'approvedBy:id,name,email'
+                'approvedBy:id,name,email',
+                'approval:id,status,current_approver_id,current_approval_level,total_approval_levels,requested_at,due_date,is_overdue,priority',
+                'approval.currentApprover:id,first_name,last_name,email',
+                'approval.requester:id,first_name,last_name,email',
+                'approval.workflow:id,workflow_name,workflow_code,total_levels'
             ])->findOrFail($id);
 
             return response()->json([

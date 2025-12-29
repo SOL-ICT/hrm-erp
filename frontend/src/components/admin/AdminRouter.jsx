@@ -198,6 +198,11 @@ const RecruitmentHierarchyManagement = lazy(() =>
   )
 );
 
+// Approval Management (NEW)
+const ApprovalDashboard = lazy(() =>
+  import("../Approval/ApprovalDashboard")
+);
+
 const AdminRouter = ({
   activeModule,
   activeSubmodule,
@@ -854,6 +859,15 @@ const AdminRouter = ({
       // Staff Advance Management Module - Dashboard
       case "staff-advance-management":
         return <StaffAdvanceManagementDashboard {...commonProps} />;
+
+      // Approval Management Module - Dashboard (NEW)
+      case "approval-management":
+        return (
+          <ApprovalDashboard
+            {...commonProps}
+            onBack={() => onModuleChange("dashboard")}
+          />
+        );
 
       // Placeholder for other modules - show coming soon
       case "billing-receivable-management":

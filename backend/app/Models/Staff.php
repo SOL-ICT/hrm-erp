@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class Staff extends Model
 {
@@ -46,6 +47,7 @@ class Staff extends Model
         'deployment_code',
         'onboarding_method',
         'onboarded_by',
+        'upload_batch_id',
         'custom_fields',
         'phone',
         'designation',
@@ -146,6 +148,14 @@ class Staff extends Model
     public function guarantors()
     {
         return $this->hasMany(StaffGuarantor::class);
+    }
+
+    /**
+     * Get the approval record for this staff boarding (polymorphic)
+     */
+    public function approval(): MorphOne
+    {
+        return $this->morphOne(Approval::class, 'approvable');
     }
 
     public function references()

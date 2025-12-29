@@ -5,16 +5,20 @@ namespace App\Services;
 use App\Models\Staff;
 use App\Models\User;
 use App\Models\Recruitment\RecruitmentRequest;
+use App\Services\Approval\ApprovalService;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class StaffBoardingService
 {
     private RecruitmentHierarchyService $hierarchyService;
+    private ApprovalService $approvalService;
 
-    public function __construct()
+    public function __construct(ApprovalService $approvalService)
     {
         $this->hierarchyService = new RecruitmentHierarchyService();
+        $this->approvalService = $approvalService;
     }
 
     /**
@@ -42,6 +46,34 @@ class StaffBoardingService
                 'status' => 'inactive', // Always inactive until Control approves
             ]));
 
+            // Create centralized approval record if approval is required
+            if ($approvalStatus === 'pending') {
+                $approval = $this->approvalService->createApproval(
+                    'App\\Models\\Staff',
+                    $staff->id,
+                    'staff_boarding',
+                    $boardingUser->id,
+                    [
+                        'staff_id' => $staff->staff_id,
+                        'employee_code' => $staff->employee_code,
+                        'first_name' => $staff->first_name,
+                        'last_name' => $staff->last_name,
+                        'client_id' => $staff->client_id,
+                        'recruitment_request_id' => $ticket->id,
+                        'priority' => 'medium',
+                    ]
+                );
+
+                // Submit for approval (assigns to Level 1 approver - Supervisor)
+                $this->approvalService->submitForApproval($approval, 'Staff boarding submitted for supervisor approval');
+
+                Log::info('Staff boarding created with centralized approval', [
+                    'staff_id' => $staff->id,
+                    'approval_id' => $approval->id,
+                    'boarding_user_id' => $boardingUser->id,
+                ]);
+            }
+
             // If auto-approved, mark as pending Control approval
             if ($approvalStatus === 'auto_approved') {
                 $staff->update([
@@ -49,6 +81,37 @@ class StaffBoardingService
                     'approved_by' => $boardingUser->id,
                     'approved_at' => now(),
                     'approval_notes' => 'Initial approval - awaiting Control compliance review',
+                ]);
+
+                // Create approval record directly at Level 2 (Control)
+                $approval = $this->approvalService->createApproval(
+                    'App\\Models\\Staff',
+                    $staff->id,
+                    'staff_boarding',
+                    $boardingUser->id,
+                    [
+                        'staff_id' => $staff->staff_id,
+                        'employee_code' => $staff->employee_code,
+                        'first_name' => $staff->first_name,
+                        'last_name' => $staff->last_name,
+                        'client_id' => $staff->client_id,
+                        'recruitment_request_id' => $ticket->id,
+                        'priority' => 'medium',
+                        'auto_approved_level_1' => true,
+                    ]
+                );
+
+                // Manually advance to Level 2 for Control approval
+                $approval->current_approval_level = 2;
+                $approval->save();
+
+                // Submit for Level 2 (Control) approval
+                $this->approvalService->submitForApproval($approval, 'Level 1 auto-approved, submitted to Control for final approval');
+
+                Log::info('Staff boarding auto-approved Level 1, submitted to Control', [
+                    'staff_id' => $staff->id,
+                    'approval_id' => $approval->id,
+                    'boarding_user_id' => $boardingUser->id,
                 ]);
             }
 
@@ -67,6 +130,7 @@ class StaffBoardingService
     /**
      * Approve boarding (supervisor level)
      * Moves from 'pending' to 'pending_control_approval'
+     * Now uses centralized ApprovalService
      */
     public function approveBoarding(Staff $staff, User $approvingUser, ?string $notes = null): Staff
     {
@@ -80,6 +144,19 @@ class StaffBoardingService
 
         DB::beginTransaction();
         try {
+            // Get the approval record
+            $approval = $staff->approval;
+            
+            if ($approval) {
+                // Use centralized approval service
+                $this->approvalService->approveRequest($approval, $approvingUser->id, $notes);
+                
+                // Approval service automatically advances to Level 2 and assigns Control approver
+                // Refresh approval to get updated data
+                $approval->refresh();
+            }
+
+            // Update staff boarding_approval_status for backward compatibility
             $staff->update([
                 'boarding_approval_status' => 'pending_control_approval',
                 'approved_by' => $approvingUser->id,
@@ -104,6 +181,7 @@ class StaffBoardingService
      * Control Department final approval (compliance/audit gate)
      * This is the FINAL step - activates staff for payroll
      * ALSO creates user account automatically
+     * Now uses centralized ApprovalService
      */
     public function controlApprove(Staff $staff, User $controlUser, ?string $notes = null): Staff
     {
@@ -118,6 +196,18 @@ class StaffBoardingService
 
         DB::beginTransaction();
         try {
+            // Get the approval record
+            $approval = $staff->approval;
+            
+            if ($approval) {
+                // Use centralized approval service for Level 2 (Control) approval
+                $this->approvalService->approveRequest($approval, $controlUser->id, $notes);
+                
+                // This completes the workflow (Level 2 is final)
+                // Approval status will be 'approved'
+            }
+
+            // Update staff status for backward compatibility
             $staff->update([
                 'boarding_approval_status' => 'control_approved',
                 'control_approved_by' => $controlUser->id,
@@ -178,13 +268,29 @@ class StaffBoardingService
             throw new \Exception("Staff is not in pending approval state");
         }
 
-        $staff->update([
-            'boarding_approval_status' => 'rejected',
-            'rejection_reason' => $reason,
-            'status' => 'inactive',
-        ]);
+        DB::beginTransaction();
+        try {
+            // Get the approval record
+            $approval = $staff->approval;
+            
+            if ($approval) {
+                // Use centralized approval service
+                $this->approvalService->rejectRequest($approval, $rejectingUser->id, $reason);
+            }
 
-        return $staff->fresh();
+            // Update staff status for backward compatibility
+            $staff->update([
+                'boarding_approval_status' => 'rejected',
+                'rejection_reason' => $reason,
+                'status' => 'inactive',
+            ]);
+
+            DB::commit();
+            return $staff->fresh();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 
     private function sendOffer(Staff $staff): void
@@ -288,14 +394,14 @@ class StaffBoardingService
      * Business Rules:
      * - Username: staff_id (unique)
      * - Email: staff email or generated from staff_id
-     * - Password: mysolc3ntfi3ld@ (default for all staff)
+     * - Password: 12345678 (default for all staff)
      * - Role: Based on staff position or default to general staff
      * - Links staff_profile_id to staff record
      * 
      * @param Staff $staff
      * @return User|null
      */
-    private function createUserAccountForStaff(Staff $staff): ?User
+    public function createUserAccountForStaff(Staff $staff): ?User
     {
         try {
             // Check if user already exists for this staff
@@ -330,8 +436,7 @@ class StaffBoardingService
                 $emailCounter++;
             }
 
-            // Determine role_id based on staff position or default
-            // You can customize this logic based on your role structure
+            // Determine role_id for staff_roles table (optional - only for staff with specific system roles)
             $roleId = $this->determineStaffRole($staff);
 
             // Create user account
@@ -339,18 +444,33 @@ class StaffBoardingService
                 'name' => trim($staff->first_name . ' ' . $staff->last_name),
                 'email' => $email,
                 'username' => $username,
-                'password' => bcrypt('mysolc3ntfi3ld@'), // Default password
-                'role_id' => $roleId,
+                'password' => bcrypt('12345678'), // Default password
+                'role' => 'Staff',
                 'user_type' => 'staff',
                 'staff_profile_id' => $staff->id,
                 'is_active' => $staff->status === 'active',
+                'preferences' => new \stdClass(),
             ]);
+
+            // Only create staff_roles entry if staff has a specific system role (not general staff)
+            if ($roleId !== null) {
+                DB::table('staff_roles')->insert([
+                    'staff_id' => $staff->id,
+                    'role_id' => $roleId,
+                    'assigned_at' => now(),
+                    'assigned_by' => Auth::id() ?? $staff->onboarded_by,
+                    'reason' => 'Auto-assigned upon staff approval',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
 
             Log::info('User account created for staff', [
                 'staff_id' => $staff->id,
                 'user_id' => $user->id,
                 'username' => $username,
                 'email' => $email,
+                'role_id' => $roleId,
             ]);
 
             return $user;
@@ -368,24 +488,123 @@ class StaffBoardingService
 
     /**
      * Determine appropriate role_id for staff based on their position
+     * Returns null - roles should be manually assigned by admins
+     * 
+     * IMPORTANT: Only SOL (client_id = 1) staff can have system roles
+     * External client staff should never have admin access
      * 
      * @param Staff $staff
-     * @return int
+     * @return int|null
      */
-    private function determineStaffRole(Staff $staff): int
+    private function determineStaffRole(Staff $staff): ?int
     {
-        // Default role for general staff
-        // You can customize this based on staff.appointment_status, department, etc.
+        // Default: No automatic role assignment
+        // Roles should be manually assigned by admins through the role management interface
+        // This prevents incorrect role assignments and gives full control to administrators
+        
+        return null;
+        
+        /* 
+         * Future: Enable auto-assignment logic if needed
+         * 
+         * // Only SOL staff can have system roles
+         * if ($staff->client_id != 1) {
+         *     return null;
+         * }
+         * 
+         * $jobTitle = strtolower($staff->job_title ?? '');
+         * $department = strtolower($staff->department ?? '');
+         * 
+         * if (str_contains($department, 'hr')) return 3; // HR
+         * if (str_contains($department, 'recruitment')) return 7; // Recruitment
+         * if (str_contains($department, 'control')) return 6; // Control
+         * if (str_contains($department, 'account')) return 5; // Accounts
+         * if (str_contains($jobTitle, 'manager')) return 8; // Regional Manager
+         * 
+         * return null;
+         */
+    }
 
-        // Example logic (customize as needed):
-        // - If staff has 'Manager' in job title → Manager role (role_id = 5)
-        // - If staff has 'HR' in department → HR role (role_id = 3)
-        // - Default → General Staff role (role_id = 9)
+    /**
+     * Board staff WITHOUT creating individual approval (for bulk uploads)
+     * Approval will be created at batch level
+     */
+    public function boardStaffWithoutApproval(array $staffData, User $boardingUser, RecruitmentRequest $ticket): Staff
+    {
+        try {
+            $approvalStatus = $this->determineApprovalStatus($boardingUser, $ticket);
+            $offerAlreadyAccepted = $staffData['offer_already_accepted'] ?? false;
+            $offerStatus = $offerAlreadyAccepted ? 'accepted' : 'pending';
 
-        $defaultStaffRoleId = 9; // Adjust based on your roles table
+            // Override approval status for batch uploads - will be handled by batch approval
+            $approvalStatus = 'pending_control_approval';
 
-        // You can add more sophisticated logic here
-        // For now, return default staff role
-        return $defaultStaffRoleId;
+            $staff = Staff::create(array_merge($staffData, [
+                'recruitment_request_id' => $ticket->id,
+                'onboarded_by' => $boardingUser->id,
+                'boarding_approval_status' => $approvalStatus,
+                'offer_acceptance_status' => $offerStatus,
+                'offer_already_accepted' => $offerAlreadyAccepted,
+                'status' => 'inactive', // Always inactive until Control approves
+            ]));
+
+            return $staff->fresh();
+        } catch (\Exception $e) {
+            throw $e;
+        }
+    }
+
+    /**
+     * Create ONE approval for an entire batch of staff uploads
+     */
+    public function createBatchApproval(
+        string $uploadBatchId, 
+        array $staffIds, 
+        User $boardingUser, 
+        RecruitmentRequest $ticket,
+        int $staffCount
+    ) {
+        try {
+            // Create batch approval record
+            $approval = $this->approvalService->createApproval(
+                'App\\Models\\Staff', // Still use Staff model but track by batch
+                $staffIds[0], // Link to first staff as primary reference
+                'staff_boarding', // Use same workflow as individual staff boarding
+                $boardingUser->id,
+                [
+                    'batch_id' => $uploadBatchId,
+                    'staff_count' => $staffCount,
+                    'staff_ids' => $staffIds,
+                    'recruitment_request_id' => $ticket->id,
+                    'client_id' => $ticket->client_id,
+                    'priority' => 'medium',
+                    'is_batch' => true,
+                ]
+            );
+
+            // Manually advance to Level 2 for Control approval (skip Level 1 for batch uploads)
+            $approval->current_approval_level = 2;
+            $approval->save();
+
+            // Submit for Control approval
+            $this->approvalService->submitForApproval(
+                $approval, 
+                "Batch upload of {$staffCount} staff submitted to Control for final approval"
+            );
+
+            Log::info('Batch approval created for staff upload', [
+                'batch_id' => $uploadBatchId,
+                'approval_id' => $approval->id,
+                'staff_count' => $staffCount,
+            ]);
+
+            return $approval;
+        } catch (\Exception $e) {
+            Log::error('Failed to create batch approval', [
+                'batch_id' => $uploadBatchId,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
     }
 }

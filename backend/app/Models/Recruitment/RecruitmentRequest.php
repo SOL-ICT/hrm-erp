@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use App\Models\Client;
 use App\Models\JobStructure;
 use App\Models\ServiceLocation;
@@ -16,6 +17,7 @@ use App\Models\RecruitmentApplication;
 use App\Models\InterviewInvitation;
 use App\Models\Candidate\CandidateJobApplication;
 use App\Models\Recruitment\TestAssignment;
+use App\Models\Approval;
 use Carbon\Carbon;
 
 class RecruitmentRequest extends Model
@@ -155,6 +157,14 @@ class RecruitmentRequest extends Model
     public function testAssignments(): HasMany
     {
         return $this->hasMany(TestAssignment::class);
+    }
+
+    /**
+     * Get the approval record for this recruitment request (polymorphic)
+     */
+    public function approval(): MorphOne
+    {
+        return $this->morphOne(Approval::class, 'approvable');
     }
 
     // ========================================

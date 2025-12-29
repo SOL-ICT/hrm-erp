@@ -43,7 +43,10 @@ class StaffBoardingController extends Controller
                 'recruitmentRequest.jobStructure:id,job_title',
                 'onboardedBy:id,name,email',
                 'approvedBy:id,name,email',
-                'controlApprovedBy:id,name,email'
+                'controlApprovedBy:id,name,email',
+                'approval:id,status,current_approver_id,current_approval_level,total_approval_levels,requested_at,due_date,is_overdue,priority',
+                'approval.currentApprover:id,first_name,last_name,email',
+                'approval.workflow:id,workflow_name,total_levels'
             ]);
 
             // Determine what user can see based on their role
@@ -149,7 +152,10 @@ class StaffBoardingController extends Controller
                 'data' => $approvedStaff->load([
                     'recruitmentRequest.client',
                     'onboardedBy',
-                    'approvedBy'
+                    'approvedBy',
+                    'approval:id,status,current_approver_id,current_approval_level,total_approval_levels,due_date,is_overdue',
+                    'approval.currentApprover:id,first_name,last_name,email',
+                    'approval.workflow:id,workflow_name,total_levels'
                 ]),
             ], 200);
         } catch (\Exception $e) {
@@ -205,7 +211,10 @@ class StaffBoardingController extends Controller
                     'recruitmentRequest.client',
                     'onboardedBy',
                     'approvedBy',
-                    'controlApprovedBy'
+                    'controlApprovedBy',
+                    'approval:id,status,completed_at,completed_by',
+                    'approval.completedBy:id,first_name,last_name,email',
+                    'approval.workflow:id,workflow_name'
                 ]),
             ], 200);
         } catch (\Exception $e) {

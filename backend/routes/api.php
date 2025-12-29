@@ -309,6 +309,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     require __DIR__ . '/modules/administration/user-management.php';
     require __DIR__ . '/modules/administration/leave-approval.php';
 
+    // Centralized Approval System
+    require __DIR__ . '/modules/approvals/approval-management.php';
+
     // Candidate Staff Management Module
     require __DIR__ . '/modules/candidate-staff-management/candidates.php';
     require __DIR__ . '/modules/candidate-staff-management/candidate-education.php';
