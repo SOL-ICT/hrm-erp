@@ -107,7 +107,7 @@ class Staff extends Model
 
     public function solOffice()
     {
-        return $this->belongsTo(SolOffice::class, 'sol_office_id');
+        return $this->belongsTo(SOLOffice::class, 'sol_office_id');
     }
 
     public function roles()

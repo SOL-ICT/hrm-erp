@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Candidate\CandidateJobApplication;
 use App\Models\Staff;
+use App\Models\SOLOffice;
 
 class RecruitmentRequest extends Model
 {
@@ -87,7 +88,7 @@ class RecruitmentRequest extends Model
 
     public function solOffice(): BelongsTo
     {
-        return $this->belongsTo(SolOffice::class);
+        return $this->belongsTo(SOLOffice::class);
     }
 
     public function createdBy(): BelongsTo
