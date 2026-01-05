@@ -54,7 +54,7 @@ class RecruitmentRequestController extends Controller
                     'solOffice:id,office_name,office_code',
                     'createdBy:id,name,email',
                     'approval:id,status,current_approver_id,current_approval_level,total_approval_levels,due_date,is_overdue',
-                    'approval.currentApprover:id,first_name,last_name,email'
+                    'approval.currentApprover:id,name,email'
                 ]);
 
                 // Apply filters
@@ -316,7 +316,7 @@ class RecruitmentRequestController extends Controller
                 'jobStructure:id,job_title,job_code',
                 'serviceLocation:id,location_name,city',
                 'solOffice:id,office_name,office_code',
-                'approval.currentApprover:id,first_name,last_name,email',
+                'approval.currentApprover:id,name,email',
                 'approval.workflow:id,workflow_name,total_levels'
             ]);
 
@@ -366,8 +366,8 @@ class RecruitmentRequestController extends Controller
                 'updatedBy:id,name,email',
                 'approvedBy:id,name,email',
                 'approval:id,status,current_approver_id,current_approval_level,total_approval_levels,requested_at,due_date,is_overdue,priority',
-                'approval.currentApprover:id,first_name,last_name,email',
-                'approval.requester:id,first_name,last_name,email',
+                'approval.currentApprover:id,name,email',
+                'approval.requester:id,name,email',
                 'approval.workflow:id,workflow_name,workflow_code,total_levels'
             ])->findOrFail($id);
 
