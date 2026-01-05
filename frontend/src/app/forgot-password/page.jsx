@@ -18,7 +18,10 @@ export default function ForgotPasswordPage() {
     setMessage(null);
 
     try {
-      const response = await api.post("/password/forgot", { staff_id: staffId });
+      const response = await api.makeRequest("/password/forgot", {
+        method: "POST",
+        body: JSON.stringify({ staff_id: staffId }),
+      });
       
       if (response.success) {
         setEmailSent(true);

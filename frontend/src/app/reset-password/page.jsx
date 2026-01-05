@@ -37,9 +37,9 @@ function ResetPasswordForm() {
 
   const verifyToken = async (token, email) => {
     try {
-      const response = await api.post("/password/verify-token", {
-        token,
-        email,
+      const response = await api.makeRequest("/password/verify-token", {
+        method: "POST",
+        body: JSON.stringify({ token, email }),
       });
 
       if (response.success) {
@@ -75,7 +75,10 @@ function ResetPasswordForm() {
     setMessage(null);
 
     try {
-      const response = await api.post("/password/reset", formData);
+      const response = await api.makeRequest("/password/reset", {
+        method: "POST",
+        body: JSON.stringify(formData),
+      });
 
       if (response.success) {
         setMessage({
