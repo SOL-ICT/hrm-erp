@@ -659,13 +659,27 @@ const HRMLoginPage = () => {
             </div>
 
             <div className="mt-6 text-center space-y-4">
-              <button
-                onClick={() => (window.location.href = "/forgot-password")}
-                className="text-sm hover:underline"
-                style={{ color: settings.primaryColor }}
-              >
-                Forgot Password?
-              </button>
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  onClick={() => (window.location.href = "/forgot-password")}
+                  className="text-sm hover:underline"
+                  style={{ color: settings.primaryColor }}
+                >
+                  Forgot Password?
+                </button>
+                {loginType === "staff" && (
+                  <>
+                    <span className="text-gray-400">|</span>
+                    <button
+                      onClick={() => (window.location.href = "/change-password")}
+                      className="text-sm hover:underline"
+                      style={{ color: settings.primaryColor }}
+                    >
+                      Change Password
+                    </button>
+                  </>
+                )}
+              </div>
               {loginType === "candidate" && (
                 <p className={"text-sm " + currentTheme.textSecondary}>
                   Don't have an account?{" "}

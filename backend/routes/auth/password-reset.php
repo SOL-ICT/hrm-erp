@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\Auth\ChangePasswordController;
 
 /*
 |--------------------------------------------------------------------------
@@ -12,7 +13,7 @@ use App\Http\Controllers\Auth\PasswordResetController;
 */
 
 Route::prefix('password')->group(function () {
-    // Send password reset link email
+    // Send password reset link email (Forgot Password)
     Route::post('/forgot', [PasswordResetController::class, 'sendResetLinkEmail'])
         ->name('password.email');
     
@@ -20,7 +21,11 @@ Route::prefix('password')->group(function () {
     Route::post('/verify-token', [PasswordResetController::class, 'verifyToken'])
         ->name('password.verify');
     
-    // Reset password
+    // Reset password (using token from email)
     Route::post('/reset', [PasswordResetController::class, 'reset'])
         ->name('password.update');
+    
+    // Change password (using Staff ID + current password)
+    Route::post('/change', [ChangePasswordController::class, 'changePassword'])
+        ->name('password.change');
 });
