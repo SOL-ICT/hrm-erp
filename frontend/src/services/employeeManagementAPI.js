@@ -17,8 +17,9 @@ const employeeManagementAPI = {
     );
   },
 
-  getPayGrades: async (jobStructureId) => {
-    const params = jobStructureId ? `?job_structure_id=${jobStructureId}` : "";
+  getPayGrades: async (clientIdOrJobStructureId, isJobStructureId = false) => {
+    const paramName = isJobStructureId ? 'job_structure_id' : 'client_id';
+    const params = clientIdOrJobStructureId ? `?${paramName}=${clientIdOrJobStructureId}` : "";
     return apiService.makeRequest(
       `/employee-management/helpers/pay-grades${params}`
     );
@@ -284,6 +285,13 @@ const employeeManagementAPI = {
     });
   },
 
+  bulkUpdateCautionStatus: async (cautionIds, status) => {
+    return apiService.makeRequest("/employee-management/cautions/bulk/update-status", {
+      method: "POST",
+      body: JSON.stringify({ caution_ids: cautionIds, status }),
+    });
+  },
+
   deleteCaution: async (id) => {
     return apiService.makeRequest(`/employee-management/cautions/${id}`, {
       method: "DELETE",
@@ -342,6 +350,13 @@ const employeeManagementAPI = {
     return apiService.makeRequest(`/employee-management/warnings/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
+    });
+  },
+
+  bulkUpdateWarningStatus: async (warningIds, status) => {
+    return apiService.makeRequest("/employee-management/warnings/bulk/update-status", {
+      method: "POST",
+      body: JSON.stringify({ warning_ids: warningIds, status }),
     });
   },
 

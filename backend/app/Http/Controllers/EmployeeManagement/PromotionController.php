@@ -64,7 +64,6 @@ class PromotionController extends Controller
             'new_pay_grade_structure_id' => 'required|exists:pay_grade_structures,id',
             'effective_date' => 'required|date',
             'reason' => 'nullable|string',
-            'notes' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -102,7 +101,6 @@ class PromotionController extends Controller
                 'new_emoluments' => $newPayGrade->emoluments,
                 'reason' => $request->reason,
                 'processed_by' => auth()->id(),
-                'notes' => $request->notes,
             ]);
 
             // Update staff record with new pay grade

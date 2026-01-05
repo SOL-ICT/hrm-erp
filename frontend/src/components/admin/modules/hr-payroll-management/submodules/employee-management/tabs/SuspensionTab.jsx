@@ -47,13 +47,26 @@ export default function SuspensionTab({ currentTheme, preferences }) {
     try {
       setLoading(true);
       const response = await employeeManagementAPI.getSuspensions(
-        selectedClient.id
+        selectedClient
       );
       setSuspensions(response.data || []);
     } catch (error) {
       console.error("Error fetching suspensions:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (suspensionId, newStatus) => {
+    try {
+      await employeeManagementAPI.updateSuspension(suspensionId, { status: newStatus });
+      setMessage({ type: "success", text: "Status updated successfully" });
+      fetchSuspensions();
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error.message || "Failed to update status",
+      });
     }
   };
 
@@ -68,8 +81,8 @@ export default function SuspensionTab({ currentTheme, preferences }) {
       setLoading(true);
       await employeeManagementAPI.createSuspension({
         ...formData,
-        staff_id: selectedStaff.id,
-        client_id: selectedClient.id,
+        staff_id: selectedStaff,
+        client_id: selectedClient,
       });
       setMessage({ type: "success", text: "Suspension created successfully" });
       resetForm();
@@ -77,7 +90,7 @@ export default function SuspensionTab({ currentTheme, preferences }) {
     } catch (error) {
       setMessage({
         type: "error",
-        text: error.response?.data?.message || "Failed to create suspension",
+        text: error.message || "Failed to create suspension",
       });
     } finally {
       setLoading(false);
@@ -385,33 +398,40 @@ export default function SuspensionTab({ currentTheme, preferences }) {
                         <td className={`px-4 py-3 text-sm font-medium ${currentTheme.textPrimary}`}>
                           {suspension.staff?.staff_id}
                         </td>
-                        <td className={`px-4 py-3 text-sm ${currentTheme.textSecondary}`}>
+                        <td className={`px-4 py-3 text-sm ${currentTheme.textSecondary}`}>  
                           {suspension.staff?.first_name}{" "}
                           {suspension.staff?.last_name}
                         </td>
                         <td className={`px-4 py-3 text-sm ${currentTheme.textSecondary}`}>
-                          {suspension.suspension_start_date}
+                          {new Date(suspension.suspension_start_date).toLocaleDateString('en-GB')}
                         </td>
                         <td className={`px-4 py-3 text-sm ${currentTheme.textSecondary}`}>
-                          {suspension.suspension_end_date}
+                          {suspension.suspension_end_date ? new Date(suspension.suspension_end_date).toLocaleDateString('en-GB') : '-'}
                         </td>
                         <td className={`px-4 py-3 text-sm ${currentTheme.textSecondary}`}>
                           <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-semibold">
-                            {suspension.suspension_days} days
+                            {suspension.suspension_days || '-'} days
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${
+                          <select
+                            value={suspension.status}
+                            onChange={(e) => handleStatusChange(suspension.id, e.target.value)}
+                            className={`px-2 py-1 rounded-lg text-xs font-semibold capitalize border-0 cursor-pointer ${
                               suspension.status === "active"
                                 ? "bg-yellow-100 text-yellow-800"
                                 : suspension.status === "completed"
                                 ? "bg-green-100 text-green-800"
+                                : suspension.status === "lifted"
+                                ? "bg-blue-100 text-blue-800"
                                 : "bg-gray-100 text-gray-800"
                             }`}
                           >
-                            {suspension.status}
-                          </span>
+                            <option value="pending">Pending</option>
+                            <option value="active">Active</option>
+                            <option value="lifted">Lifted</option>
+                            <option value="completed">Completed</option>
+                          </select>
                         </td>
                       </tr>
                     ))

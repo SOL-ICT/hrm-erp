@@ -45,6 +45,9 @@ Route::post('/performance/test-endpoint', [PerformanceController::class, 'testEn
 Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/register', [AuthController::class, 'register']);
 
+// Password reset routes (public)
+require __DIR__ . '/auth/password-reset.php';
+
 // Staff self-registration (public)
 require __DIR__ . '/modules/auth/staff-registration.php';
 

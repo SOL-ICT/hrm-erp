@@ -104,8 +104,9 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
       setLoading(true);
       await employeeManagementAPI.createRedeployment({
         ...formData,
-        staff_id: selectedStaff.id,
-        old_client_id: selectedClient.id,
+        staff_id: selectedStaff,
+        client_id: selectedClient,
+        old_client_id: selectedClient,
       });
       setMessage({
         type: "success",
@@ -116,7 +117,7 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
     } catch (error) {
       setMessage({
         type: "error",
-        text: error.response?.data?.message || "Failed to create redeployment",
+        text: error.message || "Failed to create redeployment",
       });
     } finally {
       setLoading(false);
@@ -508,6 +509,9 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
                       Type
                     </th>
                     <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
+                      Redeployed To
+                    </th>
+                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
                       Redeployment Date
                     </th>
                     <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
@@ -519,7 +523,7 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
                   {redeployments.length === 0 ? (
                     <tr>
                       <td
-                        colSpan="5"
+                        colSpan="6"
                         className={`px-4 py-8 text-center text-sm ${currentTheme?.textSecondary || 'text-gray-500'} italic`}
                       >
                         No redeployment records found. Create a new entry or
@@ -527,31 +531,46 @@ export default function RedeploymentTab({ currentTheme, preferences }) {
                       </td>
                     </tr>
                   ) : (
-                    redeployments.map((redeployment) => (
-                      <tr
-                        key={redeployment.id}
-                        className={`hover:${currentTheme?.cardBg || 'bg-gray-50'} transition-colors`}
-                      >
-                        <td className={`px-4 py-3 text-sm font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
-                          {redeployment.staff?.staff_id}
-                        </td>
-                        <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
-                          {redeployment.staff?.first_name}{" "}
-                          {redeployment.staff?.last_name}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-semibold capitalize">
-                            {redeployment.redeployment_type?.replace("_", " ")}
-                          </span>
-                        </td>
-                        <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
-                          {redeployment.redeployment_date}
-                        </td>
-                        <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
-                          {redeployment.effective_date}
-                        </td>
-                      </tr>
-                    ))
+                    redeployments.map((redeployment) => {
+                      // Determine what to show in Redeployed To column
+                      let redeployedTo = '-';
+                      if (redeployment.redeployment_type === 'client') {
+                        redeployedTo = redeployment.new_client?.organisation_name || '-';
+                      } else if (redeployment.redeployment_type === 'department') {
+                        redeployedTo = redeployment.new_department || '-';
+                      } else if (redeployment.redeployment_type === 'service_location') {
+                        redeployedTo = redeployment.new_service_location?.location_name || '-';
+                      }
+
+                      return (
+                        <tr
+                          key={redeployment.id}
+                          className={`hover:${currentTheme?.cardBg || 'bg-gray-50'} transition-colors`}
+                        >
+                          <td className={`px-4 py-3 text-sm font-medium ${currentTheme?.textPrimary || 'text-gray-900'}`}>
+                            {redeployment.staff?.staff_id}
+                          </td>
+                          <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
+                            {redeployment.staff?.first_name}{" "}
+                            {redeployment.staff?.last_name}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-semibold capitalize">
+                              {redeployment.redeployment_type?.replace("_", " ")}
+                            </span>
+                          </td>
+                          <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
+                            {redeployedTo}
+                          </td>
+                          <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
+                            {new Date(redeployment.created_at).toLocaleDateString('en-GB')}
+                          </td>
+                          <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
+                            {new Date(redeployment.effective_date).toLocaleDateString('en-GB')}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

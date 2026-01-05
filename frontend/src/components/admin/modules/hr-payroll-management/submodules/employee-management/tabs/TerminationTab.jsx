@@ -11,9 +11,10 @@ export default function TerminationTab({ currentTheme, preferences }) {
   const [selectedClient, setSelectedClient] = useState(null);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [formData, setFormData] = useState({
-    termination_type: "voluntary",
-    resignation_date: "",
-    notice_period: "",
+    termination_type: "terminated",
+    termination_date: "",
+    transaction_date: "",
+    notice_period_days: "",
     actual_relieving_date: "",
     exit_interview: "n/a",
     ppe_return: "n/a",
@@ -56,20 +57,32 @@ export default function TerminationTab({ currentTheme, preferences }) {
       return;
     }
 
+    // Validate required fields
+    if (!formData.termination_date || !formData.transaction_date || !formData.actual_relieving_date) {
+      setMessage({ 
+        type: "error", 
+        text: "Please fill in all required fields: Termination Date, Transaction Date, and Relieving Date" 
+      });
+      return;
+    }
+
     try {
       setLoading(true);
-      await employeeManagementAPI.createTermination({
+      const payload = {
         ...formData,
         staff_id: selectedStaff,
         client_id: selectedClient,
-      });
+      };
+      console.log('Submitting termination data:', payload);
+      await employeeManagementAPI.createTermination(payload);
       setMessage({ type: "success", text: "Termination created successfully" });
       resetForm();
       fetchTerminations();
     } catch (error) {
+      console.error('Termination submission error:', error);
       setMessage({
         type: "error",
-        text: error.response?.data?.message || "Failed to create termination",
+        text: error.message || "Failed to create termination",
       });
     } finally {
       setLoading(false);
@@ -129,9 +142,10 @@ export default function TerminationTab({ currentTheme, preferences }) {
   const resetForm = () => {
     setSelectedStaff(null);
     setFormData({
-      termination_type: "voluntary",
-      resignation_date: "",
-      notice_period: "",
+      termination_type: "terminated",
+      termination_date: "",
+      transaction_date: "",
+      notice_period_days: "",
       actual_relieving_date: "",
       exit_interview: "n/a",
       ppe_return: "n/a",
@@ -211,15 +225,15 @@ export default function TerminationTab({ currentTheme, preferences }) {
 
                     <div>
                       <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
-                        Resignation Date <span className="text-red-500">*</span>
+                        Termination Date <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="date"
-                        value={formData.resignation_date}
+                        value={formData.termination_date}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            resignation_date: e.target.value,
+                            termination_date: e.target.value,
                           })
                         }
                         className={`w-full px-3 py-2 text-sm ${currentTheme?.border || 'border border-gray-300'} rounded-lg hover:border-blue-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
@@ -229,22 +243,39 @@ export default function TerminationTab({ currentTheme, preferences }) {
 
                     <div>
                       <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
-                        Notice Period (days){" "}
-                        <span className="text-red-500">*</span>
+                        Transaction Date <span className="text-red-500">*</span>
                       </label>
                       <input
-                        type="number"
-                        value={formData.notice_period}
+                        type="date"
+                        value={formData.transaction_date}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            notice_period: e.target.value,
+                            transaction_date: e.target.value,
                           })
                         }
-                        max="30"
-                        placeholder="Max 30"
                         className={`w-full px-3 py-2 text-sm ${currentTheme?.border || 'border border-gray-300'} rounded-lg hover:border-blue-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                         required
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`block text-xs font-semibold ${currentTheme?.textSecondary || 'text-gray-600'} uppercase tracking-wide mb-1.5`}>
+                        Notice Period (days)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.notice_period_days}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            notice_period_days: e.target.value,
+                          })
+                        }
+                        min="0"
+                        max="30"
+                        placeholder="Max 30 days"
+                        className={`w-full px-3 py-2 text-sm ${currentTheme?.border || 'border border-gray-300'} rounded-lg hover:border-blue-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                       />
                     </div>
 
@@ -426,10 +457,10 @@ export default function TerminationTab({ currentTheme, preferences }) {
                       Type
                     </th>
                     <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textPrimary || 'text-gray-700'} uppercase tracking-wider`}>
-                      Resignation
+                      Reason
                     </th>
                     <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textPrimary || 'text-gray-700'} uppercase tracking-wider`}>
-                      Relieving
+                      Terminated
                     </th>
                     <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textPrimary || 'text-gray-700'} uppercase tracking-wider`}>
                       Blacklisted
@@ -466,10 +497,10 @@ export default function TerminationTab({ currentTheme, preferences }) {
                           </span>
                         </td>
                         <td className={`px-4 py-3 text-sm ${currentTheme?.textPrimary || 'text-gray-700'}`}>
-                          {termination.resignation_date}
+                          {termination.reason || 'N/A'}
                         </td>
                         <td className={`px-4 py-3 text-sm ${currentTheme?.textPrimary || 'text-gray-700'}`}>
-                          {termination.actual_relieving_date}
+                          {termination.termination_date ? new Date(termination.termination_date).toLocaleDateString() : 'N/A'}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {termination.is_blacklisted ? (

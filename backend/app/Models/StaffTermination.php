@@ -21,7 +21,6 @@ class StaffTermination extends Model
         'exit_interview',
         'is_blacklisted',
         'processed_by',
-        'notes',
     ];
 
     protected $casts = [

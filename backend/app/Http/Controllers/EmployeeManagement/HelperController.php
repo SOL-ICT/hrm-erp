@@ -88,6 +88,7 @@ class HelperController extends Controller
             'first_name',
             'last_name',
             'client_id',
+            'job_structure_id',
             'pay_grade_structure_id',
             'department',
             'job_title',
@@ -116,7 +117,7 @@ class HelperController extends Controller
             $query->where('status', 'active');
         }
 
-        $staff = $query->with(['client', 'payGradeStructure', 'serviceLocation'])
+        $staff = $query->with(['client', 'jobStructure', 'payGradeStructure', 'serviceLocation'])
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get();

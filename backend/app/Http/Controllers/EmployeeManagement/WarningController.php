@@ -44,8 +44,7 @@ class WarningController extends Controller
             'warning_level' => ['required', Rule::in(['first', 'second', 'final'])],
             'issued_date' => 'required|date',
             'reason' => 'required|string',
-            'status' => ['nullable', Rule::in(['pending', 'acknowledged', 'resolved'])],
-            'resolution_date' => 'nullable|date',
+            'status' => ['nullable', Rule::in(['active', 'resolved', 'escalated'])],
             'notes' => 'nullable|string',
         ]);
 
@@ -63,8 +62,7 @@ class WarningController extends Controller
             'issued_date' => $request->issued_date,
             'reason' => $request->reason,
             'issued_by' => auth()->id(),
-            'status' => $request->status ?? 'pending',
-            'resolution_date' => $request->resolution_date,
+            'status' => $request->status ?? 'active',
             'notes' => $request->notes,
         ]);
 
@@ -90,8 +88,7 @@ class WarningController extends Controller
         $warning = StaffWarning::findOrFail($id);
 
         $validator = Validator::make($request->all(), [
-            'status' => ['nullable', Rule::in(['pending', 'acknowledged', 'resolved'])],
-            'resolution_date' => 'nullable|date',
+            'status' => ['nullable', Rule::in(['active', 'resolved', 'escalated'])],
             'notes' => 'nullable|string',
         ]);
 
@@ -102,13 +99,104 @@ class WarningController extends Controller
             ], 422);
         }
 
-        $warning->update($request->only(['status', 'resolution_date', 'notes']));
+        // If escalating to termination, create termination record
+        if ($request->status === 'escalated' && $warning->status !== 'escalated') {
+            $this->createTerminationFromWarning($warning);
+        }
+
+        $warning->update($request->only(['status', 'notes']));
 
         return response()->json([
             'success' => true,
-            'message' => 'Warning record updated successfully',
+            'message' => $request->status === 'escalated' 
+                ? 'Warning escalated and termination record created successfully'
+                : 'Warning record updated successfully',
             'data' => $warning->load(['staff', 'client', 'issuedBy'])
         ]);
+    }
+
+    protected function createTerminationFromWarning($warning)
+    {
+        $staff = \App\Models\Staff::with(['client'])->findOrFail($warning->staff_id);
+        
+        // Create termination record
+        $termination = \App\Models\StaffTermination::create([
+            'staff_id' => $warning->staff_id,
+            'client_id' => $warning->client_id,
+            'termination_type' => 'terminated',
+            'termination_date' => now()->toDateString(),
+            'transaction_date' => now()->toDateString(),
+            'actual_relieving_date' => now()->toDateString(),
+            'reason' => "Escalated from {$warning->warning_level} warning: " . $warning->reason,
+            'exit_penalty' => 'no',
+            'ppe_return' => 'n/a',
+            'exit_interview' => 'n/a',
+            'is_blacklisted' => 1,
+            'processed_by' => auth()->id(),
+        ]);
+
+        // Create blacklist record
+        \App\Models\StaffBlacklist::create([
+            'staff_id' => $warning->staff_id,
+            'client_id' => $warning->client_id,
+            'termination_id' => $termination->id,
+            'blacklist_date' => now()->toDateString(),
+            'reason' => "Escalated from {$warning->warning_level} warning: " . $warning->reason,
+            'staff_details_snapshot' => json_encode([
+                'staff_id' => $staff->staff_id,
+                'first_name' => $staff->first_name,
+                'last_name' => $staff->last_name,
+                'email' => $staff->email,
+                'phone' => $staff->phone,
+                'client_name' => $staff->client->organisation_name ?? null,
+            ]),
+        ]);
+    }
+
+    public function bulkUpdateStatus(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'warning_ids' => 'required|array',
+            'warning_ids.*' => 'exists:staff_warnings,id',
+            'status' => ['required', Rule::in(['active', 'resolved', 'escalated'])],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // If escalating, create termination records for each warning
+            if ($request->status === 'escalated') {
+                $warnings = \App\Models\StaffWarning::whereIn('id', $request->warning_ids)
+                    ->where('status', '!=', 'escalated')
+                    ->get();
+
+                foreach ($warnings as $warning) {
+                    $this->createTerminationFromWarning($warning);
+                }
+            }
+
+            $updated = \App\Models\StaffWarning::whereIn('id', $request->warning_ids)
+                ->update(['status' => $request->status]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $request->status === 'escalated'
+                    ? "{$updated} warning(s) escalated and termination records created"
+                    : "{$updated} warning(s) updated successfully",
+                'updated_count' => $updated
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update warnings',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function destroy(string $id)

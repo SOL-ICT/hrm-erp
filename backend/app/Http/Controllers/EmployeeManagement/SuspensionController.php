@@ -12,6 +12,9 @@ class SuspensionController extends Controller
 {
     public function index(Request $request)
     {
+        // Auto-complete suspensions where end_date has elapsed and status is 'active'
+        $this->autoCompleteSuspensions();
+
         $query = StaffSuspension::with(['staff', 'client', 'issuedBy']);
 
         if ($request->filled('client_id')) {
@@ -30,6 +33,16 @@ class SuspensionController extends Controller
             ->paginate($request->get('per_page', 15));
 
         return response()->json($suspensions);
+    }
+
+    /**
+     * Automatically complete suspensions where end date has elapsed
+     */
+    protected function autoCompleteSuspensions()
+    {
+        StaffSuspension::where('status', 'active')
+            ->where('suspension_end_date', '<', now()->toDateString())
+            ->update(['status' => 'completed']);
     }
 
     public function store(Request $request)

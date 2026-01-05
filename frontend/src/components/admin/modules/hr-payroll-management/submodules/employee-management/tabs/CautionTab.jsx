@@ -22,6 +22,7 @@ export default function CautionTab({ currentTheme, preferences }) {
   const [cautions, setCautions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const [selectedCautions, setSelectedCautions] = useState([]);
 
   useEffect(() => {
     if (selectedClient) {
@@ -42,7 +43,59 @@ export default function CautionTab({ currentTheme, preferences }) {
       setLoading(false);
     }
   };
+  const handleStatusChange = async (cautionId, newStatus) => {
+    try {
+      await employeeManagementAPI.updateCaution(cautionId, { status: newStatus });
+      setMessage({ type: "success", text: "Status updated successfully" });
+      fetchCautions();
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error.message || "Failed to update status",
+      });
+    }
+  };
 
+  const handleBulkStatusChange = async (newStatus) => {
+    if (selectedCautions.length === 0) {
+      setMessage({ type: "error", text: "Please select at least one caution" });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await employeeManagementAPI.bulkUpdateCautionStatus(selectedCautions, newStatus);
+      setMessage({ 
+        type: "success", 
+        text: `${selectedCautions.length} caution(s) updated to ${newStatus}` 
+      });
+      setSelectedCautions([]);
+      fetchCautions();
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error.message || "Failed to update statuses",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedCautions.length === cautions.length) {
+      setSelectedCautions([]);
+    } else {
+      setSelectedCautions(cautions.map(c => c.id));
+    }
+  };
+
+  const toggleSelectCaution = (cautionId) => {
+    setSelectedCautions(prev =>
+      prev.includes(cautionId)
+        ? prev.filter(id => id !== cautionId)
+        : [...prev, cautionId]
+    );
+  };
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     if (!selectedStaff) {
@@ -54,8 +107,8 @@ export default function CautionTab({ currentTheme, preferences }) {
       setLoading(true);
       await employeeManagementAPI.createCaution({
         ...formData,
-        staff_id: selectedStaff.id,
-        client_id: selectedClient.id,
+        staff_id: selectedStaff,
+        client_id: selectedClient,
       });
       setMessage({ type: "success", text: "Caution created successfully" });
       resetForm();
@@ -63,7 +116,7 @@ export default function CautionTab({ currentTheme, preferences }) {
     } catch (error) {
       setMessage({
         type: "error",
-        text: error.response?.data?.message || "Failed to create caution",
+        text: error.message || "Failed to create caution",
       });
     } finally {
       setLoading(false);
@@ -294,10 +347,54 @@ export default function CautionTab({ currentTheme, preferences }) {
                 {cautions.length} {cautions.length === 1 ? "record" : "records"}
               </span>
             </div>
+
+            {/* Bulk Actions Bar */}
+            {selectedCautions.length > 0 && (
+              <div className="px-4 py-3 bg-blue-50 border-b border-gray-200 flex items-center justify-between">
+                <span className="text-sm font-medium text-blue-900">
+                  {selectedCautions.length} caution(s) selected
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleBulkStatusChange('resolved')}
+                    className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 transition-all"
+                  >
+                    Mark Resolved
+                  </button>
+                  <button
+                    onClick={() => handleBulkStatusChange('escalated')}
+                    className="px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-all"
+                  >
+                    Mark Escalated
+                  </button>
+                  <button
+                    onClick={() => handleBulkStatusChange('active')}
+                    className="px-3 py-1.5 bg-yellow-600 text-white text-xs font-semibold rounded-lg hover:bg-yellow-700 transition-all"
+                  >
+                    Mark Active
+                  </button>
+                  <button
+                    onClick={() => setSelectedCautions([])}
+                    className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-300 transition-all"
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className={`${currentTheme.tableHeaderBg} border-b ${currentTheme.border}`}>
                   <tr>
+                    <th className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={cautions.length > 0 && selectedCautions.length === cautions.length}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 text-yellow-600 rounded border-gray-300 focus:ring-yellow-500"
+                      />
+                    </th>
                     <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.mutedText} uppercase tracking-wider`}>
                       Staff ID
                     </th>
@@ -319,7 +416,7 @@ export default function CautionTab({ currentTheme, preferences }) {
                   {cautions.length === 0 ? (
                     <tr>
                       <td
-                        colSpan="5"
+                        colSpan="6"
                         className={`px-4 py-8 text-center text-sm ${currentTheme.mutedText} italic`}
                       >
                         No caution records found. Create a new entry or upload
@@ -332,6 +429,14 @@ export default function CautionTab({ currentTheme, preferences }) {
                         key={caution.id}
                         className={`${currentTheme.hover} transition-colors`}
                       >
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedCautions.includes(caution.id)}
+                            onChange={() => toggleSelectCaution(caution.id)}
+                            className="w-4 h-4 text-yellow-600 rounded border-gray-300 focus:ring-yellow-500"
+                          />
+                        </td>
                         <td className={`px-4 py-3 text-sm font-medium ${currentTheme.text}`}>
                           {caution.staff?.staff_id}
                         </td>
@@ -339,23 +444,27 @@ export default function CautionTab({ currentTheme, preferences }) {
                           {caution.staff?.first_name} {caution.staff?.last_name}
                         </td>
                         <td className={`px-4 py-3 text-sm ${currentTheme.text}`}>
-                          {caution.issued_date}
+                          {new Date(caution.issued_date).toLocaleDateString('en-GB')}
                         </td>
                         <td className={`px-4 py-3 text-sm ${currentTheme.text} max-w-xs truncate`}>
                           {caution.reason}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${
+                          <select
+                            value={caution.status}
+                            onChange={(e) => handleStatusChange(caution.id, e.target.value)}
+                            className={`px-2 py-1 rounded-lg text-xs font-semibold capitalize border-0 cursor-pointer ${
                               caution.status === "active"
                                 ? "bg-yellow-100 text-yellow-800"
                                 : caution.status === "resolved"
                                 ? "bg-green-100 text-green-800"
-                                : "bg-gray-100 text-gray-800"
+                                : "bg-red-100 text-red-800"
                             }`}
                           >
-                            {caution.status}
-                          </span>
+                            <option value="active">Active</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="escalated">Escalated</option>
+                          </select>
                         </td>
                       </tr>
                     ))

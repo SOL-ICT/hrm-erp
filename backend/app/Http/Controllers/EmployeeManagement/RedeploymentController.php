@@ -76,7 +76,6 @@ class RedeploymentController extends Controller
             'new_pay_grade_structure_id' => 'nullable|exists:pay_grade_structures,id',
             'effective_date' => 'required|date',
             'reason' => 'required|string',
-            'notes' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -114,7 +113,6 @@ class RedeploymentController extends Controller
                 'effective_date' => $request->effective_date,
                 'reason' => $request->reason,
                 'processed_by' => auth()->id(),
-                'notes' => $request->notes,
             ]);
 
             // Update staff record based on redeployment type

@@ -29,13 +29,26 @@ export default function QueryTab({ currentTheme, preferences }) {
     try {
       setLoading(true);
       const response = await employeeManagementAPI.getStaffQueries(
-        selectedClient.id
+        selectedClient
       );
       setQueries(response.data || []);
     } catch (error) {
       console.error("Error fetching queries:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (queryId, newStatus) => {
+    try {
+      await employeeManagementAPI.updateStaffQuery(queryId, { status: newStatus });
+      setMessage({ type: "success", text: "Status updated successfully" });
+      fetchQueries();
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error.message || "Failed to update status",
+      });
     }
   };
 
@@ -50,8 +63,8 @@ export default function QueryTab({ currentTheme, preferences }) {
       setLoading(true);
       await employeeManagementAPI.createStaffQuery({
         ...formData,
-        staff_id: selectedStaff.id,
-        client_id: selectedClient.id,
+        staff_id: selectedStaff,
+        client_id: selectedClient,
       });
       setMessage({ type: "success", text: "Query created successfully" });
       resetForm();
@@ -59,7 +72,7 @@ export default function QueryTab({ currentTheme, preferences }) {
     } catch (error) {
       setMessage({
         type: "error",
-        text: error.response?.data?.message || "Failed to create query",
+        text: error.message || "Failed to create query",
       });
     } finally {
       setLoading(false);
@@ -273,14 +286,16 @@ export default function QueryTab({ currentTheme, preferences }) {
                           {query.staff?.first_name} {query.staff?.last_name}
                         </td>
                         <td className={`px-4 py-3 text-sm ${currentTheme.text}`}>
-                          {query.query_date}
+                          {new Date(query.query_date).toLocaleDateString('en-GB')}
                         </td>
                         <td className={`px-4 py-3 text-sm ${currentTheme.text} max-w-xs truncate`}>
                           {query.query_details}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${
+                          <select
+                            value={query.status}
+                            onChange={(e) => handleStatusChange(query.id, e.target.value)}
+                            className={`px-2 py-1 rounded-lg text-xs font-semibold capitalize border-0 cursor-pointer ${
                               query.status === "pending"
                                 ? "bg-yellow-100 text-yellow-800"
                                 : query.status === "responded"
@@ -290,8 +305,11 @@ export default function QueryTab({ currentTheme, preferences }) {
                                 : "bg-red-100 text-red-800"
                             }`}
                           >
-                            {query.status}
-                          </span>
+                            <option value="pending">Pending</option>
+                            <option value="responded">Responded</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="escalated">Escalated</option>
+                          </select>
                         </td>
                       </tr>
                     ))

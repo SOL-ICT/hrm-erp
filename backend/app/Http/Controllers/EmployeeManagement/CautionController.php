@@ -39,8 +39,7 @@ class CautionController extends Controller
             'client_id' => 'required|exists:clients,id',
             'issued_date' => 'required|date',
             'reason' => 'required|string',
-            'status' => ['nullable', Rule::in(['pending', 'acknowledged', 'resolved'])],
-            'resolution_date' => 'nullable|date',
+            'status' => ['nullable', Rule::in(['active', 'resolved', 'escalated'])],
             'notes' => 'nullable|string',
         ]);
 
@@ -57,8 +56,7 @@ class CautionController extends Controller
             'issued_date' => $request->issued_date,
             'reason' => $request->reason,
             'issued_by' => auth()->id(),
-            'status' => $request->status ?? 'pending',
-            'resolution_date' => $request->resolution_date,
+            'status' => $request->status ?? 'active',
             'notes' => $request->notes,
         ]);
 
@@ -84,8 +82,7 @@ class CautionController extends Controller
         $caution = StaffCaution::findOrFail($id);
 
         $validator = Validator::make($request->all(), [
-            'status' => ['nullable', Rule::in(['pending', 'acknowledged', 'resolved'])],
-            'resolution_date' => 'nullable|date',
+            'status' => ['nullable', Rule::in(['active', 'resolved', 'escalated'])],
             'notes' => 'nullable|string',
         ]);
 
@@ -96,7 +93,7 @@ class CautionController extends Controller
             ], 422);
         }
 
-        $caution->update($request->only(['status', 'resolution_date', 'notes']));
+        $caution->update($request->only(['status', 'notes']));
 
         return response()->json([
             'success' => true,
@@ -119,6 +116,39 @@ class CautionController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete caution record',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function bulkUpdateStatus(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'caution_ids' => 'required|array',
+            'caution_ids.*' => 'exists:staff_cautions,id',
+            'status' => ['required', Rule::in(['active', 'resolved', 'escalated'])],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $updated = StaffCaution::whereIn('id', $request->caution_ids)
+                ->update(['status' => $request->status]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$updated} caution(s) updated successfully",
+                'updated_count' => $updated
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update cautions',
                 'error' => $e->getMessage()
             ], 500);
         }

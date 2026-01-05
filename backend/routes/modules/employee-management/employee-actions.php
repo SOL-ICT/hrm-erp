@@ -8,6 +8,7 @@ use App\Http\Controllers\EmployeeManagement\CautionController;
 use App\Http\Controllers\EmployeeManagement\WarningController;
 use App\Http\Controllers\EmployeeManagement\SuspensionController;
 use App\Http\Controllers\EmployeeManagement\BlacklistController;
+use App\Http\Controllers\EmployeeManagement\QueryController;
 use App\Http\Controllers\EmployeeManagement\HelperController;
 
 /*
@@ -105,6 +106,7 @@ Route::prefix('employee-management')->group(function () {
         Route::delete('/{id}', [CautionController::class, 'destroy']);
 
         // Bulk operations
+        Route::post('/bulk/update-status', [CautionController::class, 'bulkUpdateStatus']);
         Route::get('/template/download', [CautionController::class, 'downloadTemplate']);
         Route::post('/bulk/upload', [CautionController::class, 'bulkUpload']);
     });
@@ -122,6 +124,7 @@ Route::prefix('employee-management')->group(function () {
         Route::delete('/{id}', [WarningController::class, 'destroy']);
 
         // Bulk operations
+        Route::post('/bulk/update-status', [WarningController::class, 'bulkUpdateStatus']);
         Route::get('/template/download', [WarningController::class, 'downloadTemplate']);
         Route::post('/bulk/upload', [WarningController::class, 'bulkUpload']);
     });
@@ -141,6 +144,22 @@ Route::prefix('employee-management')->group(function () {
         // Bulk operations
         Route::get('/template/download', [SuspensionController::class, 'downloadTemplate']);
         Route::post('/bulk/upload', [SuspensionController::class, 'bulkUpload']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Staff Queries
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('staff-queries')->group(function () {
+        Route::get('/', [QueryController::class, 'index']);
+        Route::post('/', [QueryController::class, 'store']);
+        Route::get('/{id}', [QueryController::class, 'show']);
+        Route::put('/{id}', [QueryController::class, 'update']);
+        Route::delete('/{id}', [QueryController::class, 'destroy']);
+
+        // Bulk operations
+        Route::post('/bulk/update-status', [QueryController::class, 'bulkUpdateStatus']);
     });
 
     /*

@@ -17,6 +17,12 @@ class Kernel extends ConsoleKernel
             ->dailyAt('06:00')
             ->withoutOverlapping()
             ->runInBackground();
+
+        // Auto-complete suspensions daily at midnight
+        $schedule->command('suspensions:auto-complete')
+            ->daily()
+            ->withoutOverlapping()
+            ->runInBackground();
     }
 
     /**

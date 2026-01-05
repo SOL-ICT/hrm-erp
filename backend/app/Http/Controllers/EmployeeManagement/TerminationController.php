@@ -96,7 +96,6 @@ class TerminationController extends Controller
                 'exit_interview' => $request->exit_interview ?? 'n/a',
                 'is_blacklisted' => $request->is_blacklisted ?? false,
                 'processed_by' => auth()->id(),
-                'notes' => $request->notes,
             ]);
 
             // Update staff status to terminated

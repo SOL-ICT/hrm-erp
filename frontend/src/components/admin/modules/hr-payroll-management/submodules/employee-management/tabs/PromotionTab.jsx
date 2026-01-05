@@ -10,6 +10,8 @@ import employeeManagementAPI from "@/services/employeeManagementAPI";
 export default function PromotionTab({ currentTheme, preferences }) {
   const [selectedClient, setSelectedClient] = useState(null);
   const [selectedStaff, setSelectedStaff] = useState(null);
+  const [selectedStaffId, setSelectedStaffId] = useState(null);
+  const [staffList, setStaffList] = useState([]);
   const [jobStructures, setJobStructures] = useState([]);
   const [payGrades, setPayGrades] = useState([]);
   const [filteredPayGrades, setFilteredPayGrades] = useState([]);
@@ -35,8 +37,19 @@ export default function PromotionTab({ currentTheme, preferences }) {
       fetchJobStructures();
       fetchPayGrades();
       fetchPromotions();
+      fetchStaffList();
     }
   }, [selectedClient]);
+
+  useEffect(() => {
+    if (selectedStaffId && staffList.length > 0) {
+      const staff = staffList.find(s => s.id === parseInt(selectedStaffId));
+      setSelectedStaff(staff || null);
+    } else {
+      setSelectedStaff(null);
+      setOldEmoluments(null);
+    }
+  }, [selectedStaffId, staffList]);
 
   useEffect(() => {
     if (selectedStaff && selectedStaff.pay_grade_structure) {
@@ -69,7 +82,7 @@ export default function PromotionTab({ currentTheme, preferences }) {
   const fetchJobStructures = async () => {
     try {
       const response = await employeeManagementAPI.getJobStructures(
-        selectedClient.id
+        selectedClient
       );
       setJobStructures(response.data || []);
     } catch (error) {
@@ -80,7 +93,7 @@ export default function PromotionTab({ currentTheme, preferences }) {
   const fetchPayGrades = async () => {
     try {
       const response = await employeeManagementAPI.getPayGrades(
-        selectedClient.id
+        selectedClient
       );
       setPayGrades(response.data || []);
     } catch (error) {
@@ -92,13 +105,27 @@ export default function PromotionTab({ currentTheme, preferences }) {
     try {
       setLoading(true);
       const response = await employeeManagementAPI.getPromotions(
-        selectedClient.id
+        selectedClient
       );
       setPromotions(response.data || []);
     } catch (error) {
       console.error("Error fetching promotions:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStaffList = async () => {
+    try {
+      const response = await employeeManagementAPI.getStaff(
+        selectedClient,
+        'active'
+      );
+      if (response.success) {
+        setStaffList(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching staff list:", error);
     }
   };
 
@@ -112,9 +139,14 @@ export default function PromotionTab({ currentTheme, preferences }) {
     try {
       setLoading(true);
       await employeeManagementAPI.createPromotion({
-        ...formData,
         staff_id: selectedStaff.id,
-        client_id: selectedClient.id,
+        client_id: selectedClient,
+        old_job_structure_id: selectedStaff.job_structure_id || null,
+        old_pay_grade_structure_id: selectedStaff.pay_grade_structure_id || null,
+        new_job_structure_id: formData.job_structure_id,
+        new_pay_grade_structure_id: formData.pay_grade_structure_id,
+        effective_date: formData.effective_date,
+        reason: formData.reason,
       });
       setMessage({ type: "success", text: "Promotion created successfully" });
       resetForm();
@@ -122,7 +154,7 @@ export default function PromotionTab({ currentTheme, preferences }) {
     } catch (error) {
       setMessage({
         type: "error",
-        text: error.response?.data?.message || "Failed to create promotion",
+        text: error.message || "Failed to create promotion",
       });
     } finally {
       setLoading(false);
@@ -232,8 +264,8 @@ export default function PromotionTab({ currentTheme, preferences }) {
                 <form onSubmit={handleFormSubmit} className="space-y-3">
                   <StaffSelector
                     clientId={selectedClient}
-                    value={selectedStaff}
-                    onChange={setSelectedStaff}
+                    value={selectedStaffId}
+                    onChange={setSelectedStaffId}
                     label="Select Staff Member"
                     required
                   />
@@ -454,9 +486,6 @@ export default function PromotionTab({ currentTheme, preferences }) {
                       Name
                     </th>
                     <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
-                      New Job
-                    </th>
-                    <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
                       New Grade
                     </th>
                     <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme?.textSecondary || 'text-gray-700'} uppercase tracking-wider`}>
@@ -471,7 +500,7 @@ export default function PromotionTab({ currentTheme, preferences }) {
                   {promotions.length === 0 ? (
                     <tr>
                       <td
-                        colSpan="6"
+                        colSpan="5"
                         className={`px-4 py-8 text-center text-sm ${currentTheme?.textSecondary || 'text-gray-500'} italic`}
                       >
                         No promotion records found. Create a new entry or upload
@@ -491,19 +520,16 @@ export default function PromotionTab({ currentTheme, preferences }) {
                           {promotion.staff?.first_name}{" "}
                           {promotion.staff?.last_name}
                         </td>
-                        <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
-                          {promotion.job_structure?.job_title}
-                        </td>
                         <td className="px-4 py-3 text-sm">
                           <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-semibold">
-                            {promotion.pay_grade_structure?.grade_name}
+                            {promotion.new_pay_grade?.grade_code}
                           </span>
                         </td>
                         <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
-                          {promotion.promotion_date}
+                          {new Date(promotion.created_at).toLocaleDateString('en-GB')}
                         </td>
                         <td className={`px-4 py-3 text-sm ${currentTheme?.textSecondary || 'text-gray-700'}`}>
-                          {promotion.effective_date}
+                          {new Date(promotion.effective_date).toLocaleDateString('en-GB')}
                         </td>
                       </tr>
                     ))

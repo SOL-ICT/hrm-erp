@@ -23,6 +23,7 @@ export default function WarningTab({ currentTheme, preferences }) {
   const [warnings, setWarnings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const [selectedWarnings, setSelectedWarnings] = useState([]);
 
   useEffect(() => {
     if (selectedClient) {
@@ -34,7 +35,7 @@ export default function WarningTab({ currentTheme, preferences }) {
     try {
       setLoading(true);
       const response = await employeeManagementAPI.getWarnings(
-        selectedClient.id
+        selectedClient
       );
       setWarnings(response.data || []);
     } catch (error) {
@@ -42,6 +43,63 @@ export default function WarningTab({ currentTheme, preferences }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleStatusChange = async (warningId, newStatus) => {
+    try {
+      const response = await employeeManagementAPI.updateWarning(warningId, { status: newStatus });
+      setMessage({ 
+        type: "success", 
+        text: response.message || "Status updated successfully" 
+      });
+      fetchWarnings();
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error.message || "Failed to update status",
+      });
+    }
+  };
+
+  const handleBulkStatusChange = async (newStatus) => {
+    if (selectedWarnings.length === 0) {
+      setMessage({ type: "error", text: "Please select at least one warning" });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await employeeManagementAPI.bulkUpdateWarningStatus(selectedWarnings, newStatus);
+      setMessage({ 
+        type: "success", 
+        text: response.message || `${selectedWarnings.length} warning(s) updated to ${newStatus}` 
+      });
+      setSelectedWarnings([]);
+      fetchWarnings();
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error.message || "Failed to update statuses",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedWarnings.length === warnings.length) {
+      setSelectedWarnings([]);
+    } else {
+      setSelectedWarnings(warnings.map(w => w.id));
+    }
+  };
+
+  const toggleSelectWarning = (warningId) => {
+    setSelectedWarnings(prev =>
+      prev.includes(warningId)
+        ? prev.filter(id => id !== warningId)
+        : [...prev, warningId]
+    );
   };
 
   const handleFormSubmit = async (e) => {
@@ -55,8 +113,8 @@ export default function WarningTab({ currentTheme, preferences }) {
       setLoading(true);
       await employeeManagementAPI.createWarning({
         ...formData,
-        staff_id: selectedStaff.id,
-        client_id: selectedClient.id,
+        staff_id: selectedStaff,
+        client_id: selectedClient,
       });
       setMessage({ type: "success", text: "Warning created successfully" });
       resetForm();
@@ -64,7 +122,7 @@ export default function WarningTab({ currentTheme, preferences }) {
     } catch (error) {
       setMessage({
         type: "error",
-        text: error.response?.data?.message || "Failed to create warning",
+        text: error.message || "Failed to create warning",
       });
     } finally {
       setLoading(false);
@@ -317,10 +375,54 @@ export default function WarningTab({ currentTheme, preferences }) {
                 {warnings.length} {warnings.length === 1 ? "record" : "records"}
               </span>
             </div>
+
+            {/* Bulk Actions Bar */}
+            {selectedWarnings.length > 0 && (
+              <div className="px-4 py-3 bg-blue-50 border-b border-gray-200 flex items-center justify-between">
+                <span className="text-sm font-medium text-blue-900">
+                  {selectedWarnings.length} warning(s) selected
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleBulkStatusChange('resolved')}
+                    className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 transition-all"
+                  >
+                    Mark Resolved
+                  </button>
+                  <button
+                    onClick={() => handleBulkStatusChange('escalated')}
+                    className="px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-all"
+                  >
+                    ⚠️ Escalate & Terminate
+                  </button>
+                  <button
+                    onClick={() => handleBulkStatusChange('active')}
+                    className="px-3 py-1.5 bg-yellow-600 text-white text-xs font-semibold rounded-lg hover:bg-yellow-700 transition-all"
+                  >
+                    Mark Active
+                  </button>
+                  <button
+                    onClick={() => setSelectedWarnings([])}
+                    className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-300 transition-all"
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className={`${currentTheme.cardHeader} border-b ${currentTheme.border}`}>
                   <tr>
+                    <th className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={warnings.length > 0 && selectedWarnings.length === warnings.length}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500"
+                      />
+                    </th>
                     <th className={`text-left px-4 py-3 text-xs font-bold ${currentTheme.textMuted} uppercase tracking-wider`}>
                       Staff ID
                     </th>
@@ -345,7 +447,7 @@ export default function WarningTab({ currentTheme, preferences }) {
                   {warnings.length === 0 ? (
                     <tr>
                       <td
-                        colSpan="6"
+                        colSpan="7"
                         className={`px-4 py-8 text-center text-sm ${currentTheme.textMuted} italic`}
                       >
                         No warning records found. Create a new entry or upload
@@ -358,6 +460,14 @@ export default function WarningTab({ currentTheme, preferences }) {
                         key={warning.id}
                         className={`${currentTheme.hover} transition-colors`}
                       >
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedWarnings.includes(warning.id)}
+                            onChange={() => toggleSelectWarning(warning.id)}
+                            className="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500"
+                          />
+                        </td>
                         <td className={`px-4 py-3 text-sm font-medium ${currentTheme.text}`}>
                           {warning.staff?.staff_id}
                         </td>
@@ -378,14 +488,16 @@ export default function WarningTab({ currentTheme, preferences }) {
                           </span>
                         </td>
                         <td className={`px-4 py-3 text-sm ${currentTheme.textSecondary}`}>
-                          {warning.issued_date}
+                          {new Date(warning.issued_date).toLocaleDateString('en-GB')}
                         </td>
                         <td className={`px-4 py-3 text-sm ${currentTheme.textSecondary} max-w-xs truncate`}>
                           {warning.reason}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${
+                          <select
+                            value={warning.status}
+                            onChange={(e) => handleStatusChange(warning.id, e.target.value)}
+                            className={`px-2 py-1 rounded-lg text-xs font-semibold capitalize border-0 cursor-pointer ${
                               warning.status === "active"
                                 ? "bg-yellow-100 text-yellow-800"
                                 : warning.status === "resolved"
@@ -393,8 +505,10 @@ export default function WarningTab({ currentTheme, preferences }) {
                                 : "bg-red-100 text-red-800"
                             }`}
                           >
-                            {warning.status}
-                          </span>
+                            <option value="active">Active</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="escalated">⚠️ Escalate & Terminate</option>
+                          </select>
                         </td>
                       </tr>
                     ))

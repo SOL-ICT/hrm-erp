@@ -179,9 +179,12 @@ export class APIService {
           );
         }
 
-        throw new Error(
-          data.message || `HTTP error! status: ${response.status}`
-        );
+        // Include the error field if it exists (e.g., from backend exceptions)
+        const errorMessage = data.error
+          ? `${data.message}: ${data.error}`
+          : data.message || `HTTP error! status: ${response.status}`;
+
+        throw new Error(errorMessage);
       }
 
       return data;

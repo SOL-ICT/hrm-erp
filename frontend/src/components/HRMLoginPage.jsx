@@ -660,13 +660,11 @@ const HRMLoginPage = () => {
 
             <div className="mt-6 text-center space-y-4">
               <button
-                onClick={() => (window.location.href = "/reset-password")}
+                onClick={() => (window.location.href = "/forgot-password")}
                 className="text-sm hover:underline"
                 style={{ color: settings.primaryColor }}
               >
-                {loginType === "staff"
-                  ? "Forgot Password? (Staff Reset)"
-                  : "Forgot Password? (Email Reset)"}
+                Forgot Password?
               </button>
               {loginType === "candidate" && (
                 <p className={"text-sm " + currentTheme.textSecondary}>
