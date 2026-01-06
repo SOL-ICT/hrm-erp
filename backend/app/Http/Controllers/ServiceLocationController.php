@@ -60,19 +60,29 @@ class ServiceLocationController extends Controller
 
             // Step 3: Fall back to state-level assignment
             if ($locationInfo->state_code) {
+                // Check both home state (state_code) and additional controlled states (controlled_areas)
                 $stateOffice = DB::table('sol_offices')
                     ->where('control_type', 'state')
                     ->where('is_active', true)
                     ->whereNull('deleted_at')
-                    ->whereJsonContains('controlled_areas', $locationInfo->state_code)
-                    ->select('id', 'office_name', 'office_code', 'control_type', 'state_name')
+                    ->where(function($query) use ($locationInfo) {
+                        // Match if it's the office's home state
+                        $query->where('state_code', $locationInfo->state_code)
+                              // OR if the state is in the controlled_areas JSON
+                              ->orWhereJsonContains('controlled_areas', $locationInfo->state_code);
+                    })
+                    ->select('id', 'office_name', 'office_code', 'control_type', 'state_name', 'state_code')
                     ->first();
 
                 if ($stateOffice) {
+                    // Determine if it's home state or additional coverage
+                    $isHomeState = ($stateOffice->state_code === $locationInfo->state_code);
+                    $coverageType = $isHomeState ? 'home state' : 'additional state coverage';
+                    
                     return [
                         'office' => $stateOffice,
                         'assignment_type' => 'state',
-                        'assignment_reason' => "Assigned to {$stateOffice->office_name} (State-level control: {$locationInfo->state_name})",
+                        'assignment_reason' => "Assigned to {$stateOffice->office_name} (State-level control: {$locationInfo->state_name}, {$coverageType})",
                         'location_info' => $locationInfo
                     ];
                 }
