@@ -34,6 +34,7 @@ interface NewClaimModalProps {
 export default function NewClaimModal({ isOpen, onClose, onSuccess }: NewClaimModalProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [solStaff, setSolStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -43,8 +44,10 @@ export default function NewClaimModal({ isOpen, onClose, onSuccess }: NewClaimMo
     client_contact_email: '',
     staff_position: '',
     assignment_start_date: '',
-    incident_date: '',
+    report_time: '',
+    notified_to_staff_id: '',
     incident_description: '',
+    reported_loss_status: 'known',
     reported_loss: '',
     policy_single_limit: '' as string | number,
     policy_aggregate_limit: '' as string | number
@@ -55,6 +58,7 @@ export default function NewClaimModal({ isOpen, onClose, onSuccess }: NewClaimMo
   useEffect(() => {
     if (isOpen) {
       fetchClients();
+      fetchSolStaff();
     }
   }, [isOpen]);
 
@@ -74,6 +78,25 @@ export default function NewClaimModal({ isOpen, onClose, onSuccess }: NewClaimMo
       }
     } catch (error) {
       console.error('Failed to fetch clients:', error);
+    }
+  };
+
+  const fetchSolStaff = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const response = await fetch(`${apiUrl}/admin/claims/resolution/sol-staff`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSolStaff(data.staff || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch SOL staff:', error);
     }
   };
 
@@ -206,8 +229,10 @@ export default function NewClaimModal({ isOpen, onClose, onSuccess }: NewClaimMo
       client_contact_email: '',
       staff_position: '',
       assignment_start_date: '',
-      incident_date: '',
+      report_time: '',
+      notified_to_staff_id: '',
       incident_description: '',
+      reported_loss_status: 'known',
       reported_loss: '',
       policy_single_limit: '',
       policy_aggregate_limit: ''
@@ -292,7 +317,7 @@ export default function NewClaimModal({ isOpen, onClose, onSuccess }: NewClaimMo
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Client Contact Name <span className="text-red-500">*</span>
+                  Reported By <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -306,7 +331,7 @@ export default function NewClaimModal({ isOpen, onClose, onSuccess }: NewClaimMo
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Client Contact Email <span className="text-red-500">*</span>
+                  Reported By (Email) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="email"
@@ -320,7 +345,7 @@ export default function NewClaimModal({ isOpen, onClose, onSuccess }: NewClaimMo
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Staff Position <span className="text-red-500">*</span>
+                  Reported By (Position) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -334,7 +359,7 @@ export default function NewClaimModal({ isOpen, onClose, onSuccess }: NewClaimMo
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Assignment Start Date <span className="text-red-500">*</span>
+                  Date of Notification <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
@@ -343,6 +368,38 @@ export default function NewClaimModal({ isOpen, onClose, onSuccess }: NewClaimMo
                   onChange={(e) => setFormData(prev => ({ ...prev, assignment_start_date: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Time of Report <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="time"
+                  required
+                  value={formData.report_time}
+                  onChange={(e) => setFormData(prev => ({ ...prev, report_time: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Notified To <span className="text-red-500">*</span>
+                </label>
+                <select
+                  required
+                  value={formData.notified_to_staff_id}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notified_to_staff_id: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select SOL staff...</option>
+                  {solStaff.map((staff) => (
+                    <option key={staff.id} value={staff.id}>
+                      {staff.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -356,31 +413,39 @@ export default function NewClaimModal({ isOpen, onClose, onSuccess }: NewClaimMo
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Incident Date <span className="text-red-500">*</span>
+                  Reported Loss <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
+                <select
                   required
-                  value={formData.incident_date}
-                  onChange={(e) => setFormData(prev => ({ ...prev, incident_date: e.target.value }))}
+                  value={formData.reported_loss_status}
+                  onChange={(e) => setFormData(prev => ({ 
+                    ...prev, 
+                    reported_loss_status: e.target.value,
+                    reported_loss: e.target.value === 'not_provided' ? '' : prev.reported_loss
+                  }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+                >
+                  <option value="known">If Known</option>
+                  <option value="not_provided">Not Provided</option>
+                </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Reported Loss (₦) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  required
-                  step="0.01"
-                  value={formData.reported_loss}
-                  onChange={(e) => setFormData(prev => ({ ...prev, reported_loss: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="15000.00"
-                />
-              </div>
+              {formData.reported_loss_status === 'known' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Loss Amount (₦) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    step="0.01"
+                    value={formData.reported_loss}
+                    onChange={(e) => setFormData(prev => ({ ...prev, reported_loss: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="15000.00"
+                  />
+                </div>
+              )}
             </div>
 
             <div>
@@ -435,43 +500,66 @@ export default function NewClaimModal({ isOpen, onClose, onSuccess }: NewClaimMo
             </div>
           </div>
 
-          {/* Evidence Upload Section */}
+          {/* Required Documents Checklist */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
-              Evidence Files (Optional)
+              Required Documents (Optional - can update after claim creation)
             </h3>
+            
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Check documents that are currently provided and enter their file paths. You can update this list later.
+            </p>
 
-            <div>
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.jpg,.jpeg,.png,.mp4,.xlsx,.xls"
-                onChange={handleFileChange}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Allowed: PDF, Images (JPG, PNG), Videos (MP4), Excel (XLSX, XLS). Max 10MB per file.
-              </p>
-            </div>
-
-            {evidenceFiles.length > 0 && (
-              <div className="space-y-2">
-                {evidenceFiles.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 px-3 py-2 rounded border border-gray-200 dark:border-gray-600">
-                    <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
-                      {file.name} ({(file.size / 1024).toFixed(1)} KB)
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeFile(index)}
-                      className="text-red-600 hover:text-red-700 text-sm font-medium ml-2"
-                    >
-                      Remove
-                    </button>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {[
+                'Duly completed claim form',
+                'Detailed incident report',
+                'Letter of termination',
+                'Unpaid salary details',
+                'Recovery made by employee/guarantors',
+                'Character reference forms (2)',
+                'Query/response copies',
+                'Fraud instruments',
+                'Internal investigation report',
+                'Customer account statements',
+                'Police investigation report',
+                'Last payslip of defaulter',
+                'Customer complaints evidence',
+                'Detailed claim estimate',
+                'Terminal benefits',
+                'Signed recovery agreement',
+                '3 months pay slips',
+                'Letter of employment',
+                'Letter of confirmation',
+                'Disclaimer notice',
+                'Employees\' ID cards',
+                'Guarantor forms'
+              ].map((docName, index) => (
+                <div key={index} className="space-y-2 p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id={`doc-${index}`}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      disabled
+                    />
+                    <label htmlFor={`doc-${index}`} className="text-sm text-gray-700 dark:text-gray-300">
+                      {docName}
+                    </label>
                   </div>
-                ))}
-              </div>
-            )}
+                  <input
+                    type="text"
+                    placeholder="File path (e.g., C:\Documents\claim_form.pdf)"
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled
+                  />
+                </div>
+              ))}
+            </div>
+            
+            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+              Note: Document checklist will be automatically created and can be updated from the claim details page after submission.
+            </p>
           </div>
 
           {/* Actions */}

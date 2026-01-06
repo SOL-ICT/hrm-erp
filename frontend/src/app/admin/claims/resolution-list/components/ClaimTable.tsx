@@ -9,7 +9,9 @@
 
 'use client';
 
+import { useState } from 'react';
 import StatusBadge from './StatusBadge';
+import ClaimDetailsModal from './ClaimDetailsModal';
 
 interface Claim {
   id: number;
@@ -18,7 +20,6 @@ interface Claim {
   client_contact: string;
   staff_name: string;
   staff_position: string;
-  incident_date: string;
   reported_loss: number;
   status: 'client_reported' | 'sol_under_review' | 'sol_accepted' | 'sol_declined' | 'insurer_processing' | 'insurer_settled';
   sol_evaluation_status: string | null;
@@ -36,6 +37,8 @@ interface ClaimTableProps {
 }
 
 export default function ClaimTable({ claims, sortBy, sortOrder, onSort }: ClaimTableProps) {
+  const [selectedClaimId, setSelectedClaimId] = useState<number | null>(null);
+  
   const formatCurrency = (amount: string) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -89,14 +92,6 @@ export default function ClaimTable({ claims, sortBy, sortOrder, onSort }: ClaimT
               </div>
             </th>
             <th
-              onClick={() => onSort('incident_date')}
-              className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              <div className="flex items-center gap-1">
-                Incident Date <SortIcon column="incident_date" />
-              </div>
-            </th>
-            <th
               onClick={() => onSort('reported_loss')}
               className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
             >
@@ -139,9 +134,6 @@ export default function ClaimTable({ claims, sortBy, sortOrder, onSort }: ClaimT
               <td className="px-4 py-3 text-gray-900 dark:text-gray-100">
                 {claim.staff_name}
               </td>
-              <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                {formatDate(claim.incident_date)}
-              </td>
               <td className="px-4 py-3 text-right text-red-600 dark:text-red-400 font-semibold">
                 {formatCurrency(claim.reported_loss.toString())}
               </td>
@@ -152,7 +144,10 @@ export default function ClaimTable({ claims, sortBy, sortOrder, onSort }: ClaimT
                 {formatDate(claim.created_at)}
               </td>
               <td className="px-4 py-3 text-center">
-                <button className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-xs font-medium">
+                <button 
+                  onClick={() => setSelectedClaimId(claim.id)}
+                  className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-xs font-medium"
+                >
                   View
                 </button>
               </td>
@@ -160,6 +155,13 @@ export default function ClaimTable({ claims, sortBy, sortOrder, onSort }: ClaimT
           ))}
         </tbody>
       </table>
+
+      {selectedClaimId && (
+        <ClaimDetailsModal
+          claimId={selectedClaimId}
+          onClose={() => setSelectedClaimId(null)}
+        />
+      )}
 
       {claims.length === 0 && (
         <div className="text-center py-12 bg-white dark:bg-gray-800">

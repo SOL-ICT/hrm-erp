@@ -14,7 +14,6 @@ class Client extends Model
         'cac_registration_number',
         'industry_category',
         'client_category',
-        'phone',
         'head_office_address',
         'payment_terms',
         'contact_person_name',

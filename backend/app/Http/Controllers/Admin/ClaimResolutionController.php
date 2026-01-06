@@ -64,7 +64,6 @@ class ClaimResolutionController extends Controller
                         'staff_name' => trim("{$claim->staff->first_name} {$claim->staff->middle_name} {$claim->staff->last_name}"),
                         'staff_position' => $claim->staff_position,
                         'assignment_start_date' => $claim->assignment_start_date->format('Y-m-d'),
-                        'incident_date' => $claim->incident_date->format('Y-m-d'),
                         'incident_description' => $claim->incident_description,
                         'reported_loss' => $claim->reported_loss,
                         'policy_single_limit' => $claim->policy_single_limit,
@@ -140,20 +139,13 @@ class ClaimResolutionController extends Controller
         try {
             $staff = Staff::where('client_id', $clientId)
                 ->where('status', 'active')
-                ->leftJoin('staff_categories', 'staff.category_id', '=', 'staff_categories.id')
-                ->select(
-                    'staff.id',
-                    'staff.first_name',
-                    'staff.middle_name',
-                    'staff.last_name',
-                    'staff_categories.name as category_name'
-                )
+                ->select('id', 'first_name', 'middle_name', 'last_name', 'job_title')
                 ->get()
                 ->map(function ($s) {
                     return [
                         'id' => $s->id,
                         'name' => trim("{$s->first_name} {$s->middle_name} {$s->last_name}"),
-                        'position' => $s->category_name ?? 'N/A',
+                        'position' => $s->job_title ?? 'N/A',
                     ];
                 });
 
@@ -171,6 +163,91 @@ class ClaimResolutionController extends Controller
     }
 
     /**
+     * Get SOL (Strategic Outsourcing Limited) staff for "Notified To" dropdown
+     */
+    public function getSolStaff()
+    {
+        try {
+            // Client ID 1 is Strategic Outsourcing Limited
+            $solStaff = Staff::where('client_id', 1)
+                ->where('status', 'active')
+                ->select('id', 'first_name', 'middle_name', 'last_name', 'job_title')
+                ->get()
+                ->map(function ($s) {
+                    return [
+                        'id' => $s->id,
+                        'name' => trim("{$s->first_name} {$s->middle_name} {$s->last_name}"),
+                        'position' => $s->job_title ?? 'N/A',
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'staff' => $solStaff,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch SOL staff',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Update claim document status and file path
+     */
+    public function updateClaimDocuments(Request $request, $claimId)
+    {
+        $validator = Validator::make($request->all(), [
+            'documents' => 'required|array',
+            'documents.*.id' => 'required|exists:fidelity_claim_documents,id',
+            'documents.*.is_provided' => 'required|boolean',
+            'documents.*.file_path' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            foreach ($request->documents as $docData) {
+                DB::table('fidelity_claim_documents')
+                    ->where('id', $docData['id'])
+                    ->where('claim_id', $claimId)
+                    ->update([
+                        'is_provided' => $docData['is_provided'],
+                        'file_path' => $docData['file_path'] ?? null,
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            DB::commit();
+
+            $claim = FidelityClaim::with('documents')->findOrFail($claimId);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Documents updated successfully',
+                'documents' => $claim->documents,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update documents',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Create new fidelity claim
      */
     public function store(Request $request)
@@ -182,9 +259,11 @@ class ClaimResolutionController extends Controller
             'staff_id' => 'required|exists:staff,id',
             'staff_position' => 'required|string|max:255',
             'assignment_start_date' => 'required|date',
-            'incident_date' => 'required|date|after_or_equal:assignment_start_date',
+            'report_time' => 'required|date_format:H:i',
+            'notified_to_staff_id' => 'required|exists:staff,id',
             'incident_description' => 'required|string',
-            'reported_loss' => 'required|numeric|min:0',
+            'reported_loss_status' => 'required|in:known,not_provided',
+            'reported_loss' => 'required_if:reported_loss_status,known|nullable|numeric|min:0',
             'policy_single_limit' => 'required|numeric|min:0',
             'policy_aggregate_limit' => 'required|numeric|min:0',
         ]);
@@ -208,21 +287,57 @@ class ClaimResolutionController extends Controller
                 'staff_id' => $request->staff_id,
                 'staff_position' => $request->staff_position,
                 'assignment_start_date' => $request->assignment_start_date,
-                'incident_date' => $request->incident_date,
+                'report_time' => $request->report_time,
+                'notified_to_staff_id' => $request->notified_to_staff_id,
                 'incident_description' => $request->incident_description,
-                'reported_loss' => $request->reported_loss,
+                'reported_loss_status' => $request->reported_loss_status,
+                'reported_loss' => $request->reported_loss_status === 'known' ? $request->reported_loss : null,
                 'policy_single_limit' => $request->policy_single_limit,
                 'policy_aggregate_limit' => $request->policy_aggregate_limit,
                 'status' => 'client_reported',
                 'sol_evaluation_status' => 'pending',
             ]);
 
+            // Seed default document checklist (22 required documents)
+            $defaultDocuments = [
+                'Duly completed claim form (Blank form attached)',
+                'Detailed incident report',
+                'Letter of termination of the employees following the incident',
+                'Details of the unpaid salary due to the employees',
+                'Recovery made by the employee and their guarantors till date',
+                'Copy of 2 Character Reference form submitted by the employees at the time of employment',
+                'Copy of query issued to the employees and response to same',
+                'Instrument used in perpetuating fraud',
+                'Detailed Internal investigation report',
+                'Statement of Account of the affected customers',
+                'Police investigation report',
+                'Copy of last payslip of Defaulter',
+                'Evidence of customer complaints',
+                'Detailed claim estimate',
+                'Terminal benefits',
+                'Signed Agreement/Terms of recovery',
+                'Copy of Last Pay slips of the Defaulters (3 months\' pay slip)',
+                'Letter of employment',
+                'Letter of confirmation',
+                'Disclaimer notice',
+                'Employees\' ID cards',
+                'Guarantor form/satisfactory character reference forms obtained from Employee prior to employment',
+            ];
+
+            foreach ($defaultDocuments as $docName) {
+                $claim->documents()->create([
+                    'document_name' => $docName,
+                    'is_provided' => false,
+                    'file_path' => null,
+                ]);
+            }
+
             DB::commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Claim created successfully',
-                'claim' => $claim->load(['client', 'staff']),
+                'claim' => $claim->load(['client', 'staff', 'notifiedTo', 'documents']),
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();

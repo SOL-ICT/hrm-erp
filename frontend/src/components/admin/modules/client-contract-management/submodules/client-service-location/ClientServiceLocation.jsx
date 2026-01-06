@@ -676,7 +676,7 @@ const ClientServiceLocation = ({ currentTheme, preferences, onBack }) => {
       {/* Location Form Modal */}
       {showLocationForm && (
         <LocationMasterForm
-          location={editingLocation}
+          editingLocation={editingLocation}
           isOpen={showLocationForm}
           onClose={() => {
             setShowLocationForm(false);

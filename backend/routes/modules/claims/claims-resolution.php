@@ -22,11 +22,13 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::get('/', [ClaimResolutionController::class, 'index']); // Dashboard stats & active claims
         Route::get('/clients', [ClaimResolutionController::class, 'getClients']); // Get clients with policy info
         Route::get('/clients/{clientId}/staff', [ClaimResolutionController::class, 'getClientStaff']); // Get staff for client
+        Route::get('/sol-staff', [ClaimResolutionController::class, 'getSolStaff']); // Get SOL staff for "Notified To"
         Route::post('/', [ClaimResolutionController::class, 'store']); // Create new claim
         Route::put('/{id}/accept', [ClaimResolutionController::class, 'accept']); // Accept claim
         Route::put('/{id}/decline', [ClaimResolutionController::class, 'decline']); // Decline claim
         Route::put('/{id}/file-insurer', [ClaimResolutionController::class, 'fileWithInsurer']); // File with insurer
         Route::put('/{id}/settle', [ClaimResolutionController::class, 'markAsSettled']); // Mark as settled
+        Route::put('/{id}/documents', [ClaimResolutionController::class, 'updateClaimDocuments']); // Update document checklist
         Route::post('/{id}/evidence', [ClaimResolutionController::class, 'uploadEvidence']); // Upload evidence
         Route::get('/{id}/evidence', [ClaimResolutionController::class, 'getEvidence']); // Get evidence files
         Route::delete('/{id}/evidence/{evidenceId}', [ClaimResolutionController::class, 'deleteEvidence']); // Delete evidence

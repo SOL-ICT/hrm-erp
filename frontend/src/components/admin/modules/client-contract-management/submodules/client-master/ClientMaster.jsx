@@ -186,7 +186,6 @@ const ClientMaster = ({ currentTheme, onClose }) => {
       organisation_name: "",
       cac_registration_number: "",
       head_office_address: "",
-      phone: "",
       industry_category: "",
       client_category: "",
       payment_terms: "",
@@ -238,7 +237,6 @@ const ClientMaster = ({ currentTheme, onClose }) => {
       organisation_name: client.organisation_name || "",
       cac_registration_number: client.cac_registration_number || "",
       head_office_address: client.head_office_address || "",
-      phone: client.phone || "",
       industry_category: client.industry_category || "",
       client_category: client.client_category || "",
       payment_terms: client.payment_terms || "",
@@ -413,26 +411,6 @@ const ClientMaster = ({ currentTheme, onClose }) => {
                         }
                         className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                         placeholder="CAC Registration Number"
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        className={`block text-sm font-medium ${currentTheme.textPrimary} mb-2`}
-                      >
-                        Phone
-                      </label>
-                      <input
-                        type="tel"
-                        value={formData.phone || ""}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            phone: e.target.value,
-                          }))
-                        }
-                        className={`w-full px-4 py-3 rounded-lg border ${currentTheme.border} ${currentTheme.cardBg} ${currentTheme.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                        placeholder="Phone number"
                       />
                     </div>
                   </div>
@@ -1395,11 +1373,6 @@ const ClientMaster = ({ currentTheme, onClose }) => {
                         <td className="px-6 py-4">
                           <div
                             className={`text-sm ${currentTheme.textPrimary}`}
-                          >
-                            {client.phone || "No phone"}
-                          </div>
-                          <div
-                            className={`text-sm ${currentTheme.textSecondary}`}
                           >
                             {client.head_office_address || "No address"}
                           </div>

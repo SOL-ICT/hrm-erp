@@ -16,8 +16,10 @@ class FidelityClaim extends Model
         'staff_id',
         'staff_position',
         'assignment_start_date',
-        'incident_date',
+        'report_time',
+        'notified_to_staff_id',
         'incident_description',
+        'reported_loss_status',
         'reported_loss',
         'policy_single_limit',
         'policy_aggregate_limit',
@@ -36,7 +38,6 @@ class FidelityClaim extends Model
 
     protected $casts = [
         'assignment_start_date' => 'date',
-        'incident_date' => 'date',
         'settlement_date' => 'date',
         'sol_evaluated_at' => 'datetime',
         'insurer_filed_at' => 'datetime',
@@ -92,6 +93,16 @@ class FidelityClaim extends Model
     public function evidence(): HasMany
     {
         return $this->hasMany(ClaimEvidence::class, 'claim_id');
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(FidelityClaimDocument::class, 'claim_id');
+    }
+
+    public function notifiedTo(): BelongsTo
+    {
+        return $this->belongsTo(Staff::class, 'notified_to_staff_id');
     }
 
     /**

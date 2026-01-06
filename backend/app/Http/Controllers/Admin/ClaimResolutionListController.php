@@ -40,12 +40,12 @@ class ClaimResolutionListController extends Controller
                 $query->where('client_id', $request->client_id);
             }
 
-            // Filter by date range
+            // Filter by date range (claim creation date)
             if ($request->has('date_from') && $request->date_from !== '') {
-                $query->whereDate('incident_date', '>=', $request->date_from);
+                $query->whereDate('created_at', '>=', $request->date_from);
             }
             if ($request->has('date_to') && $request->date_to !== '') {
-                $query->whereDate('incident_date', '<=', $request->date_to);
+                $query->whereDate('created_at', '<=', $request->date_to);
             }
 
             // Filter by amount range
@@ -76,7 +76,7 @@ class ClaimResolutionListController extends Controller
             $sortBy = $request->get('sort_by', 'created_at');
             $sortOrder = $request->get('sort_order', 'desc');
             
-            $allowedSorts = ['created_at', 'incident_date', 'reported_loss', 'status', 'claim_number'];
+            $allowedSorts = ['created_at', 'reported_loss', 'status', 'claim_number'];
             if (in_array($sortBy, $allowedSorts)) {
                 $query->orderBy($sortBy, $sortOrder);
             } else {
@@ -96,7 +96,6 @@ class ClaimResolutionListController extends Controller
                     'client_contact' => $claim->client_contact_name,
                     'staff_name' => trim("{$claim->staff->first_name} {$claim->staff->middle_name} {$claim->staff->last_name}"),
                     'staff_position' => $claim->staff_position,
-                    'incident_date' => $claim->incident_date->format('Y-m-d'),
                     'reported_loss' => $claim->reported_loss,
                     'status' => $claim->status,
                     'sol_evaluation_status' => $claim->sol_evaluation_status,
@@ -128,7 +127,8 @@ class ClaimResolutionListController extends Controller
                 'staff',
                 'solEvaluator',
                 'insurerFiler',
-                'evidence.uploader'
+                'evidence.uploader',
+                'documents'
             ])->findOrFail($id);
 
             return response()->json([
@@ -150,7 +150,6 @@ class ClaimResolutionListController extends Controller
                     'assignment_start_date' => $claim->assignment_start_date->format('Y-m-d'),
                     
                     // Incident details
-                    'incident_date' => $claim->incident_date->format('Y-m-d'),
                     'incident_description' => $claim->incident_description,
                     'reported_loss' => $claim->reported_loss,
                     
@@ -182,6 +181,16 @@ class ClaimResolutionListController extends Controller
                             'file_size' => $file->formatted_size,
                             'uploaded_by' => $file->uploader->name,
                             'uploaded_at' => $file->created_at->format('Y-m-d H:i'),
+                        ];
+                    }),
+                    
+                    // Documents
+                    'documents' => $claim->documents->map(function ($doc) {
+                        return [
+                            'id' => $doc->id,
+                            'document_name' => $doc->document_name,
+                            'is_provided' => (bool) $doc->is_provided,
+                            'file_path' => $doc->file_path,
                         ];
                     }),
                     
@@ -253,10 +262,10 @@ class ClaimResolutionListController extends Controller
                 $query->where('client_id', $request->client_id);
             }
             if ($request->has('date_from') && $request->date_from !== '') {
-                $query->whereDate('incident_date', '>=', $request->date_from);
+                $query->whereDate('created_at', '>=', $request->date_from);
             }
             if ($request->has('date_to') && $request->date_to !== '') {
-                $query->whereDate('incident_date', '<=', $request->date_to);
+                $query->whereDate('created_at', '<=', $request->date_to);
             }
 
             $claims = $query->orderBy('created_at', 'desc')->get();
@@ -267,7 +276,6 @@ class ClaimResolutionListController extends Controller
                     'Client' => $claim->client->organisation_name,
                     'Staff Member' => trim("{$claim->staff->first_name} {$claim->staff->middle_name} {$claim->staff->last_name}"),
                     'Position' => $claim->staff_position,
-                    'Incident Date' => $claim->incident_date->format('Y-m-d'),
                     'Reported Loss' => $claim->reported_loss,
                     'Status' => $claim->status,
                     'SOL Evaluation' => $claim->sol_evaluation_status,

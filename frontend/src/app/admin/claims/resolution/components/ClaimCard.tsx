@@ -21,7 +21,6 @@ interface Claim {
   staff_id: number;
   staff_name: string;
   staff_position: string;
-  incident_date: string;
   incident_description: string;
   reported_loss: string;
   policy_single_limit: string;
@@ -111,8 +110,8 @@ export default function ClaimCard({ claim, onAccept, onDecline, onFileInsurer, o
         </div>
         <div className="space-y-1">
           <div className="text-xs">
-            <span className="font-medium text-gray-700 dark:text-gray-300">Incident Date: </span>
-            <span className="text-gray-900 dark:text-gray-100">{formatDate(claim.incident_date)}</span>
+            <span className="font-medium text-gray-700 dark:text-gray-300">Created: </span>
+            <span className="text-gray-900 dark:text-gray-100">{formatDate(claim.created_at)}</span>
           </div>
           {claim.insurer_claim_id && (
             <div className="text-xs">

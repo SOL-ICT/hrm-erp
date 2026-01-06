@@ -34,7 +34,6 @@ interface Claim {
   staff_name: string;
   staff_position: string;
   assignment_start_date: string;
-  incident_date: string;
   incident_description: string;
   reported_loss: string;
   policy_single_limit: string;

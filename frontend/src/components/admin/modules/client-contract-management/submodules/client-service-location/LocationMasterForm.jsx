@@ -17,7 +17,7 @@ const LocationMasterForm = ({
   isOpen,
   onClose,
   editingLocation = null,
-  onSave,
+  onSubmit,
   showBulkUpload = false,
 }) => {
   const [formData, setFormData] = useState({
@@ -57,6 +57,8 @@ const LocationMasterForm = ({
   // Pre-fill form when editing
   useEffect(() => {
     if (editingLocation) {
+      console.log("Editing location data:", editingLocation);
+      console.log("Unique ID from backend:", editingLocation.unique_id);
       setFormData({
         location_code: editingLocation.location_code || "",
         location_name: editingLocation.location_name || "",
@@ -209,7 +211,9 @@ const LocationMasterForm = ({
         }
 
         alert(message);
-        onSave(response.data);
+        if (onSubmit && typeof onSubmit === 'function') {
+          onSubmit(response.data);
+        }
         onClose();
         resetForm();
       } else {
@@ -296,9 +300,8 @@ const LocationMasterForm = ({
           setUploadFile(null);
           setUploadProgress(0);
           setUploadResults(null);
-          if (onSave && typeof onSave === 'function') {
-            onSave();
-          }
+          // Don't call onSubmit for bulk upload - it's already saved on the backend
+          // Just close the modal - parent will refresh the list
           onClose();
         }, 2000);
       } else {

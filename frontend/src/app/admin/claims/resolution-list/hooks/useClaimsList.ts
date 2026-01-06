@@ -26,7 +26,6 @@ interface Claim {
   client_contact: string;
   staff_name: string;
   staff_position: string;
-  incident_date: string;
   reported_loss: number;
   status: 'client_reported' | 'sol_under_review' | 'sol_accepted' | 'sol_declined' | 'insurer_processing' | 'insurer_settled';
   sol_evaluation_status: string | null;
