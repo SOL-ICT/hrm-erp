@@ -122,11 +122,11 @@ export default function StaffHeader({
                   <span className="text-white font-bold text-sm">SOL</span>
                 </div>
                 <div className="hidden md:block">
-                  {profile?.client_name === "Strategic Outsourcing Limited" ? (
+                  {profile?.organisation_name === "Strategic Outsourcing Limited" ? (
                     <span className="text-xl font-semibold text-gray-800">Strategic Outsourcing Limited</span>
                   ) : (
                     <div className="flex flex-col">
-                      <span className="text-lg font-semibold text-gray-800">{profile?.client_name}</span>
+                      <span className="text-lg font-semibold text-gray-800">{profile?.organisation_name}</span>
                       <span className="text-xs text-gray-500">Powered by SOL</span>
                     </div>
                   )}
