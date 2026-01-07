@@ -84,6 +84,7 @@ class StaffProfileController extends Controller
 
     \Log::info('StaffProfileController::me - Authenticated user:', [
         'user_id' => $user?->id,
+        'user_staff_profile_id' => $user?->staff_profile_id ?? null,
     ]);
 
     if (!$user) {
@@ -91,14 +92,21 @@ class StaffProfileController extends Controller
     }
 
     try {
-        // Match staff_profiles.staff_id to users.id
+        // Prefer explicit mapping: if users.staff_profile_id exists use it,
+        // otherwise fall back to using users.id. This handles cases where
+        // a user record points to a separate staff profile record.
+        $staffLookupId = $user->staff_profile_id ?? $user->id;
+
+        // Match staff_profiles.staff_id to the resolved staff id
         $staffProfile = \DB::table('staff_profiles')
-            ->where('staff_id', $user->id)
+            ->where('staff_id', $staffLookupId)
             ->first();
 
         if (!$staffProfile) {
-            \Log::warning('StaffProfileController::me - Profile not found for user_id', [
+            \Log::warning('StaffProfileController::me - Profile not found for resolved staff id', [
+                'resolved_staff_id' => $staffLookupId,
                 'user_id' => $user->id,
+                'user_staff_profile_id' => $user->staff_profile_id ?? null,
             ]);
             return response()->json(['message' => 'Staff profile not found'], 404);
         }
