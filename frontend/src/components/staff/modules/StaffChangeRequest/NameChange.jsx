@@ -10,21 +10,14 @@ import {
   XCircle,
   PlusCircle,
 } from "lucide-react";
-
-// Example employee data (static for now)
-const employeeData = {
-  employeeCode: "SOL/2023/0298",
-  clientName: "Strategic Outsourcing Limited",
-  serviceLocation: "LAGOS",
-  formalName: "Ibrahim Babajide Runmonkun",
-  designation: "Officer",
-  emailId: "bdam81@gmail.com",
-};
+import apiService from '@/services/api';
 
 export default function NameChange() {
   const [requests, setRequests] = useState([]);
+  const [employeeData, setEmployeeData] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
@@ -36,30 +29,44 @@ export default function NameChange() {
   const [fileName, setFileName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Fetch requests from backend
+  // Fetch employee profile
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setLoadingProfile(true);
+      try {
+        const data = await apiService.makeRequest("/staff/staff-profiles/me", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          credentials: "include",
+        });
+
+        setEmployeeData(data);
+      } catch (error) {
+        console.error("Error fetching employee profile:", error);
+        setErrorMessage("Unable to load employee information. Please try again later.");
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  // Fetch name change requests
   useEffect(() => {
     const fetchRequests = async () => {
       setLoading(true);
       setErrorMessage("");
       try {
-        const response = await fetch("http://localhost:8000/api/staff/name-change-requests", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          credentials: "include",
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch requests");
-        }
-
-        const data = await response.json();
-        setRequests(data);
+        const data = await apiService.makeRequest("staff/name-change-requests", { method: "GET" });
+        setRequests(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching requests:", error);
-        setErrorMessage("Unable to load requests. Please try again.");
+        setErrorMessage("Unable to load request history. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -92,26 +99,16 @@ export default function NameChange() {
     try {
       const payload = new FormData();
       payload.append("first_name", formData.firstName);
-      payload.append("middle_name", formData.middleName);
+      payload.append("middle_name", formData.middleName || "");
       payload.append("last_name", formData.lastName);
       payload.append("reason", formData.reasonForChange);
       payload.append("proof_document", formData.proofOfReason);
 
-      const response = await fetch("http://localhost:8000/api/staff/name-change-requests", {
+      await apiService.makeRequest("staff/name-change-requests", {
         method: "POST",
-        headers: {
-          Accept: "application/json",
-        },
         body: payload,
-        credentials: "include",
+        headers: {}, // Allow browser to set Content-Type for FormData
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to submit request");
-      }
-
-      await response.json();
-      alert("Name change request submitted successfully!");
 
       // Reset form
       setFormData({
@@ -125,7 +122,7 @@ export default function NameChange() {
       setShowForm(false);
     } catch (error) {
       console.error("Error submitting request:", error);
-      setErrorMessage("Failed to submit request. Try again.");
+      setErrorMessage("Failed to submit request. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -133,6 +130,28 @@ export default function NameChange() {
 
   const hasPendingRequest = requests.some((req) => req.status === "Pending");
   const hasRejectedRequest = requests.some((req) => req.status === "Rejected");
+
+  if (loadingProfile) {
+    return (
+      <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg border border-gray-200">
+        <div className="text-center py-10 text-gray-500">
+          <p>Loading employee information...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!employeeData) {
+    return (
+      <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg border border-gray-200">
+        <div className="text-center py-10 text-red-600">
+          <p>Unable to retrieve employee information.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const formalName = `${employeeData.first_name}${employeeData.middle_name ? ` ${employeeData.middle_name}` : ""} ${employeeData.last_name}`;
 
   return (
     <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg border border-gray-200">
@@ -168,7 +187,7 @@ export default function NameChange() {
           <label className="text-sm font-medium text-gray-700">Employee Code</label>
           <input
             type="text"
-            value={employeeData.employeeCode}
+            value={employeeData.employee_code || ""}
             readOnly
             className="mt-1 w-full px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-600 cursor-not-allowed"
           />
@@ -177,7 +196,7 @@ export default function NameChange() {
           <label className="text-sm font-medium text-gray-700">Formal Name</label>
           <input
             type="text"
-            value={employeeData.formalName}
+            value={formalName}
             readOnly
             className="mt-1 w-full px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-600 cursor-not-allowed"
           />
@@ -186,7 +205,7 @@ export default function NameChange() {
           <label className="text-sm font-medium text-gray-700">Designation</label>
           <input
             type="text"
-            value={employeeData.designation}
+            value={employeeData.designation || employeeData.job_title || ""}
             readOnly
             className="mt-1 w-full px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-600 cursor-not-allowed"
           />
@@ -246,7 +265,7 @@ export default function NameChange() {
                   {request.last_name}
                 </p>
                 <p className="text-sm text-gray-700">Reason: {request.reason}</p>
-                {request.status === "Rejected" && (
+                {request.status === "Rejected" && request.rejection_reason && (
                   <p className="mt-2 text-sm font-semibold text-red-500">
                     Rejection Reason: {request.rejection_reason}
                   </p>
@@ -278,7 +297,7 @@ export default function NameChange() {
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">
-                  Middle Name
+                  Middle Name (optional)
                 </label>
                 <input
                   type="text"
@@ -303,7 +322,7 @@ export default function NameChange() {
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">
-                  Reason
+                  Reason for Change
                 </label>
                 <textarea
                   name="reasonForChange"
@@ -318,7 +337,7 @@ export default function NameChange() {
 
             <div className="flex flex-col space-y-4">
               <label className="text-sm font-medium text-gray-700">
-                Proof of reason
+                Proof of Reason (Required)
               </label>
               <div className="border border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center h-full bg-gray-50">
                 <Upload className="h-12 w-12 text-gray-400" />
@@ -360,8 +379,8 @@ export default function NameChange() {
             </button>
             <button
               type="submit"
-              className="flex items-center space-x-2 px-4 py-2 bg-green-500 text-white rounded-lg shadow-sm hover:bg-green-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               disabled={isSubmitting}
+              className="flex items-center space-x-2 px-4 py-2 bg-green-500 text-white rounded-lg shadow-sm hover:bg-green-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               <Save className="h-5 w-5" />
               <span>{isSubmitting ? "Submitting..." : "Submit Request"}</span>

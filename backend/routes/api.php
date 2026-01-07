@@ -363,6 +363,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     require __DIR__ . '/modules/staff/staff-change-request.php';
     require __DIR__ . '/modules/staff/leave-apply.php';
     require __DIR__ . '/modules/staff/offer-acceptance.php';
+    require __DIR__ . '/modules/staff/misc-change-request.php';
 });
 
 /*

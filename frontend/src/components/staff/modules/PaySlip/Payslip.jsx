@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   Mail, 
   Phone, 
@@ -10,29 +10,36 @@ import {
   X
 } from 'lucide-react';
 
-const payslipsData = [
-  { id: '#10029', month: 'January', year: '2021', salary: '$32,000', date: '01-02-2021', workingDays: 31, present: 31, absent: 0, A: '330,675.89', B: '66,219.66', C: '264,456.23', D: '68,355.04', E: '0.00', F: '332,811.27' },
-  { id: '#10321', month: 'December', year: '2020', salary: '$28,000', date: '01-01-2021', workingDays: 31, present: 31, absent: 0, A: '330,675.89', B: '66,219.66', C: '264,456.23', D: '68,355.04', E: '0.00', F: '332,811.27' },
-  { id: '#10598', month: 'November', year: '2020', salary: '$28,000', date: '01-12-2020', workingDays: 30, present: 30, absent: 0, A: '330,675.89', B: '66,219.66', C: '264,456.23', D: '68,355.04', E: '0.00', F: '332,811.27' },
-  { id: '#10438', month: 'October', year: '2020', salary: '$28,000', date: '01-11-2020', workingDays: 31, present: 31, absent: 0, A: '330,675.89', B: '66,219.66', C: '264,456.23', D: '68,355.04', E: '0.00', F: '332,811.27' },
-  { id: '#10837', month: 'September', year: '2020', salary: '$28,000', date: '01-10-2020', workingDays: 30, present: 30, absent: 0, A: '330,675.89', B: '66,219.66', C: '264,456.23', D: '68,355.04', E: '0.00', F: '332,811.27' },
-  { id: '#10391', month: 'August', year: '2020', salary: '$28,000', date: '01-09-2020', workingDays: 31, present: 31, absent: 0, A: '330,675.89', B: '66,219.66', C: '264,456.23', D: '68,355.04', E: '0.00', F: '332,811.27' },
-  { id: '#11073', month: 'July', year: '2020', salary: '$28,000', date: '02-08-2020', workingDays: 31, present: 31, absent: 0, A: '377,904.80', B: '79,256.08', C: '298,627.92', D: '70,715.49', E: '0.00', F: '369,343.41' },
-  { id: '#10839', month: 'June', year: '2020', salary: '$28,000', date: '02-07-2020', workingDays: 30, present: 30, absent: 0, A: '330,675.89', B: '66,219.66', C: '264,456.23', D: '68,355.04', E: '0.00', F: '332,811.27' },
-  { id: '#10289', month: 'May', year: '2020', salary: '$28,000', date: '01-06-2020', workingDays: 31, present: 31, absent: 0, A: '330,675.89', B: '66,219.66', C: '264,456.23', D: '68,355.04', E: '0.00', F: '332,811.27' },
-  { id: '#10422', month: 'April', year: '2020', salary: '$28,000', date: '01-05-2020', workingDays: 30, present: 30, absent: 0, A: '330,675.89', B: '66,219.66', C: '264,456.23', D: '68,355.04', E: '0.00', F: '332,811.27' },
-  { id: '#10029', month: 'March', year: '2020', salary: '$24,000', date: '01-04-2020', workingDays: 31, present: 31, absent: 0, A: '330,675.89', B: '66,219.66', C: '264,456.23', D: '68,355.04', E: '0.00', F: '332,811.27' },
-  { id: '#10398', month: 'February', year: '2020', salary: '$24,000', date: '01-03-2020', workingDays: 29, present: 29, absent: 0, A: '330,675.89', B: '66,219.66', C: '264,456.23', D: '68,355.04', E: '0.00', F: '332,811.27' },
-  { id: '#10092', month: 'January', year: '2020', salary: '$24,000', date: '01-02-2020', workingDays: 31, present: 31, absent: 0, A: '330,675.89', B: '66,219.66', C: '264,456.23', D: '68,355.04', E: '0.00', F: '332,811.27' },
-  { id: '#11986', month: 'December', year: '2019', salary: '$24,000', date: '01-01-2020', workingDays: 31, present: 31, absent: 0, A: '330,675.89', B: '66,219.66', C: '264,456.23', D: '68,355.04', E: '0.00', F: '332,811.27' },
-  { id: '#10029', month: 'November', year: '2019', salary: '$24,000', date: '01-12-2019', workingDays: 30, present: 30, absent: 0, A: '330,675.89', B: '66,219.66', C: '264,456.23', D: '68,355.04', E: '0.00', F: '332,811.27' },
-];
-
 export default function Payslips() {
+  const [payslipsData, setPayslipsData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedPayslip, setSelectedPayslip] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  // API function placeholder - replace with actual API call
+  const fetchPayslips = async () => {
+    try {
+      setLoading(true);
+      // Replace this with your actual API endpoint
+      // const response = await fetch('/api/payslips');
+      // const data = await response.json();
+      // setPayslipsData(data);
+      
+      // For now, set empty array
+      setPayslipsData([]);
+    } catch (error) {
+      console.error('Error fetching payslips:', error);
+      setPayslipsData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPayslips();
+  }, []);
 
   const handleView = (payslip) => {
     setSelectedPayslip(payslip);
@@ -49,7 +56,7 @@ export default function Payslips() {
   };
 
   const filteredPayslips = useMemo(() => {
-    if (!startDate || !endDate) {
+    if (!startDate || !endDate || payslipsData.length === 0) {
       return payslipsData;
     }
 
@@ -57,10 +64,10 @@ export default function Payslips() {
     const end = new Date(endDate);
 
     return payslipsData.filter(payslip => {
-      const payslipDate = new Date(payslip.date.split('-').reverse().join('-'));
+      const payslipDate = new Date(payslip.date?.split('-').reverse().join('-'));
       return payslipDate >= start && payslipDate <= end;
     });
-  }, [startDate, endDate]);
+  }, [startDate, endDate, payslipsData]);
 
   const ActionButton = ({ icon: Icon, title, color, onClick }) => (
     <button
@@ -120,7 +127,7 @@ export default function Payslips() {
                   id="startDate"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                 />
               </div>
               <div className="flex items-center space-x-2">
@@ -130,7 +137,7 @@ export default function Payslips() {
                   id="endDate"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-2 focus:ring-blue-500 text-gray-900"
                 />
               </div>
             </div>
@@ -139,121 +146,138 @@ export default function Payslips() {
           {/* Card Body */}
           <div className="p-6">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                      #ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                      Month
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                      Year
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                      Working Days
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                      Present
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                      Absent
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                      A
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                      B
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                      C
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                      D
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                      E
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                      F
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredPayslips.map((payslip, index) => (
-                    <tr key={index} className="hover:bg-gray-50 transition-colors duration-150">
-                      <td className="px-6 py-4 text-center text-sm text-gray-900 border-b border-gray-200">
-                        {payslip.id}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">
-                        {payslip.month}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">
-                        {payslip.year}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">
-                        {payslip.workingDays}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">
-                        {payslip.present}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">
-                        {payslip.absent}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-900 border-b border-gray-200">
-                        {payslip.A}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-900 border-b border-gray-200">
-                        {payslip.B}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-900 border-b border-gray-200">
-                        {payslip.C}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-900 border-b border-gray-200">
-                        {payslip.D}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-900 border-b border-gray-200">
-                        {payslip.E}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-900 border-b border-gray-200">
-                        {payslip.F}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">
-                        <div className="flex space-x-2">
-                          <ActionButton
-                            icon={Eye}
-                            title="View"
-                            color="bg-blue-600"
-                            onClick={() => handleView(payslip)}
-                          />
-                          <ActionButton
-                            icon={Download}
-                            title="Download"
-                            color="bg-green-600"
-                            onClick={() => console.log('Download clicked')}
-                          />
-                          <ActionButton
-                            icon={Printer}
-                            title="Print"
-                            color="bg-cyan-600"
-                            onClick={() => handleView(payslip)}
-                          />
-                          <ActionButton
-                            icon={Share2}
-                            title="Share"
-                            color="bg-yellow-500"
-                            onClick={() => console.log('Share clicked')}
-                          />
-                        </div>
-                      </td>
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <span className="ml-2 text-gray-600">Loading payslips...</span>
+                </div>
+              ) : filteredPayslips.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-gray-500 text-lg mb-2">No payslips found</div>
+                  <div className="text-gray-400 text-sm">
+                    {payslipsData.length === 0 
+                      ? "No payslips available at this time" 
+                      : "No payslips match the selected date range"
+                    }
+                  </div>
+                </div>
+              ) : (
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        #ID
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Month
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Year
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Working Days
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Present
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Absent
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Gross Salary
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Deductions
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Net Salary
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Performance Pay
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Other Income
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Total Credit
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        Action
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredPayslips.map((payslip, index) => (
+                      <tr key={payslip.id || index} className="hover:bg-gray-50 transition-colors duration-150">
+                        <td className="px-6 py-4 text-center text-sm text-gray-900 border-b border-gray-200">
+                          {payslip.id || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">
+                          {payslip.month || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">
+                          {payslip.year || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">
+                          {payslip.working_days || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">
+                          {payslip.present_days || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">
+                          {payslip.absent_days || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-semibold text-gray-900 border-b border-gray-200">
+                          {payslip.gross_salary || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-semibold text-gray-900 border-b border-gray-200">
+                          {payslip.total_deductions || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-semibold text-gray-900 border-b border-gray-200">
+                          {payslip.net_salary || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-semibold text-gray-900 border-b border-gray-200">
+                          {payslip.performance_pay || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-semibold text-gray-900 border-b border-gray-200">
+                          {payslip.other_income || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-semibold text-gray-900 border-b border-gray-200">
+                          {payslip.total_credit || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 border-b border-gray-200">
+                          <div className="flex space-x-2">
+                            <ActionButton
+                              icon={Eye}
+                              title="View"
+                              color="bg-blue-600"
+                              onClick={() => handleView(payslip)}
+                            />
+                            <ActionButton
+                              icon={Download}
+                              title="Download"
+                              color="bg-green-600"
+                              onClick={() => console.log('Download clicked')}
+                            />
+                            <ActionButton
+                              icon={Printer}
+                              title="Print"
+                              color="bg-cyan-600"
+                              onClick={() => handleView(payslip)}
+                            />
+                            <ActionButton
+                              icon={Share2}
+                              title="Share"
+                              color="bg-yellow-500"
+                              onClick={() => console.log('Share clicked')}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>
@@ -286,13 +310,21 @@ export default function Payslips() {
             <div className="p-6 bg-white text-gray-800">
               {/* Company Header */}
               <div className="text-center mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Strategic Outsourcing Limited</h1>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  {selectedPayslip.company_name || 'Company Name'}
+                </h1>
                 <p className="text-sm text-gray-600">
-                  The Godwin Adetayo Complex, Off Queens Street, RM 10, 1st FI, Ikeja Expressway, 15361, Lagos.
+                  {selectedPayslip.company_address || 'Company Address'}
                 </p>
-                <p className="text-sm text-gray-600">+2348023458865, +2348113440524</p>
-                <p className="text-sm text-gray-600">osogboyerecidonks@solwigeria.com</p>
-                <p className="text-lg text-blue-600 mt-4 font-semibold underline">Pay slip for the period - {selectedPayslip.month} {selectedPayslip.year}</p>
+                <p className="text-sm text-gray-600">
+                  {selectedPayslip.company_phone || 'Company Phone'}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {selectedPayslip.company_email || 'Company Email'}
+                </p>
+                <p className="text-lg text-blue-600 mt-4 font-semibold underline">
+                  Pay slip for the period - {selectedPayslip.month} {selectedPayslip.year}
+                </p>
               </div>
 
               {/* Employee Details */}
@@ -302,23 +334,23 @@ export default function Payslips() {
                     <tbody>
                       <tr className="border-b border-gray-200">
                         <td className="py-2 font-medium">Emp. Code:</td>
-                        <td className="py-2">SOL/2025/0065</td>
+                        <td className="py-2">{selectedPayslip.employee_code || '-'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="py-2 font-medium">Department:</td>
-                        <td className="py-2">ICT</td>
+                        <td className="py-2">{selectedPayslip.department || '-'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="py-2 font-medium">Designation:</td>
-                        <td className="py-2">Officer</td>
+                        <td className="py-2">{selectedPayslip.designation || '-'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="py-2 font-medium">Grade:</td>
-                        <td className="py-2">GL15</td>
+                        <td className="py-2">{selectedPayslip.grade || '-'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="py-2 font-medium">PF No:</td>
-                        <td className="py-2">PEN21369132913876</td>
+                        <td className="py-2">{selectedPayslip.pf_number || '-'}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -328,31 +360,31 @@ export default function Payslips() {
                     <tbody>
                       <tr className="border-b border-gray-200">
                         <td className="py-2 font-medium">Emp. Name:</td>
-                        <td className="py-2">John Doe</td>
+                        <td className="py-2">{selectedPayslip.employee_name || '-'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="py-2 font-medium">Client Name:</td>
-                        <td className="py-2">Strategic Outsourcing Limited</td>
+                        <td className="py-2">{selectedPayslip.client_name || '-'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="py-2 font-medium">Service Place:</td>
-                        <td className="py-2">LAGOS</td>
+                        <td className="py-2">{selectedPayslip.service_place || '-'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="py-2 font-medium">Service Location:</td>
-                        <td className="py-2">LAGOS</td>
+                        <td className="py-2">{selectedPayslip.service_location || '-'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="py-2 font-medium">Working Day(s):</td>
-                        <td className="py-2">{selectedPayslip.workingDays}</td>
+                        <td className="py-2">{selectedPayslip.working_days || '-'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="py-2 font-medium">Present Day(s):</td>
-                        <td className="py-2">{selectedPayslip.present}</td>
+                        <td className="py-2">{selectedPayslip.present_days || '-'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="py-2 font-medium">Absent Day(s):</td>
-                        <td className="py-2">{selectedPayslip.absent}</td>
+                        <td className="py-2">{selectedPayslip.absent_days || '-'}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -374,31 +406,37 @@ export default function Payslips() {
                     <tbody>
                       <tr>
                         <td className="p-3 border-r border-gray-200">Basic Salary</td>
-                        <td className="p-3 text-right">2,767,545.75</td>
+                        <td className="p-3 text-right">{selectedPayslip.basic_salary || '-'}</td>
                       </tr>
                       <tr>
                         <td className="p-3 border-r border-gray-200">Housing Allowance</td>
-                        <td className="p-3 text-right">967,500.00</td>
+                        <td className="p-3 text-right">{selectedPayslip.housing_allowance || '-'}</td>
                       </tr>
                       <tr>
                         <td className="p-3 border-r border-gray-200">Transport Allowance</td>
-                        <td className="p-3 text-right">375,875.26</td>
+                        <td className="p-3 text-right">{selectedPayslip.transport_allowance || '-'}</td>
                       </tr>
                       <tr>
                         <td className="p-3 border-r border-gray-200">Medical</td>
-                        <td className="p-3 text-right">1,125,754.88</td>
+                        <td className="p-3 text-right">{selectedPayslip.medical_allowance || '-'}</td>
                       </tr>
+                      {selectedPayslip.other_allowances && selectedPayslip.other_allowances.map((allowance, index) => (
+                        <tr key={index}>
+                          <td className="p-3 border-r border-gray-200">{allowance.name}</td>
+                          <td className="p-3 text-right">{allowance.amount}</td>
+                        </tr>
+                      ))}
                       <tr className="font-bold bg-gray-100">
                         <td className="p-3 border-r border-gray-200">Total (A)</td>
-                        <td className="p-3 text-right">5,236,675.89.</td>
+                        <td className="p-3 text-right">{selectedPayslip.gross_salary || '-'}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
 
-                {/* Monthly Net Salary */}
+                {/* Monthly Deductions */}
                 <div className="border border-gray-300">
-                  <h3 className="text-base font-bold bg-gray-100 p-3">MONTHLY NET SALARY</h3>
+                  <h3 className="text-base font-bold bg-gray-100 p-3">MONTHLY DEDUCTIONS</h3>
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50">
@@ -408,24 +446,30 @@ export default function Payslips() {
                     </thead>
                     <tbody>
                       <tr>
-                        <td className="p-3 border-r border-gray-200">Gross Salary</td>
-                        <td className="p-3 text-right">430,675.89</td>
+                        <td className="p-3 border-r border-gray-200">PAYE Tax</td>
+                        <td className="p-3 text-right">{selectedPayslip.paye_tax || '-'}</td>
                       </tr>
                       <tr>
-                        <td className="p-3 border-r border-gray-200">NHIS(Statutory)</td>
-                        <td className="p-3 text-right">161,533.79</td>
+                        <td className="p-3 border-r border-gray-200">NHIS</td>
+                        <td className="p-3 text-right">{selectedPayslip.nhis || '-'}</td>
                       </tr>
                       <tr>
-                        <td className="p-3 border-r border-gray-200">ITF(Statutory)</td>
-                        <td className="p-3 text-right">113,227.04</td>
+                        <td className="p-3 border-r border-gray-200">ITF</td>
+                        <td className="p-3 text-right">{selectedPayslip.itf || '-'}</td>
                       </tr>
                       <tr>
-                        <td className="p-3 border-r border-gray-200">Tax & Others LST</td>
-                        <td className="p-3 text-right">136,250.16</td>
+                        <td className="p-3 border-r border-gray-200">Pension</td>
+                        <td className="p-3 text-right">{selectedPayslip.pension || '-'}</td>
                       </tr>
+                      {selectedPayslip.other_deductions && selectedPayslip.other_deductions.map((deduction, index) => (
+                        <tr key={index}>
+                          <td className="p-3 border-r border-gray-200">{deduction.name}</td>
+                          <td className="p-3 text-right">{deduction.amount}</td>
+                        </tr>
+                      ))}
                       <tr className="font-bold bg-gray-100">
                         <td className="p-3 border-r border-gray-200">Total (B)</td>
-                        <td className="p-3 text-right">964,664.92</td>
+                        <td className="p-3 text-right">{selectedPayslip.total_deductions || '-'}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -444,19 +488,23 @@ export default function Payslips() {
                     <tbody>
                       <tr>
                         <td className="p-3 border-r border-gray-200">Net Monthly Salary</td>
-                        <td className="p-3 text-right">264,459.25</td>
-                      </tr>
-                      <tr>
-                        <td className="p-3 border-r border-gray-200">Net Monthly Operational Reimbursable</td>
-                        <td className="p-3 text-right">0.00</td>
+                        <td className="p-3 text-right">{selectedPayslip.net_salary || '-'}</td>
                       </tr>
                       <tr>
                         <td className="p-3 border-r border-gray-200">Performance Pay</td>
-                        <td className="p-3 text-right">98,355.36</td>
+                        <td className="p-3 text-right">{selectedPayslip.performance_pay || '-'}</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 border-r border-gray-200">Other Income</td>
+                        <td className="p-3 text-right">{selectedPayslip.other_income || '-'}</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 border-r border-gray-200">Operational Reimbursable</td>
+                        <td className="p-3 text-right">{selectedPayslip.operational_reimbursable || '-'}</td>
                       </tr>
                       <tr className="font-bold bg-gray-100">
                         <td className="p-3 border-r border-gray-200">Total (F)</td>
-                        <td className="p-3 text-right">362,811.36</td>
+                        <td className="p-3 text-right">{selectedPayslip.total_credit || '-'}</td>
                       </tr>
                     </tbody>
                   </table>

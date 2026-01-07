@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { API_BASE_URL } from '@/config/api';
+import { apiService } from "@/services/api";
+
 
 const Profile = () => {
   const [profile, setProfile] = useState(null);
@@ -7,19 +10,24 @@ const Profile = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const { user } = useAuth();
 
+
+useEffect(() => {
+  console.log('[DEBUG] API_BASE_URL =', API_BASE_URL);
+}, []);
+
+
+
   useEffect(() => {
     const fetchUserProfile = async () => {
       setIsLoading(true);
       setErrorMessage('');
 
       try {
-        // Get CSRF token
-        await fetch('http://localhost:8000/sanctum/csrf-cookie', {
-          credentials: 'include',
-        });
+        // Get CSRF token from same origin base (no '/api')
+        await apiService.makeRequest('/sanctum/csrf-cookie');
 
-        // Fetch all profiles
-        const response = await fetch('http://localhost:8000/api/staff/staff-profiles', {
+        // Fetch the authenticated user's profile
+        const data = await apiService.makeRequest('/staff/staff-profiles/me', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -29,24 +37,12 @@ const Profile = () => {
           credentials: 'include',
         });
 
-        console.log('[FETCH] Response status:', response.status);
+        console.log('[FETCH] My profile received:', data);
 
-        if (!response.ok) {
-          if (response.status === 401) {
-            setErrorMessage('Authentication failed. Please log in again.');
-          } else {
-            setErrorMessage(`Failed to fetch profile: HTTP ${response.status}`);
-          }
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('[FETCH] All profiles received:', data);
-
-        const userProfile = Array.isArray(data) ? data[0] : data;
+        const userProfile = data;
 
         if (userProfile && userProfile.staff_id) {
-          const specificResponse = await fetch(`http://localhost:8000/api/staff/staff-profiles/${user?.id}`, {
+          const specificResponse = await apiService.makeRequest(`/staff/staff-profiles/${user?.id}`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
@@ -83,7 +79,7 @@ const Profile = () => {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-4">My Profile</h2>
+      <h2 className="text-2xl font-semibold text-gray-800 mb-4">My Profile</h2>
 
       {errorMessage && (
         <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
