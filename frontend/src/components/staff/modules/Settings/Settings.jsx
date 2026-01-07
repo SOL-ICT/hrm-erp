@@ -2,6 +2,7 @@ import { useState,useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigation } from '@/components/staff/components/NavigationContext'; 
 import { Lock, User, Palette, Shield, Eye, EyeOff, Check, X, AlertCircle, Moon, Sun, Monitor, Bell, Smartphone, Clock } from 'lucide-react';
+import { apiService } from '@/services/api';
 
 export default function SettingsPage() {
   // const [activeTab, setActiveTab] = useState('password');
@@ -44,42 +45,29 @@ useEffect(() => {
     setErrorMessage('');
 
     try {
-      // Get CSRF token
-      await fetch('http://localhost:8000/sanctum/csrf-cookie', {
-        credentials: 'include',
-      });
+      // Ensure CSRF cookie — safe no-op for GET requests
+      await apiService.makeRequest('sanctum/csrf-cookie');
 
-      // Fetch the current user's profile
-      const response = await fetch(`http://localhost:8000/api/staff/staff-profiles/${user?.id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        credentials: 'include',
-      });
+      // Use the apiService which returns parsed JSON (or throws on non-OK)
+      const data = await apiService.makeRequest('staff/staff-profiles/me', { method: 'GET' });
 
-      console.log('[FETCH] Response status:', response.status);
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          setErrorMessage('Authentication failed. Please log in again.');
-        } else {
-          setErrorMessage(`Failed to fetch profile: HTTP ${response.status}`);
-        }
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const data = await response.json();
       console.log('[FETCH] Profile data:', data);
-      setProfile(data);
 
+      // Defensive handling: backend sometimes returns an array; pick first item
+      if (Array.isArray(data)) {
+        setProfile(data[0] || null);
+      } else {
+        setProfile(data || null);
+      }
     } catch (error) {
       console.error('[FETCH] Error fetching profile:', error);
-      if (!errorMessage) {
+
+      if (error?.message && error.message.toLowerCase().includes('401')) {
+        setErrorMessage('Authentication failed. Please log in again.');
+      } else {
         setErrorMessage('An error occurred while fetching the profile.');
       }
+
       setProfile(null);
     } finally {
       setIsLoading(false);
@@ -585,7 +573,7 @@ useEffect(() => {
               </div>
 
               {/* Active Sessions */}
-              <div className="mb-8">
+              {/* <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Active Sessions</h3>
                 <div className="space-y-3">
                   <div className="border border-gray-200 rounded-lg p-4">
@@ -628,10 +616,10 @@ useEffect(() => {
                     </div>
                   </div>
                 </div>
-              </div>
+              </div> */}
 
               {/* Recent Activity */}
-              <div>
+              {/* <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
                 <div className="space-y-3">
                   {[
@@ -654,7 +642,9 @@ useEffect(() => {
                     );
                   })}
                 </div>
-              </div>
+              </div> */}
+
+
 
               {/* Danger Zone */}
               {/* <div className="mt-8 pt-8 border-t border-gray-200">

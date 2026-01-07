@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, PhoneCall, Info, Eye, Trash2 } from 'lucide-react';
 import { PieChart } from 'react-minimal-pie-chart';
+import { apiService } from "@/services/api";
 
 // Maps status to Tailwind CSS badge colors
 const statusColorMap = {
@@ -41,7 +42,8 @@ export default function MyLeaves() {
             setIsLoading(true);
             setErrorMessage('');
             try {
-                const response = await fetch('http://localhost:8000/api/staff/leave-applications', {
+                // apiService returns parsed JSON or throws on non-OK responses
+                const data = await apiService.makeRequest('/staff/leave-applications', {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
@@ -50,17 +52,8 @@ export default function MyLeaves() {
                     credentials: 'include',
                 });
 
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        setErrorMessage('Authentication failed. Please log in again.');
-                    } else {
-                        setErrorMessage(`Failed to fetch leaves: HTTP ${response.status}`);
-                    }
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-
-                const data = await response.json();
-                setLeaves(data);
+                console.log('Fetched leave data:', data);
+                setLeaves(data || []);
             } catch (error) {
                 console.error('Failed to fetch leave data:', error);
                 if (!errorMessage) setErrorMessage('An error occurred while fetching leaves.');
@@ -85,19 +78,14 @@ export default function MyLeaves() {
         setDeleting(true);
         setErrorMessage('');
         try {
-            const response = await fetch(`http://localhost:8000/api/staff/leave-applications/${leaveId}`, {
+            // apiService throws on errors; if we reach here, deletion succeeded
+            await apiService.makeRequest(`/staff/leave-applications/${leaveId}`, {
                 method: 'DELETE',
                 headers: {
                     'Accept': 'application/json',
                 },
                 credentials: 'include',
             });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                setErrorMessage(errorData.message || 'Failed to delete leave application.');
-                throw new Error('Failed to delete leave application');
-            }
 
             setLeaves(prevLeaves => prevLeaves.filter(leave => leave.id !== leaveId));
             setErrorMessage('');
@@ -112,7 +100,8 @@ export default function MyLeaves() {
     const handleReportSubmit = async () => {
         setErrorMessage('');
         try {
-            const response = await fetch('http://localhost:8000/api/staff/report-issue', {
+            // apiService throws on non-OK responses; if this resolves, the report was submitted
+            await apiService.makeRequest('/staff/report-issue', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -124,12 +113,6 @@ export default function MyLeaves() {
                     subject: reportSubject,
                 }),
             });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                setErrorMessage(errorData.message || 'Failed to submit report.');
-                throw new Error('Failed to submit report');
-            }
 
             setReportSubject('');
             setReportModalOpen(false);

@@ -10,35 +10,33 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Create staff_profiles view that includes leave entitlement from categories
-        // Use DROP + CREATE to support SQLite which may not accept CREATE OR REPLACE VIEW
         DB::statement('DROP VIEW IF EXISTS staff_profiles');
 
         DB::statement("
             CREATE VIEW staff_profiles AS
-            SELECT 
+            SELECT
                 s.id AS staff_id,
-                s.employee_code,
-                s.first_name,
-                s.middle_name,
-                s.last_name,
-                s.job_title,
-                s.email,
-                s.entry_date,
-                s.location,
-                s.client_id,
-                s.department,
-                s.status,
+                s.employee_code AS employee_code,
+                s.first_name AS first_name,
+                s.middle_name AS middle_name,
+                s.last_name AS last_name,
+                s.job_title AS job_title,
+                s.email AS email,
+                s.entry_date AS entry_date,
+                s.location AS location,
+                s.client_id AS client_id,
+                s.department AS department,
+                s.status AS status,
                 sc.name AS category_name,
                 sc.annual_leave_allowance AS leave_entitlement,
-                sc.max_transferable_days,
-                spi.mobile_phone,
-                spi.current_address,
-                spi.state_of_residence,
-                spi.marital_status,
-                sli.national_id_no,
-                sb.account_number,
-                sb.bank_name
+                sc.max_transferable_days AS max_transferable_days,
+                spi.mobile_phone AS mobile_phone,
+                spi.current_address AS current_address,
+                spi.state_of_residence AS state_of_residence,
+                spi.marital_status AS marital_status,
+                sli.national_id_no AS national_id_no,
+                sb.account_number AS account_number,
+                sb.bank_name AS bank_name
             FROM staff s
             LEFT JOIN staff_categories sc ON s.category_id = sc.id
             LEFT JOIN staff_personal_info spi ON s.id = spi.staff_id

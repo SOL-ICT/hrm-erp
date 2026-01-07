@@ -4,6 +4,7 @@ import { PieChart } from 'react-minimal-pie-chart';
 import CalendarReact from 'react-calendar';
 import { useAuth } from '@/contexts/AuthContext';
 import 'react-calendar/dist/Calendar.css'; // Import react-calendar styles
+import { apiService } from "@/services/api";
 
 export default function LeaveApply() {
   const [leaveType, setLeaveType] = useState('');
@@ -28,14 +29,9 @@ export default function LeaveApply() {
   const currentYear = new Date().getFullYear();
   
 
-  // Dummy staff data
-  const staffList = [
-    { id: '1', name: 'John Smith', email: 'john.smith@company.com' },
-    { id: '2', name: 'Sarah Johnson', email: 'sarah.johnson@company.com' },
-    { id: '3', name: 'Michael Brown', email: 'michael.brown@company.com' },
-    { id: '4', name: 'Emily Davis', email: 'emily.davis@company.com' },
-    { id: '5', name: 'David Wilson', email: 'david.wilson@company.com' }
-  ];
+ 
+  const [staffList, setStaffList] = useState([]);
+
 
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
@@ -47,12 +43,12 @@ export default function LeaveApply() {
 
     try {
       // Get CSRF token
-      await fetch('http://localhost:8000/sanctum/csrf-cookie', {
+      await apiService.makeRequest('/sanctum/csrf-cookie', {
         credentials: 'include',
       });
 
-      // Fetch the current user's profile
-      const response = await fetch(`http://localhost:8000/api/staff/staff-profiles/${user?.id}`, {
+      // Fetch the current user's profile (apiService returns parsed JSON)
+      const data = await apiService.makeRequest('/staff/staff-profiles/me', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -62,18 +58,6 @@ export default function LeaveApply() {
         credentials: 'include',
       });
 
-      console.log('[FETCH] Response status:', response.status);
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          setErrorMessage('Authentication failed. Please log in again.');
-        } else {
-          setErrorMessage(`Failed to fetch profile: HTTP ${response.status}`);
-        }
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const data = await response.json();
       console.log('[FETCH] Profile data:', data);
       setProfile(data);
 
@@ -97,7 +81,8 @@ export default function LeaveApply() {
       setIsLoading(true);
       setErrorMessage('');
       try {
-        const response = await fetch('http://localhost:8000/api/staff/leave-applications', {
+        // apiService returns parsed JSON or throws on errors
+        const data = await apiService.makeRequest('/staff/leave-applications', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -106,24 +91,13 @@ export default function LeaveApply() {
           credentials: 'include',
         });
 
-        if (!response.ok) {
-          if (response.status === 401) {
-            setErrorMessage('Authentication failed. Please log in again.');
-          } else {
-            setErrorMessage(`Failed to fetch leaves: HTTP ${response.status}`);
-          }
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-
-        const data = await response.json();
         console.log('Fetched leave data:', data);
-        
         // Filter current year leaves
         const currentYearLeaves = data.filter(leave => 
           new Date(leave.start_date).getFullYear() === currentYear
         );
         
-        setLeaves(data);
+        setLeaves(data || []);
         
         // Calculate used days for current year
         const totalUsedDays = currentYearLeaves.reduce((acc, leave) => acc + (leave.days || 0), 0);
@@ -139,15 +113,40 @@ export default function LeaveApply() {
     fetchLeaves();
   }, []);
 
-  // Update hand over email when staff selection changes
+
+  //dynamic staff list fetch
   useEffect(() => {
-    if (handOverTo) {
-      const selectedStaff = staffList.find(staff => staff.id === handOverTo);
-      setHandOverEmail(selectedStaff ? selectedStaff.email : '');
+  const fetchStaffList = async () => {
+    try {
+      const data = await apiService.makeRequest('/staff/leave-handover-list', {
+        headers: { 'Accept': 'application/json' },
+        credentials: 'include'
+      });
+      console.log('Fetched staff list:', data);
+      setStaffList(data || []);
+    } catch (err) {
+      console.error('[FETCH] Error fetching staff list:', err);
+      setStaffList([]);
+    }
+  };
+
+  fetchStaffList();
+}, []);
+ // Update hand over email when staff selection changes
+useEffect(() => {
+  if (handOverTo && staffList.length > 0) {
+    const selectedStaff = staffList.find(staff => staff.id === handOverTo);
+    if (selectedStaff) {
+      setHandOverEmail(selectedStaff.email || '');
     } else {
       setHandOverEmail('');
     }
-  }, [handOverTo]);
+  } else {
+    setHandOverEmail('');
+  }
+}, [handOverTo, staffList]);
+
+
 
   // Calculate end date based on start date, number of days, and public holidays
   const calculateEndDate = (startDateStr, days, holidays) => {
@@ -243,7 +242,7 @@ export default function LeaveApply() {
       numberOfDays,
       publicHolidays: publicHolidays || '0',
       handOverTo,
-      handOverToName: staffList.find(staff => staff.id === handOverTo)?.name || '',
+      handOverToName: staffList.find(staff => staff.id === handOverTo)?.first_name + ' ' + staffList.find(staff => staff.id === handOverTo)?.last_name || '',
       handOverEmail
     };
 
@@ -264,7 +263,7 @@ export default function LeaveApply() {
 
     try {
       const promises = applications.map(app => 
-        fetch('http://localhost:8000/api/staff/leave-applications', {
+        apiService.makeRequest('/staff/leave-applications', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -280,23 +279,17 @@ export default function LeaveApply() {
         })
       );
 
+      // apiService throws on non-OK responses; if Promise.all resolves, all succeeded
       const responses = await Promise.all(promises);
-      
-      // Check if all submissions were successful
-      const allSuccessful = responses.every(response => response.ok);
-      
-      if (allSuccessful) {
-        setShowSuccess(true);
-        setApplications([]);
-        setErrorMessage('');
-        setTimeout(() => {
-          setShowSuccess(false);
-          // Refresh leave data
-          window.location.reload();
-        }, 2000);
-      } else {
-        setErrorMessage('Some applications failed to submit. Please try again.');
-      }
+
+      setShowSuccess(true);
+      setApplications([]);
+      setErrorMessage('');
+      setTimeout(() => {
+        setShowSuccess(false);
+        // Refresh leave data
+        window.location.reload();
+      }, 2000);
     } catch (error) {
       setErrorMessage('An error occurred while submitting applications. Please try again.');
       console.error('Submission error:', error);
@@ -407,6 +400,20 @@ export default function LeaveApply() {
               />
             </div>
 
+            {/* Supervisor Name - Read-only field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Supervisor
+                </label>
+                <input
+                  type="text"
+                  value={profile?.supervisor_name || 'Not assigned'}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                  placeholder="Supervisor name"
+                />
+              </div>
+
             {/* Start Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -499,10 +506,11 @@ export default function LeaveApply() {
                   <option value="">Select Staff</option>
                   {staffList.map((staff) => (
                     <option key={staff.id} value={staff.id}>
-                      {staff.name}
+                      {staff.first_name} {staff.last_name} - {staff.job_title}
                     </option>
                   ))}
                 </select>
+
                 <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               </div>
             </div>
