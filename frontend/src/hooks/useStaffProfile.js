@@ -16,8 +16,10 @@ export default function useStaffProfile() {
       setError("");
 
       try {
-        // Ensure CSRF cookie (safe no-op for GETs)
-        await apiService.makeRequest('sanctum/csrf-cookie');
+        // Fire-and-forget CSRF prefetch: don't block profile fetch if it fails
+        apiService.makeRequest('sanctum/csrf-cookie').catch((err) => {
+          console.warn('CSRF prefetch failed (ignored):', err?.message || err);
+        });
 
         // Use centralized API service which returns parsed JSON or throws on errors
         const data = await apiService.makeRequest('staff/staff-profiles/me', { method: 'GET' });

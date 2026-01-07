@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PieChart } from 'react-minimal-pie-chart';
 import { Eye } from 'lucide-react';
+import apiService from '@/services/api';
 
 const statusColorMap = {
   pending: 'bg-yellow-100 text-yellow-800',
@@ -28,15 +29,8 @@ export default function LeaveOverviewCard() {
   useEffect(() => {
     const fetchLeaves = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/staff/leave-applications', {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-          },
-          credentials: 'include',
-        });
-        const data = await response.json();
-        setLeaves(data);
+        const data = await apiService.makeRequest('/staff/leave-applications');
+        setLeaves(data || []);
       } catch (err) {
         console.error('Error fetching leave data', err);
         setLeaves([]);

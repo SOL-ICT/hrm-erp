@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X, Clock, AlertTriangle, Mail, Calendar, FileText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import apiService from '@/services/api';
 
 export default function OfferAcceptance() {
   const [offerStatus, setOfferStatus] = useState(null);
@@ -23,33 +24,7 @@ export default function OfferAcceptance() {
     setErrorMessage('');
 
     try {
-      // Get CSRF token
-      await fetch('http://localhost:8000/sanctum/csrf-cookie', {
-        credentials: 'include',
-      });
-
-      const response = await fetch('http://localhost:8000/api/staff/offer-status', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          setErrorMessage('Authentication failed. Please log in again.');
-        } else if (response.status === 404) {
-          setErrorMessage('No offer found for your account.');
-        } else {
-          setErrorMessage(`Failed to fetch offer status: HTTP ${response.status}`);
-        }
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await apiService.makeRequest('/staff/offer-status');
       console.log('[OFFER] Status data:', data);
       setOfferStatus(data);
 
@@ -75,29 +50,9 @@ export default function OfferAcceptance() {
     setSuccessMessage('');
 
     try {
-      await fetch('http://localhost:8000/sanctum/csrf-cookie', {
-        credentials: 'include',
-      });
-
-      const response = await fetch('http://localhost:8000/api/staff/accept-offer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        setErrorMessage(errorData.message || 'Failed to accept offer');
-        throw new Error(errorData.message);
-      }
-
-      const data = await response.json();
+      await apiService.makeRequest('/staff/accept-offer', { method: 'POST' });
       setSuccessMessage('Offer accepted successfully! Welcome aboard!');
-      
+
       // Refresh offer status
       setTimeout(() => {
         fetchOfferStatus();
@@ -125,31 +80,14 @@ export default function OfferAcceptance() {
     setSuccessMessage('');
 
     try {
-      await fetch('http://localhost:8000/sanctum/csrf-cookie', {
-        credentials: 'include',
-      });
-
-      const response = await fetch('http://localhost:8000/api/staff/reject-offer', {
+      await apiService.makeRequest('/staff/reject-offer', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        credentials: 'include',
         body: JSON.stringify({ reason: rejectReason }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        setErrorMessage(errorData.message || 'Failed to reject offer');
-        throw new Error(errorData.message);
-      }
-
-      const data = await response.json();
       setSuccessMessage('Offer rejected. Thank you for your consideration.');
       setShowRejectModal(false);
-      
+
       // Refresh offer status
       setTimeout(() => {
         fetchOfferStatus();
