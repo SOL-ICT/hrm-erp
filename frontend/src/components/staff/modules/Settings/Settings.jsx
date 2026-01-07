@@ -45,8 +45,10 @@ useEffect(() => {
     setErrorMessage('');
 
     try {
-      // Ensure CSRF cookie — safe no-op for GET requests
-      await apiService.makeRequest('sanctum/csrf-cookie');
+      // Fire-and-forget CSRF prefetch: don't block profile fetch if it fails
+      apiService.makeRequest('sanctum/csrf-cookie').catch((err) => {
+        console.warn('CSRF prefetch failed (ignored):', err?.message || err);
+      });
 
       // Use the apiService which returns parsed JSON (or throws on non-OK)
       const data = await apiService.makeRequest('staff/staff-profiles/me', { method: 'GET' });

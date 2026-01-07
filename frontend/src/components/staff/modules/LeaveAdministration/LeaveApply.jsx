@@ -41,10 +41,10 @@ export default function LeaveApply() {
     setIsLoading(true);
     setErrorMessage('');
 
-    try {
-      // Get CSRF token
-      await apiService.makeRequest('/sanctum/csrf-cookie', {
-        credentials: 'include',
+      try {
+      // Fire-and-forget CSRF token prefetch; don't block profile fetch if it fails
+      apiService.makeRequest('/sanctum/csrf-cookie').catch((err) => {
+        console.warn('CSRF prefetch failed (ignored):', err?.message || err);
       });
 
       // Fetch the current user's profile (apiService returns parsed JSON)

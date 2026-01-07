@@ -23,45 +23,15 @@ useEffect(() => {
       setErrorMessage('');
 
       try {
-        // Get CSRF token from same origin base (no '/api')
-        await apiService.makeRequest('/sanctum/csrf-cookie');
-
-        // Fetch the authenticated user's profile
-        const data = await apiService.makeRequest('/staff/staff-profiles/me', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-          credentials: 'include',
+        // Fire-and-forget CSRF token prefetch. Don't block profile fetch if it fails.
+        apiService.makeRequest('/sanctum/csrf-cookie').catch((err) => {
+          console.warn('CSRF prefetch failed (ignored):', err?.message || err);
         });
 
+        // Fetch the authenticated user's profile via the `/me` endpoint
+        const data = await apiService.makeRequest('/staff/staff-profiles/me');
         console.log('[FETCH] My profile received:', data);
-
-        const userProfile = data;
-
-        if (userProfile && userProfile.staff_id) {
-          const specificResponse = await apiService.makeRequest(`/staff/staff-profiles/${user?.id}`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'X-Requested-With': 'XMLHttpRequest',
-            },
-            credentials: 'include',
-          });
-
-          if (specificResponse.ok) {
-            const specificData = await specificResponse.json();
-            console.log('[FETCH] Specific profile data:', specificData);
-            setProfile(specificData);
-          } else {
-            setProfile(userProfile);
-          }
-        } else {
-          setProfile(userProfile);
-        }
+        setProfile(data || null);
 
       } catch (error) {
         console.error('[FETCH] Error fetching profile:', error);
