@@ -494,7 +494,14 @@ class SalaryStructureController extends Controller
             $validator = Validator::make($request->all(), [
                 'job_structure_id' => 'required|exists:job_structures,id',
                 'grade_name' => 'required|string|max:100',
-                'grade_code' => 'required|string|max:20|unique:pay_grade_structures,grade_code',
+                'grade_code' => [
+                    'required',
+                    'string',
+                    'max:20',
+                    Rule::unique('pay_grade_structures', 'grade_code')->where(function ($query) use ($request) {
+                        return $query->where('job_structure_id', $request->job_structure_id);
+                    })
+                ],
                 'pay_structure_type' => 'required|string',
                 'emoluments' => 'nullable|array', // Changed from 'required' to 'nullable' - can add emoluments later via bulk upload
                 'currency' => 'nullable|string|max:3'
@@ -566,7 +573,16 @@ class SalaryStructureController extends Controller
             $validator = Validator::make($request->all(), [
                 'job_structure_id' => 'required|exists:job_structures,id',
                 'grade_name' => 'required|string|max:100',
-                'grade_code' => 'required|string|max:20|unique:pay_grade_structures,grade_code,' . $id,
+                'grade_code' => [
+                    'required',
+                    'string',
+                    'max:20',
+                    Rule::unique('pay_grade_structures', 'grade_code')
+                        ->where(function ($query) use ($request) {
+                            return $query->where('job_structure_id', $request->job_structure_id);
+                        })
+                        ->ignore($id)
+                ],
                 'pay_structure_type' => 'required|string',
                 'emoluments' => 'nullable|array', // Changed from 'required' to 'nullable' - can add emoluments later via bulk upload
                 'currency' => 'nullable|string|max:3'

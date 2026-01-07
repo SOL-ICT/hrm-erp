@@ -419,16 +419,13 @@ const ApprovalDetailModal = ({
                             <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                               <tr>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                                  Staff ID
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                                   Employee Code
                                 </th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                                   Name
                                 </th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                                  Email
+                                  Recruitment Ticket
                                 </th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                                   Phone
@@ -442,16 +439,13 @@ const ApprovalDetailModal = ({
                               {approval.batch_data.staff_list.map((staff, index) => (
                                 <tr key={staff.id} className="hover:bg-gray-50">
                                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {staff.staff_id}
-                                  </td>
-                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                                     {staff.employee_code}
                                   </td>
                                   <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                                     {staff.first_name} {staff.last_name}
                                   </td>
-                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                                    {staff.email || '-'}
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600">
+                                    {staff.recruitment_ticket || '-'}
                                   </td>
                                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                                     {staff.phone_number || '-'}

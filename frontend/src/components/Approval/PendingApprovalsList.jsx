@@ -453,7 +453,7 @@ const PendingApprovalsList = ({
                 Status
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                Due Date
+                Request Date
               </th>
               <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
                 Actions
@@ -548,18 +548,9 @@ const PendingApprovalsList = ({
                     <ApprovalStatusBadge status={approval.status} size="sm" />
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    {approval.due_date ? (
-                      <div className={`text-sm ${isOverdue(approval.due_date) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
-                        {formatDate(approval.due_date)}
-                        {isOverdue(approval.due_date) && (
-                          <span className="ml-1">
-                            <AlertTriangle size={14} className="inline" />
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-sm text-gray-400">-</span>
-                    )}
+                    <div className="text-sm text-gray-600">
+                      {formatDate(approval.created_at || approval.requested_at)}
+                    </div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-center">
                     <div className="flex items-center justify-center gap-2">

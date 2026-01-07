@@ -167,13 +167,8 @@ class ApprovalController extends Controller
             // Apply additional filters using helper method
             $this->applyFilters($query, $request, ['status']); // Exclude status filter
 
-            // Optimize ordering for pending approvals
-            $query->orderByRaw('CASE 
-                WHEN priority = "critical" THEN 1
-                WHEN priority = "high" THEN 2
-                WHEN priority = "medium" THEN 3
-                ELSE 4 END')
-                ->orderBy('requested_at', 'asc');
+            // Order by date - newest first
+            $query->orderBy('requested_at', 'desc');
 
             $perPage = min($request->input('per_page', 20), 100);
             $approvals = $query->paginate($perPage);
@@ -367,6 +362,7 @@ class ApprovalController extends Controller
                                 'last_name' => $staff->last_name,
                                 'email' => $staff->email,
                                 'phone_number' => $staff->personalInfo->mobile_phone ?? null,
+                                'recruitment_ticket' => $staff->recruitmentRequest->ticket_id ?? null,
                                 'boarding_approval_status' => $staff->boarding_approval_status,
                                 'status' => $staff->status,
                                 'entry_date' => $staff->entry_date,

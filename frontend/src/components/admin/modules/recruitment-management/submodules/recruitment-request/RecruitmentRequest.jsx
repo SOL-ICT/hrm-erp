@@ -116,6 +116,14 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
 
   // Filter state
   const [showAssignedToMe, setShowAssignedToMe] = useState(false);
+  
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    last_page: 1,
+    per_page: 10,
+    total: 0,
+  });
 
   // ========================================
   // LIFECYCLE & DATA FETCHING
@@ -295,10 +303,11 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
     }
   };
 
-  const fetchRecruitmentRequests = async () => {
+  const fetchRecruitmentRequests = async (page = 1) => {
     try {
       const response = await recruitmentRequestAPI.getAll({
-        limit: 10,
+        page: page,
+        per_page: pagination.per_page,
         sort: "created_at",
         order: "desc",
         _t: Date.now(), // Cache buster
@@ -307,12 +316,29 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
       if (response.success && response.data) {
         // Handle different response structures
         let requestsData = [];
-        if (Array.isArray(response.data.data)) {
+        let paginationData = {};
+        
+        if (response.data.data && Array.isArray(response.data.data)) {
+          // Laravel paginated response
           requestsData = response.data.data;
+          paginationData = {
+            current_page: response.data.current_page || 1,
+            last_page: response.data.last_page || 1,
+            per_page: response.data.per_page || 10,
+            total: response.data.total || 0,
+          };
         } else if (Array.isArray(response.data)) {
           requestsData = response.data;
+          paginationData = {
+            current_page: 1,
+            last_page: 1,
+            per_page: 10,
+            total: response.data.length,
+          };
         }
+        
         setRecruitmentRequests(requestsData);
+        setPagination(paginationData);
       }
     } catch (error) {
       console.error("Failed to fetch recruitment requests:", error);
@@ -1665,6 +1691,61 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
                     </table>
                   );
                 })()}
+                
+                {/* Pagination */}
+                {pagination.last_page > 1 && (
+                <div className="mt-4 flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                  <div className="text-sm text-gray-600">
+                    Showing {((pagination.current_page - 1) * pagination.per_page) + 1} to{' '}
+                    {Math.min(pagination.current_page * pagination.per_page, pagination.total)} of{' '}
+                    {pagination.total} results
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => fetchRecruitmentRequests(pagination.current_page - 1)}
+                      disabled={pagination.current_page === 1}
+                      className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Previous
+                    </button>
+                    
+                    {[...Array(pagination.last_page)].map((_, i) => {
+                      const page = i + 1;
+                      if (
+                        page === 1 ||
+                        page === pagination.last_page ||
+                        (page >= pagination.current_page - 1 && page <= pagination.current_page + 1)
+                      ) {
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => fetchRecruitmentRequests(page)}
+                            className={`px-3 py-1 border rounded transition-colors ${
+                              page === pagination.current_page
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      } else if (page === pagination.current_page - 2 || page === pagination.current_page + 2) {
+                        return <span key={page} className="px-2 text-gray-400">...</span>;
+                      }
+                      return null;
+                    })}
+                    
+                    <button
+                      onClick={() => fetchRecruitmentRequests(pagination.current_page + 1)}
+                      disabled={pagination.current_page === pagination.last_page}
+                      className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
               </div>
             )}
           </div>
