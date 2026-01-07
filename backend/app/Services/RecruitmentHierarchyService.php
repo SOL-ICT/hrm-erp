@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\RecruitmentHierarchy;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -164,11 +165,42 @@ class RecruitmentHierarchyService
         $cacheKey = "recruitment_hierarchy_user_{$user->id}";
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($user) {
-            // Get user's role ID
-            $roleId = $user->role;
+            // First, try to get permissions from staff_roles table (multi-role support)
+            if ($user->staff_profile_id) {
+                $staffRoles = DB::table('staff_roles')
+                    ->where('staff_id', $user->staff_profile_id)
+                    ->pluck('role_id')
+                    ->toArray();
+
+                if (!empty($staffRoles)) {
+                    // Get the highest authority role (lowest hierarchy_level)
+                    $permissions = RecruitmentHierarchy::whereIn('role_id', $staffRoles)
+                        ->orderBy('hierarchy_level', 'asc')
+                        ->first();
+
+                    if ($permissions) {
+                        Log::info("User {$user->id} permissions from staff_roles", [
+                            'role_ids' => $staffRoles,
+                            'selected_role_id' => $permissions->role_id,
+                            'hierarchy_level' => $permissions->hierarchy_level
+                        ]);
+                        return $permissions;
+                    }
+                }
+            }
+
+            // Fallback: Map string role from users table to numeric role_id
+            $roleMapping = [
+                'super-admin' => 1,
+                'admin' => 2,
+                'recruitment' => 7,
+                'staff' => null, // Staff don't have recruitment permissions
+            ];
+
+            $roleId = $roleMapping[$user->role] ?? null;
 
             if (!$roleId) {
-                Log::warning("User {$user->id} has no role assigned");
+                Log::warning("User {$user->id} has unmapped role: {$user->role}");
                 return null;
             }
 

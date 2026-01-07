@@ -4,6 +4,7 @@ namespace App\Http\Requests\Approval;
 
 use Illuminate\Foundation\Http\FormRequest;
 use App\Models\Approval;
+use App\Services\RecruitmentHierarchyService;
 use Illuminate\Support\Facades\Auth;
 
 class RejectApprovalRequest extends FormRequest
@@ -19,12 +20,22 @@ class RejectApprovalRequest extends FormRequest
             return false;
         }
 
-        // User must be the current approver or have delegation rights
         $userId = Auth::id();
+        $user = Auth::user();
         
-        // Check if user is current approver
+        // Check if user is the specific assigned approver
         if ($approval->current_approver_id === $userId) {
             return true;
+        }
+
+        // For Control level approvals, check if user has Control role permissions
+        if ($approval->current_approval_level == 2) {
+            $hierarchyService = app(RecruitmentHierarchyService::class);
+            $permissions = $hierarchyService->getUserPermissions($user);
+            
+            if ($permissions && $permissions->hierarchy_level === 0 && $permissions->can_approve_boarding) {
+                return true;
+            }
         }
 
         // TODO: Check delegation when fully implemented

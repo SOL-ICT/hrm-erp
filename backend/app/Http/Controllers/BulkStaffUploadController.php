@@ -268,7 +268,22 @@ class BulkStaffUploadController extends Controller
             $ticket = RecruitmentRequest::with('client')->findOrFail($request->recruitment_request_id);
             $user = Auth::user();
 
-            if (!$this->canUseTicket($user, $ticket)) {
+            Log::info('Bulk upload process started', [
+                'user_id' => $user->id,
+                'ticket_id' => $ticket->id,
+                'user_staff_profile_id' => $user->staff_profile_id,
+            ]);
+
+            $canUse = $this->canUseTicket($user, $ticket);
+            Log::info('canUseTicket check result', [
+                'user_id' => $user->id,
+                'ticket_id' => $ticket->id,
+                'can_use' => $canUse,
+                'ticket_created_by' => $ticket->created_by,
+                'ticket_assigned_to' => $ticket->assigned_to,
+            ]);
+
+            if (!$canUse) {
                 return response()->json([
                     'success' => false,
                     'message' => 'You do not have permission to use this recruitment request'
@@ -302,6 +317,12 @@ class BulkStaffUploadController extends Controller
                 // Generate unique batch ID for this upload
                 $uploadBatchId = \Illuminate\Support\Str::uuid()->toString();
 
+                Log::info('Starting row processing', [
+                    'total_rows' => count($dataRows),
+                    'header_row_index' => $headerRow,
+                    'batch_id' => $uploadBatchId,
+                ]);
+
                 $successCount = 0;
                 $failedCount = 0;
                 $updatedCount = 0;
@@ -311,7 +332,15 @@ class BulkStaffUploadController extends Controller
                 $batchStaffIds = [];
 
                 foreach ($dataRows as $rowIndex => $row) {
-                    if (empty(array_filter($row))) continue;
+                    if (empty(array_filter($row))) {
+                        Log::debug("Skipping empty row {$rowIndex}");
+                        continue;
+                    }
+
+                    Log::info("Processing row {$rowIndex}", [
+                        'row_data_keys' => array_keys($row),
+                        'row_has_data' => !empty(array_filter($row)),
+                    ]);
 
                     try {
                         $mappedRow = $this->mapRowToFields($row, $fieldMapping);
@@ -320,6 +349,9 @@ class BulkStaffUploadController extends Controller
                         if (!$validation['valid']) {
                             $failedCount++;
                             $errors[] = "Row " . ($rowIndex + 1) . ": " . implode(', ', $validation['errors']);
+                            Log::warning("Row {$rowIndex} validation failed", [
+                                'errors' => $validation['errors']
+                            ]);
                             continue;
                         }
 
@@ -329,7 +361,19 @@ class BulkStaffUploadController extends Controller
                         // Check if staff already exists (UPDATE mode)
                         $existingStaff = $this->findExistingStaff($validatedRow);
 
+                        // Also check for rejected staff that should be re-submitted
+                        $rejectedStaff = null;
+                        if (!$existingStaff && !empty($validatedRow['employee_code'])) {
+                            $rejectedStaff = Staff::where('employee_code', $validatedRow['employee_code'])
+                                ->whereIn('boarding_approval_status', ['control_rejected', 'supervisor_rejected'])
+                                ->first();
+                        }
+
                         if ($existingStaff) {
+                            Log::info("Row {$rowIndex}: Existing staff found, updating", [
+                                'staff_id' => $existingStaff->id,
+                                'employee_code' => $existingStaff->employee_code
+                            ]);
                             // UPDATE MODE: Only fill NULL/empty fields
                             $updated = $this->updateExistingStaff($existingStaff, $validatedRow, $ticket);
                             
@@ -342,7 +386,65 @@ class BulkStaffUploadController extends Controller
                                     'status' => 'updated',
                                 ];
                             }
+                        } elseif ($rejectedStaff) {
+                            Log::info("Row {$rowIndex}: Rejected staff found, re-submitting", [
+                                'staff_id' => $rejectedStaff->id,
+                                'employee_code' => $rejectedStaff->employee_code,
+                                'previous_status' => $rejectedStaff->boarding_approval_status
+                            ]);
+                            
+                            // RE-SUBMISSION MODE: Update the rejected staff record and reset approval status
+                            $staffData = $this->prepareStaffData($validatedRow, $ticket, $request->offer_already_accepted);
+                            $staffData['upload_batch_id'] = $uploadBatchId;
+                            
+                            // Filter to only include fields that exist in the staff table
+                            $staffTableFields = [
+                                'client_id', 'service_location_id', 'sol_office_id', 'staff_type_id',
+                                'employee_code', 'staff_id', 'email', 'first_name', 'middle_name', 'last_name',
+                                'gender', 'entry_date', 'end_date', 'appointment_status', 'employment_type',
+                                'status', 'pay_grade_structure_id', 'salary_effective_date', 'salary_currency',
+                                'job_title', 'job_structure_id', 'department', 'location', 'state_lga_id',
+                                'supervisor_id', 'leave_category_level', 'appraisal_category', 'tax_id_no',
+                                'pf_no', 'pf_administrator', 'pfa_code', 'bv_no', 'nhf_account_no',
+                                'client_assigned_code', 'deployment_code', 'onboarding_method', 'upload_batch_id',
+                                'recruitment_request_id', 'boarding_approval_status'
+                            ];
+                            
+                            // Only keep fields that exist in staff table
+                            $filteredStaffData = array_intersect_key($staffData, array_flip($staffTableFields));
+                            
+                            // Update the staff record
+                            foreach ($filteredStaffData as $field => $value) {
+                                $rejectedStaff->{$field} = $value;
+                            }
+                            
+                            // Determine approval status based on user permissions
+                            // For bulk uploads, always use pending_control_approval to go through batch approval workflow
+                            $rejectedStaff->boarding_approval_status = 'pending_control_approval';
+                            $rejectedStaff->save();
+                            
+                            Log::info("Row {$rowIndex}: Rejected staff updated and re-submitted", [
+                                'staff_id' => $rejectedStaff->id,
+                                'employee_code' => $rejectedStaff->employee_code,
+                                'new_status' => $rejectedStaff->boarding_approval_status
+                            ]);
+
+                            // Create related records if data provided
+                            $this->createRelatedRecords($rejectedStaff, $validatedRow);
+
+                            $successCount++;
+                            $batchStaffIds[] = $rejectedStaff->id;
+                            $createdStaff[] = [
+                                'id' => $rejectedStaff->id,
+                                'employee_code' => $rejectedStaff->employee_code,
+                                'name' => $rejectedStaff->first_name . ' ' . $rejectedStaff->last_name,
+                                'status' => 'resubmitted',
+                            ];
                         } else {
+                            Log::info("Row {$rowIndex}: New staff, creating", [
+                                'first_name' => $validatedRow['first_name'] ?? 'N/A',
+                                'last_name' => $validatedRow['last_name'] ?? 'N/A',
+                            ]);
                             // INSERT MODE: Create new staff
                             // Prepare staff data
                             $staffData = $this->prepareStaffData($validatedRow, $ticket, $request->offer_already_accepted);
@@ -350,6 +452,11 @@ class BulkStaffUploadController extends Controller
 
                             // Board staff WITHOUT individual approval (batch approval will be created later)
                             $staff = $this->boardingService->boardStaffWithoutApproval($staffData, $user, $ticket);
+
+                            Log::info("Row {$rowIndex}: Staff boarded successfully", [
+                                'staff_id' => $staff->id,
+                                'employee_code' => $staff->employee_code
+                            ]);
 
                             // Create related records if data provided
                             $this->createRelatedRecords($staff, $validatedRow);
@@ -366,6 +473,10 @@ class BulkStaffUploadController extends Controller
                     } catch (\Exception $e) {
                         $failedCount++;
                         $errors[] = "Row " . ($rowIndex + 1) . ": " . $e->getMessage();
+                        Log::error("Row {$rowIndex} processing failed", [
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString()
+                        ]);
                     }
                 }
 
@@ -801,6 +912,7 @@ class BulkStaffUploadController extends Controller
                 ->whereHas('recruitmentRequest', function ($q) use ($ticket) {
                     $q->where('client_id', $ticket->client_id);
                 })
+                ->whereNotIn('boarding_approval_status', ['rejected', 'control_rejected'])
                 ->exists();
 
             if ($exists) {
@@ -808,9 +920,11 @@ class BulkStaffUploadController extends Controller
             }
         }
 
-        // Check for duplicate staff_id globally
+        // Check for duplicate staff_id globally (exclude rejected records)
         if (!empty($row['staff_id'])) {
-            if (Staff::where('staff_id', $row['staff_id'])->exists()) {
+            if (Staff::where('staff_id', $row['staff_id'])
+                    ->whereNotIn('boarding_approval_status', ['rejected', 'control_rejected'])
+                    ->exists()) {
                 $errors[] = "Staff ID '{$row['staff_id']}' already exists";
             }
         }
@@ -1190,10 +1304,16 @@ class BulkStaffUploadController extends Controller
 
     /**
      * Find existing staff by employee_code or staff_id
+     * 
+     * Note: Rejected staff are NOT considered "existing" - they should be re-submitted
+     * as new boarding attempts with a fresh approval workflow.
      */
     private function findExistingStaff(array $row)
     {
         $query = Staff::query();
+
+        // Exclude rejected staff - they should be re-uploaded as new submissions
+        $query->whereNotIn('boarding_approval_status', ['control_rejected', 'supervisor_rejected']);
 
         // Try to find by employee_code first (primary identifier)
         if (!empty($row['employee_code'])) {
@@ -1203,9 +1323,11 @@ class BulkStaffUploadController extends Controller
             }
         }
 
-        // Fallback to staff_id
+        // Fallback to staff_id (reset query to exclude rejected again)
         if (!empty($row['staff_id'])) {
-            $staff = Staff::where('staff_id', $row['staff_id'])->first();
+            $staff = Staff::where('staff_id', $row['staff_id'])
+                ->whereNotIn('boarding_approval_status', ['control_rejected', 'supervisor_rejected'])
+                ->first();
             if ($staff) {
                 return $staff;
             }

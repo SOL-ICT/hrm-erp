@@ -31,26 +31,65 @@ const approvalAPI = {
 
   /**
    * Get my pending approvals (approvals waiting for my action)
+   * @param {Object} filters - Optional filters including page and per_page
    * @returns {Promise} Pending approvals with summary stats
    */
-  getPending: async () => {
-    return apiService.makeRequest("/admin/approvals/pending");
+  getPending: async (filters = {}) => {
+    const params = new URLSearchParams();
+    
+    if (filters.page) params.append("page", filters.page);
+    if (filters.per_page) params.append("per_page", filters.per_page);
+    if (filters.module) params.append("module", filters.module);
+    if (filters.status) params.append("status", filters.status);
+    if (filters.priority) params.append("priority", filters.priority);
+    if (filters.search) params.append("search", filters.search);
+
+    const queryString = params.toString();
+    const url = `/admin/approvals/pending${queryString ? `?${queryString}` : ""}`;
+    
+    return apiService.makeRequest(url);
   },
 
   /**
    * Get my submitted approvals (approvals I requested)
+   * @param {Object} filters - Optional filters including page and per_page
    * @returns {Promise} Submitted approvals with counts by status
    */
-  getSubmitted: async () => {
-    return apiService.makeRequest("/admin/approvals/submitted");
+  getSubmitted: async (filters = {}) => {
+    const params = new URLSearchParams();
+    
+    if (filters.page) params.append("page", filters.page);
+    if (filters.per_page) params.append("per_page", filters.per_page);
+    if (filters.module) params.append("module", filters.module);
+    if (filters.status) params.append("status", filters.status);
+    if (filters.priority) params.append("priority", filters.priority);
+    if (filters.search) params.append("search", filters.search);
+
+    const queryString = params.toString();
+    const url = `/admin/approvals/submitted${queryString ? `?${queryString}` : ""}`;
+    
+    return apiService.makeRequest(url);
   },
 
   /**
    * Get approvals delegated to me
+   * @param {Object} filters - Optional filters including page and per_page
    * @returns {Promise} Delegated approvals
    */
-  getDelegated: async () => {
-    return apiService.makeRequest("/admin/approvals/delegated");
+  getDelegated: async (filters = {}) => {
+    const params = new URLSearchParams();
+    
+    if (filters.page) params.append("page", filters.page);
+    if (filters.per_page) params.append("per_page", filters.per_page);
+    if (filters.module) params.append("module", filters.module);
+    if (filters.status) params.append("status", filters.status);
+    if (filters.priority) params.append("priority", filters.priority);
+    if (filters.search) params.append("search", filters.search);
+
+    const queryString = params.toString();
+    const url = `/admin/approvals/delegated${queryString ? `?${queryString}` : ""}`;
+    
+    return apiService.makeRequest(url);
   },
 
   /**

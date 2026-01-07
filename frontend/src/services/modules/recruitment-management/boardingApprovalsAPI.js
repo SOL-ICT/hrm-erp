@@ -2,7 +2,7 @@
 
 import apiService from "@/services/apiService";
 
-const BASE_URL = "/boarding-approvals";
+const BASE_URL = "/boarding";
 
 const boardingApprovalsAPI = {
   /**
@@ -11,7 +11,7 @@ const boardingApprovalsAPI = {
    */
   getPending: async () => {
     try {
-      const response = await apiService.get(`${BASE_URL}/pending`);
+      const response = await apiService.get(`${BASE_URL}/pending-approvals`);
       return response;
     } catch (error) {
       console.error("Get pending approvals failed:", error);
