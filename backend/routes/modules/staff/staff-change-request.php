@@ -19,7 +19,7 @@ Route::middleware(['auth:sanctum'])->prefix('staff')->group(function () {
     // Misc routes
 
     //Route::get('/staff/profile', [ChangeRequestController::class, 'showProfile']);
-    Route::post('/change-requests', [ChangeRequestController::class, 'store']);
-    Route::get('/change-requests/history', [ChangeRequestController::class, 'getHistory']);
-    Route::put('/change-requests/{id}', [ChangeRequestController::class, 'update']);
+    // Route::post('/change-requests', [ChangeRequestController::class, 'store']);
+    // Route::get('/change-requests/history', [ChangeRequestController::class, 'getHistory']);
+    // Route::put('/change-requests/{id}', [ChangeRequestController::class, 'update']);
 });

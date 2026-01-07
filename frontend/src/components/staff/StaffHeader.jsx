@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation"; // Importing the router
 import { useNavigation } from '@/components/staff/components/NavigationContext'; 
+import useStaffProfile from "@/hooks/useStaffProfile"; // staff profile data
+import { apiService } from '@/services/api';
 import { 
   Menu, 
   X, 
@@ -37,7 +39,7 @@ export default function StaffHeader({
 
   //user
     const { user, logout } = useAuth();
-
+    const { profile, isLoading, error } = useStaffProfile(); //staff profile data 
   // Close all dropdowns
   const closeAllDropdowns = () => {
     setIsProfileOpen(false);
@@ -114,13 +116,22 @@ export default function StaffHeader({
               </button>
             </div>
 
-            {/* Brand Logo */}
-            <a href="#" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
-                <span className="text-white font-bold text-sm">SOL</span>
-              </div>
-              <span className="hidden md:block text-xl font-semibold text-gray-800">Strategic Outsourcing Limited</span>
-            </a>
+              {/* Brand Logo */}
+              <a href="#" className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">SOL</span>
+                </div>
+                <div className="hidden md:block">
+                  {profile?.client_name === "Strategic Outsourcing Limited" ? (
+                    <span className="text-xl font-semibold text-gray-800">Strategic Outsourcing Limited</span>
+                  ) : (
+                    <div className="flex flex-col">
+                      <span className="text-lg font-semibold text-gray-800">{profile?.client_name}</span>
+                      <span className="text-xs text-gray-500">Powered by SOL</span>
+                    </div>
+                  )}
+                </div>
+              </a>
             
 
           </div>
@@ -263,7 +274,7 @@ export default function StaffHeader({
     <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-50">
       <div className="p-4 border-b border-gray-200 text-center">
         <h6 className="font-semibold text-gray-900">{user?.name || "Loading..."}</h6>
-        <p className="text-sm text-gray-600">App Developer</p>
+        <p className="text-sm text-gray-600">{profile?.job_title || "Loading job title..."}</p>
       </div>
       <div className="py-2">
         {/* Profile Link as a Button */}

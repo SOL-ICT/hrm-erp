@@ -27,10 +27,19 @@ export class APIService {
   }
 
   async makeRequest(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
+    // Normalize endpoint and choose appropriate base URL.
+    // If the endpoint is a Sanctum endpoint (e.g. '/sanctum/...'),
+    // call the backend root (no '/api' prefix). For all other
+    // endpoints keep the configured `this.baseURL`.
+    const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    const isSanctum = normalizedEndpoint.startsWith("/sanctum");
+    const effectiveBase = isSanctum ? this.baseURL.replace("/api", "") : this.baseURL;
+    const url = `${effectiveBase}${normalizedEndpoint}`;
 
     // For authenticated requests, ensure CSRF cookie is available
-    if (!options.skipCsrf && typeof window !== "undefined") {
+    // but skip the prefetch when the caller is explicitly requesting the
+    // sanctum cookie itself to avoid double-calling the wrong '/api' path.
+    if (!options.skipCsrf && typeof window !== "undefined" && !isSanctum) {
       try {
         await fetch(`${this.baseURL.replace("/api", "")}/sanctum/csrf-cookie`, {
           credentials: "include",

@@ -104,49 +104,87 @@ class LeaveApplyController extends Controller
         }
     }
 
-    // Delete leave application
+    //for delting leave application
     public function destroy($id)
-    {
-        try {
-            // Check if user is authenticated
-            if (!Auth::check()) {
-                return response()->json(['message' => 'Unauthenticated'], 401);
-            }
-
-            // Check if leave application exists and belongs to authenticated user
-            $leave = DB::table('leave_applications')
-                ->where('id', $id)
-                ->where('staff_id', Auth::id())
-                ->first();
-
-            if (!$leave) {
-                return response()->json([
-                    'message' => 'Leave application not found or unauthorized'
-                ], 404);
-            }
-
-            // Only allow deletion of pending applications
-            if ($leave->status !== 'pending') {
-                return response()->json([
-                    'message' => 'Can only delete pending leave applications'
-                ], 403);
-            }
-
-            // Delete the leave application
-            DB::table('leave_applications')
-                ->where('id', $id)
-                ->where('staff_id', Auth::id())
-                ->delete();
-
-            return response()->json([
-                'message' => 'Leave application deleted successfully'
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Error deleting leave application',
-                'error' => $e->getMessage()
-            ], 500);
+{
+    try {
+        if (!Auth::check()) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
         }
+
+        // Find the leave and ensure it belongs to the user
+        $leave = DB::table('leave_applications')
+            ->where('id', $id)
+            ->where('staff_id', Auth::id())
+            ->first();
+
+        if (!$leave) {
+            return response()->json(['message' => 'Leave application not found'], 404);
+        }
+
+        if ($leave->status !== 'pending') {
+            return response()->json(['message' => 'Only pending leaves can be deleted'], 403);
+        }
+
+        DB::table('leave_applications')
+            ->where('id', $id)
+            ->delete();
+
+        return response()->json(['message' => 'Leave application deleted successfully.']);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Error deleting leave application',
+            'error' => $e->getMessage()
+        ], 500);
     }
 }
+
+
+// Get staff available for leave handover
+// Get staff available for leave handover
+public function handoverList()
+{
+    try {
+        if (!Auth::check()) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        // Get current staff ID (primary key) - same as other methods
+        $currentStaffId = Auth::id(); // This returns 8
+        
+        // Get current staff record to find client_id
+        $currentStaff = DB::table('staff')
+            ->where('id', $currentStaffId)
+            ->first();
+        
+        if (!$currentStaff) {
+            return response()->json(['message' => 'Staff record not found'], 404);
+        }
+        
+        $clientId = $currentStaff->client_id;
+        
+        // Fetch staff with same client, excluding the current user (by primary key id, not staff_id)
+        $handoverStaff = DB::table('staff')
+            ->select(
+                'staff_id as id',  // Return staff_id for frontend compatibility
+                'first_name',
+                'last_name',
+                'job_title',
+                'email'
+            )
+            ->where('client_id', $clientId)
+            ->where('id', '<>', $currentStaffId) // Use primary key 'id', not 'staff_id'
+            ->orderBy('first_name')
+            ->get();
+
+        return response()->json($handoverStaff);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Error fetching handover staff list',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+}
+

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import useStaffProfile from "@/hooks/useStaffProfile";
 import {
   ChevronDown,
   ChevronRight,
@@ -15,8 +16,6 @@ import {
   BookOpen,
   Star,
   Bell,
-  FileCheck,
-  Package,
 } from "lucide-react";
 
 // We've added a `componentKey` to each menu item and child.
@@ -37,10 +36,11 @@ const menuItems = [
     componentKey: "my-profile",
   },
   {
-    title: "Offer Acceptance",
-    icon: <FileCheck className="h-5 w-5" />,
+    title : "Offer Acceptance",
+    icon: <User className="h-5 w-5" />,
     componentKey: "offer-acceptance",
   },
+
   {
     title: "Leave Administration",
     icon: <Calendar className="h-5 w-5" />,
@@ -66,7 +66,7 @@ const menuItems = [
   },
   {
     title: "Requisition Management",
-    icon: <Package className="h-5 w-5" />,
+    icon: <DollarSign className="h-5 w-5" />,
     children: [{ title: "Create Requisition", componentKey: "create-requisition" }],
   },
   {
@@ -100,6 +100,7 @@ export default function StaffSidebar({
 }) {
   //username 
   const { user } = useAuth();
+  const { profile, isLoading, error } = useStaffProfile();
 
   const [expandedSections, setExpandedSections] = useState([]);
 
@@ -162,7 +163,7 @@ export default function StaffSidebar({
             {isOpen && (
               <div className="flex-1">
                 <h2 className="font-semibold text-base text-gray-800">{user?.name || "Loading..."}</h2>
-                <p className="text-xs text-gray-500">App Developer</p>
+                <p className="text-xs text-gray-500">{profile?.job_title || "Loading job title..."}</p>
               </div>
             )}
           </div>

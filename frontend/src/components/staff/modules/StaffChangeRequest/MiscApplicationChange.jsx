@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, ChevronLeft, Upload, Lock, Info, CheckCircle, AlertCircle, FileText, User, Mail, Phone, MapPin, Users, Heart, CreditCard, Building, Edit3 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Upload, Lock, Info, CheckCircle, AlertCircle, FileText, User, Mail, Phone, MapPin, Users, Heart, CreditCard, Building, Edit3, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import apiService from '@/services/api';
 
 const MiscApplicationChange = ({ userId }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [staffProfile, setStaffProfile] = useState(null);
+  const [currentValues, setCurrentValues] = useState({});
   const [applicationHistory, setApplicationHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -15,20 +17,218 @@ const MiscApplicationChange = ({ userId }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState({});
+  const [validationErrors, setValidationErrors] = useState({});
+  const [showSensitiveData, setShowSensitiveData] = useState({});
 
-  const availableFields = [
-    { id: 'accountNumber', label: 'Account Number', icon: CreditCard, sensitive: true, proofRequired: true },
-    { id: 'placeOfService', label: 'Place of Service', icon: Building, proofRequired: false },
-    { id: 'residentialAddress', label: 'Residential Address', icon: MapPin, proofRequired: true },
-    { id: 'stateOfResidence', label: 'State of Residence', icon: MapPin, proofRequired: true },
-    { id: 'guarantorDetails', label: 'Guarantor Details', icon: Users, proofRequired: true },
-    { id: 'nextOfKin', label: 'Next of Kin', icon: User, proofRequired: true },
-    { id: 'maritalStatus', label: 'Marital Status', icon: Heart, proofRequired: true },
-    { id: 'mobileNumber', label: 'Mobile Number', icon: Phone, proofRequired: false },
-    { id: 'emailAddress', label: 'Email Address', icon: Mail, proofRequired: false },
-    { id: 'pensionDetails', label: 'Pension Details', icon: FileText, proofRequired: true },
-    { id: 'other', label: 'Other', icon: Edit3, proofRequired: false, freeText: true }
-  ];
+  // Field categories for better organization
+  const fieldCategories = {
+    banking: {
+      title: 'Banking Information',
+      icon: CreditCard,
+      fields: [
+        { id: 'bankName', label: 'Bank Name', type: 'select', sensitive: false, proofRequired: true },
+        { id: 'accountNumber', label: 'Account Number', type: 'text', sensitive: true, proofRequired: true },
+        { id: 'accountType', label: 'Account Type', type: 'select', sensitive: false, proofRequired: true },
+        { id: 'bvn', label: 'Bank Verification Number (BVN)', type: 'text', sensitive: true, proofRequired: true },
+        { id: 'sortCode', label: 'Sort Code', type: 'text', sensitive: false, proofRequired: false }
+      ]
+    },
+    identification: {
+      title: 'Identification Information',
+      icon: FileText,
+      fields: [
+        { id: 'nin', label: 'National Identification Number (NIN)', type: 'text', sensitive: true, proofRequired: true },
+        { id: 'tin', label: 'Tax Identification Number (TIN)', type: 'text', sensitive: true, proofRequired: true },
+        { id: 'driverLicense', label: "Driver's License Number", type: 'text', sensitive: false, proofRequired: true },
+        { id: 'passportNumber', label: 'International Passport Number', type: 'text', sensitive: false, proofRequired: true }
+      ]
+    },
+    location: {
+      title: 'Location Information',
+      icon: MapPin,
+      fields: [
+        { id: 'residentialAddress', label: 'Residential Address', type: 'textarea', sensitive: false, proofRequired: true },
+        { id: 'stateOfResidence', label: 'State of Residence', type: 'select', sensitive: false, proofRequired: true },
+        { id: 'lga', label: 'Local Government Area (LGA)', type: 'select', sensitive: false, proofRequired: true },
+        { id: 'landmark', label: 'Landmark/Directions', type: 'textarea', sensitive: false, proofRequired: false },
+        { id: 'residenceType', label: 'Residence Type', type: 'select', sensitive: false, proofRequired: true },
+        { id: 'gpsCoordinates', label: 'GPS Coordinates', type: 'text', sensitive: false, proofRequired: false }
+      ]
+    },
+    employment: {
+      title: 'Employment Information',
+      icon: Building,
+      fields: [
+        { id: 'placeOfService', label: 'Place of Service', type: 'text', sensitive: false, proofRequired: false },
+        { id: 'department', label: 'Department/Division', type: 'text', sensitive: false, proofRequired: false },
+        { id: 'employmentGrade', label: 'Employment Grade/Level', type: 'text', sensitive: false, proofRequired: false },
+        { id: 'employmentType', label: 'Employment Type', type: 'select', sensitive: false, proofRequired: false },
+        { id: 'lastPromotionDate', label: 'Date of Last Promotion', type: 'date', sensitive: false, proofRequired: false }
+      ]
+    },
+    contact: {
+      title: 'Contact Information',
+      icon: Phone,
+      fields: [
+        { id: 'mobileNumber', label: 'Mobile Number', type: 'tel', sensitive: false, proofRequired: false },
+        { id: 'alternativeNumber', label: 'Alternative Phone Number', type: 'tel', sensitive: false, proofRequired: false },
+        { id: 'emailAddress', label: 'Email Address', type: 'email', sensitive: false, proofRequired: false }
+      ]
+    },
+    personal: {
+      title: 'Personal Information',
+      icon: User,
+      fields: [
+        { id: 'maritalStatus', label: 'Marital Status', type: 'select', sensitive: false, proofRequired: true }
+      ]
+    },
+    pension: {
+      title: 'Pension Information',
+      icon: Heart,
+      fields: [
+        { id: 'pfaName', label: 'Pension Fund Administrator (PFA) Name', type: 'select', sensitive: false, proofRequired: true },
+        { id: 'pensionPin', label: 'Pension PIN', type: 'text', sensitive: true, proofRequired: true },
+        { id: 'rsaNumber', label: 'Retirement Savings Account (RSA) Number', type: 'text', sensitive: true, proofRequired: true }
+      ]
+    },
+    nextOfKin: {
+      title: 'Next of Kin Information',
+      icon: Users,
+      fields: [
+        { id: 'nokFullName', label: 'Next of Kin Full Name', type: 'text', sensitive: false, proofRequired: true },
+        { id: 'nokRelationship', label: 'Relationship to Employee', type: 'select', sensitive: false, proofRequired: true },
+        { id: 'nokDateOfBirth', label: 'Next of Kin Date of Birth', type: 'date', sensitive: false, proofRequired: true },
+        { id: 'nokOccupation', label: 'Next of Kin Occupation', type: 'text', sensitive: false, proofRequired: true },
+        { id: 'nokEmployer', label: 'Next of Kin Employer', type: 'text', sensitive: false, proofRequired: true },
+        { id: 'nokAddress', label: 'Next of Kin Complete Address', type: 'textarea', sensitive: false, proofRequired: true },
+        { id: 'nokPhone', label: 'Next of Kin Phone Number', type: 'tel', sensitive: false, proofRequired: true },
+        { id: 'nokAlternativePhone', label: 'Next of Kin Alternative Phone', type: 'tel', sensitive: false, proofRequired: false },
+        { id: 'nokEmail', label: 'Next of Kin Email Address', type: 'email', sensitive: false, proofRequired: false }
+      ]
+    },
+    guarantor: {
+      title: 'Guarantor Information',
+      icon: Users,
+      fields: [
+        { id: 'guarantorFullName', label: 'Guarantor Full Name', type: 'text', sensitive: false, proofRequired: true },
+        { id: 'guarantorRelationship', label: 'Relationship to Employee', type: 'text', sensitive: false, proofRequired: true },
+        { id: 'guarantorOccupation', label: 'Guarantor Occupation', type: 'text', sensitive: false, proofRequired: true },
+        { id: 'guarantorEmployer', label: 'Guarantor Employer', type: 'text', sensitive: false, proofRequired: true },
+        { id: 'guarantorAddress', label: 'Guarantor Complete Address', type: 'textarea', sensitive: false, proofRequired: true },
+        { id: 'guarantorPhone', label: 'Guarantor Phone Number', type: 'tel', sensitive: false, proofRequired: true },
+        { id: 'guarantorEmail', label: 'Guarantor Email Address', type: 'email', sensitive: false, proofRequired: true },
+        { id: 'guarantorIncome', label: 'Guarantor Monthly Income', type: 'number', sensitive: true, proofRequired: true }
+      ]
+    },
+    other: {
+      title: 'Other Information',
+      icon: Edit3,
+      fields: [
+        { id: 'other', label: 'Other', type: 'textarea', sensitive: false, proofRequired: false, freeText: true }
+      ]
+    }
+  };
+
+  // Nigerian-specific data for dropdowns
+  const nigerianData = {
+    banks: [
+      'Access Bank', 'Citibank', 'Ecobank', 'Fidelity Bank', 'First Bank of Nigeria',
+      'First City Monument Bank', 'Guaranty Trust Bank', 'Heritage Bank', 'Keystone Bank',
+      'Polaris Bank', 'Stanbic IBTC Bank', 'Standard Chartered Bank', 'Sterling Bank',
+      'Union Bank of Nigeria', 'United Bank for Africa', 'Unity Bank', 'Wema Bank', 'Zenith Bank'
+    ],
+    accountTypes: ['Savings Account', 'Current Account', 'Domiciliary Account'],
+    states: [
+      'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',
+      'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'FCT', 'Gombe',
+      'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara',
+      'Lagos', 'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau',
+      'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara'
+    ],
+    residenceTypes: ['Owned', 'Rented', 'Family Home', 'Company Accommodation'],
+    maritalStatus: ['Single', 'Married', 'Divorced', 'Widowed', 'Separated'],
+    employmentTypes: ['Permanent', 'Contract', 'Temporary', 'Consultant'],
+    relationships: ['Father', 'Mother', 'Spouse', 'Sibling', 'Child', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Other'],
+    pfaNames: [
+      'ARM Pension Managers', 'AXA Mansard Pension', 'Crusader Sterling Pensions',
+      'FCMB Pensions', 'Fidelity Pension Managers', 'IEI-Anchor Pension Managers',
+      'IGI Pension Fund Managers', 'Investment One Pension Managers', 'Leadway Pensure',
+      'NLPC Pension Fund Administrators', 'NPF Pensions', 'OAK Pensions',
+      'Pensions Alliance Limited', 'Premium Pension', 'Radix Pension Managers',
+      'Sigma Pensions', 'Stanbic IBTC Pension Managers', 'Trustfund Pensions',
+      'Veritas Glanvills Pensions', 'Zenith Pension Custodian'
+    ]
+  };
+
+  // Validation functions
+  const validateField = (fieldId, value, fieldConfig) => {
+    const errors = [];
+
+    if (!value || value.toString().trim() === '') {
+      errors.push('This field is required');
+      return errors;
+    }
+
+    switch (fieldId) {
+      case 'bvn':
+        if (!/^\d{11}$/.test(value)) {
+          errors.push('BVN must be exactly 11 digits');
+        }
+        break;
+      case 'nin':
+        if (!/^\d{11}$/.test(value)) {
+          errors.push('NIN must be exactly 11 digits');
+        }
+        break;
+      case 'tin':
+        if (!/^\d{10,12}$/.test(value)) {
+          errors.push('TIN must be 10-12 digits');
+        }
+        break;
+      case 'accountNumber':
+        if (!/^\d{10}$/.test(value)) {
+          errors.push('Nigerian account numbers must be exactly 10 digits');
+        }
+        break;
+      case 'rsaNumber':
+        if (!/^\d{15}$/.test(value)) {
+          errors.push('RSA number must be exactly 15 digits');
+        }
+        break;
+      case 'mobileNumber':
+      case 'alternativeNumber':
+      case 'nokPhone':
+      case 'nokAlternativePhone':
+      case 'guarantorPhone':
+        if (!/^(080|081|090|091|070|071)\d{8}$/.test(value.replace(/\s/g, ''))) {
+          errors.push('Nigerian phone numbers must follow the format 080xxxxxxxx, 081xxxxxxxx, 090xxxxxxxx, 091xxxxxxxx, 070xxxxxxxx, or 071xxxxxxxx');
+        }
+        break;
+      case 'emailAddress':
+      case 'nokEmail':
+      case 'guarantorEmail':
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          errors.push('Please enter a valid email address');
+        }
+        break;
+      case 'nokDateOfBirth':
+        const birthDate = new Date(value);
+        const eighteenYearsAgo = new Date();
+        eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
+        if (birthDate > eighteenYearsAgo) {
+          errors.push('Next of kin must be at least 18 years old');
+        }
+        break;
+      case 'guarantorIncome':
+        if (isNaN(value) || parseFloat(value) <= 0) {
+          errors.push('Please enter a valid monthly income amount');
+        }
+        break;
+    }
+
+    return errors;
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -44,49 +244,32 @@ const MiscApplicationChange = ({ userId }) => {
 
       try {
         console.log('Fetching staff profile for user ID:', user.id);
-        const profileResponse = await fetch(`http://localhost:8000/api/staff/staff-profiles/${user.id}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          credentials: 'include',
-        });
-        console.log('Profile API response status:', profileResponse.status);
-        if (!profileResponse.ok) {
-          if (profileResponse.status === 401) {
-            setErrorMessage('Authentication failed. Please log in again.');
-          } else {
-            setErrorMessage(`Failed to fetch profile: HTTP ${profileResponse.status}`);
-          }
-          throw new Error(`Profile fetch failed: ${profileResponse.status}`);
-        }
-        const profileData = await profileResponse.json();
+
+        // Use centralized apiService (returns parsed JSON or throws on non-OK)
+        const profileRaw = await apiService.makeRequest(`staff/staff-profiles/${user.id}`, { method: 'GET' });
+        const profileData = Array.isArray(profileRaw) ? profileRaw[0] || null : profileRaw || null;
         setStaffProfile(profileData);
 
-        console.log('Fetching application history');
-        const historyResponse = await fetch(`http://localhost:8000/api/staff/change-requests/history`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          credentials: 'include',
-        });
-        console.log('History API response status:', historyResponse.status);
-        if (!historyResponse.ok) {
-          if (historyResponse.status === 401) {
-            setErrorMessage('Authentication failed. Please log in again.');
-          } else {
-            setErrorMessage(`Failed to fetch history: HTTP ${historyResponse.status}`);
-          }
-          throw new Error(`History fetch failed: ${historyResponse.status}`);
+        // Attempt to fetch current values (mock endpoint that will fail gracefully)
+        try {
+          console.log('Attempting to fetch current values');
+          const currentValuesData = await apiService.makeRequest(`staff/current-values/${user.id}`, { method: 'GET' });
+          setCurrentValues(currentValuesData || {});
+        } catch (currentValuesError) {
+          console.log('Current values endpoint failed gracefully:', currentValuesError.message);
+          setCurrentValues({});
         }
-        const historyData = await historyResponse.json();
-        setApplicationHistory(historyData);
+
+        console.log('Fetching application history');
+        const historyData = await apiService.makeRequest('staff/change-requests/history', { method: 'GET' });
+        setApplicationHistory(Array.isArray(historyData) ? historyData : []);
       } catch (error) {
         console.error('Failed to fetch data:', error.message);
-        if (!errorMessage) setErrorMessage('An error occurred while fetching data.');
+        if (error?.message && error.message.toLowerCase().includes('401')) {
+          setErrorMessage('Authentication failed. Please log in again.');
+        } else if (!errorMessage) {
+          setErrorMessage('An error occurred while fetching data.');
+        }
       } finally {
         setLoading(false);
       }
@@ -94,6 +277,24 @@ const MiscApplicationChange = ({ userId }) => {
 
     fetchData();
   }, [user]);
+
+  const getCurrentValue = (fieldId) => {
+    return currentValues[fieldId] || staffProfile?.[fieldId] || 'Not set';
+  };
+
+  const toggleCategory = (categoryId) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
+    }));
+  };
+
+  const toggleSensitiveData = (fieldId) => {
+    setShowSensitiveData(prev => ({
+      ...prev,
+      [fieldId]: !prev[fieldId]
+    }));
+  };
 
   const handleFieldSelection = (fieldId) => {
     setSelectedFields(prev =>
@@ -108,12 +309,25 @@ const MiscApplicationChange = ({ userId }) => {
       ...prev,
       [fieldId]: value
     }));
+
+    // Real-time validation
+    const fieldConfig = Object.values(fieldCategories)
+      .flatMap(cat => cat.fields)
+      .find(field => field.id === fieldId);
+
+    if (fieldConfig) {
+      const errors = validateField(fieldId, value, fieldConfig);
+      setValidationErrors(prev => ({
+        ...prev,
+        [fieldId]: errors
+      }));
+    }
   };
 
-  const handleFileUpload = (fieldId, file) => {
+  const handleFileUpload = (fieldId, files) => {
     setUploadedFiles(prev => ({
       ...prev,
-      [fieldId]: file
+      [fieldId]: Array.from(files)
     }));
   };
 
@@ -125,31 +339,38 @@ const MiscApplicationChange = ({ userId }) => {
       selectedFields.forEach(fieldId => {
         formDataToSend.append(fieldId, formData[fieldId] || '');
         if (uploadedFiles[fieldId]) {
-          formDataToSend.append(`${fieldId}_proof`, uploadedFiles[fieldId]);
+          uploadedFiles[fieldId].forEach((file, index) => {
+            formDataToSend.append(`${fieldId}_proof_${index}`, file);
+          });
         }
       });
       formDataToSend.append('userId', user.id);
 
       console.log('Submitting change request');
-      const response = await fetch(`http://localhost:8000/api/staff/change-requests`, {
-        method: 'POST',
-        body: formDataToSend,
-        credentials: 'include',
-      });
-      console.log('Submit API response status:', response.status);
-      if (!response.ok) {
-        if (response.status === 401) {
+      try {
+        await apiService.makeRequest('staff/change-requests', {
+          method: 'POST',
+          body: formDataToSend,
+          headers: {}, // allow browser to set Content-Type for FormData
+        });
+
+        setShowSuccess(true);
+        setTimeout(() => {
+          setShowSuccess(false);
+          setCurrentStep(0);
+          setSelectedFields([]);
+          setFormData({});
+          setUploadedFiles({});
+        }, 3000);
+      } catch (submitError) {
+        console.error('Submit API error:', submitError.message);
+        if (submitError?.message && submitError.message.toLowerCase().includes('401')) {
           setErrorMessage('Authentication failed. Please log in again.');
-        } else {
-          setErrorMessage(`Failed to submit request: HTTP ${response.status}`);
+        } else if (!errorMessage) {
+          setErrorMessage('An error occurred while submitting the request.');
         }
-        throw new Error(`Submit failed: ${response.status}`);
+        throw submitError;
       }
-      setShowSuccess(true);
-      setTimeout(() => {
-        setShowSuccess(false);
-        setCurrentStep(0);
-      }, 3000);
     } catch (error) {
       console.error('Error submitting change request:', error.message);
       if (!errorMessage) setErrorMessage('An error occurred while submitting the request.');
@@ -158,21 +379,109 @@ const MiscApplicationChange = ({ userId }) => {
     }
   };
 
-  const getFieldIcon = (fieldId) => {
-    const field = availableFields.find(f => f.id === fieldId);
-    const IconComponent = field?.icon || Edit3;
-    return <IconComponent className="w-5 h-5" />;
+  const getFieldConfig = (fieldId) => {
+    return Object.values(fieldCategories)
+      .flatMap(cat => cat.fields)
+      .find(field => field.id === fieldId);
   };
 
   const isFormValid = () => {
     return selectedFields.every(fieldId => {
-      const field = availableFields.find(f => f.id === fieldId);
-      const currentValue = staffProfile?.[fieldId] || 'Not set';
+      const field = getFieldConfig(fieldId);
+      const currentValue = getCurrentValue(fieldId);
       const newValue = formData[fieldId] || '';
       const isValueChanged = newValue !== currentValue && newValue.trim() !== '';
-      const hasFileIfRequired = field?.proofRequired ? !!uploadedFiles[fieldId] : true;
-      return isValueChanged && hasFileIfRequired;
+      const hasFileIfRequired = field?.proofRequired ? 
+        (uploadedFiles[fieldId] && uploadedFiles[fieldId].length > 0) : true;
+      const hasNoValidationErrors = !validationErrors[fieldId] || validationErrors[fieldId].length === 0;
+      return isValueChanged && hasFileIfRequired && hasNoValidationErrors;
     });
+  };
+
+  const renderInput = (field, value, onChange) => {
+    const hasError = validationErrors[field.id] && validationErrors[field.id].length > 0;
+
+    const baseInputClass = `w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
+      hasError ? 'border-red-300 bg-red-50' : 'border-gray-300'
+    }`;
+
+    switch (field.type) {
+      case 'select':
+        let options = [];
+        if (field.id === 'bankName') options = nigerianData.banks;
+        else if (field.id === 'accountType') options = nigerianData.accountTypes;
+        else if (field.id === 'stateOfResidence') options = nigerianData.states;
+        else if (field.id === 'residenceType') options = nigerianData.residenceTypes;
+        else if (field.id === 'maritalStatus') options = nigerianData.maritalStatus;
+        else if (field.id === 'employmentType') options = nigerianData.employmentTypes;
+        else if (field.id === 'nokRelationship') options = nigerianData.relationships;
+        else if (field.id === 'pfaName') options = nigerianData.pfaNames;
+
+        return (
+          <select
+            value={value || ''}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            className={baseInputClass}
+          >
+            <option value="">Select {field.label}</option>
+            {options.map(option => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        );
+
+      case 'textarea':
+        return (
+          <textarea
+            value={value || ''}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            className={baseInputClass}
+            rows="3"
+            placeholder={`Enter ${field.label.toLowerCase()}`}
+          />
+        );
+
+      case 'tel':
+      case 'email':
+      case 'text':
+      case 'date':
+      case 'number':
+        const inputElement = (
+          <input
+            type={field.type}
+            value={value || ''}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            className={baseInputClass}
+            placeholder={`Enter ${field.label.toLowerCase()}`}
+          />
+        );
+
+        if (field.sensitive) {
+          return (
+            <div className="relative">
+              <input
+                type={showSensitiveData[field.id] ? 'text' : 'password'}
+                value={value || ''}
+                onChange={(e) => onChange(field.id, e.target.value)}
+                className={`${baseInputClass} pr-12`}
+                placeholder={`Enter ${field.label.toLowerCase()}`}
+              />
+              <button
+                type="button"
+                onClick={() => toggleSensitiveData(field.id)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              >
+                {showSensitiveData[field.id] ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+          );
+        }
+
+        return inputElement;
+
+      default:
+        return inputElement;
+    }
   };
 
   if (loading) {
@@ -215,10 +524,9 @@ const MiscApplicationChange = ({ userId }) => {
               {[
                 { label: 'Entry Date', value: staffProfile?.entry_date },
                 { label: 'Employee Code', value: staffProfile?.employee_code },
-                { label: 'Client Name', value: staffProfile?.clientName },
+                { label: 'Client Name', value: staffProfile?.client_name },
                 { label: 'Service Location', value: staffProfile?.location },
-               // for employee name i want to concat .first_name , .middle_name and .last_name from staffprofile, if middle_name exists
-                { label: 'Employee Name', value: `${staffProfile?.first_name} ${staffProfile?.middle_name ? staffProfile?.middle_name + ' ' : ''}${staffProfile?.last_name}` },
+                { label: 'Employee Name', value: `${staffProfile?.first_name || ''} ${staffProfile?.middle_name ? staffProfile?.middle_name + ' ' : ''}${staffProfile?.last_name || ''}`.trim() || 'Not set' },
                 { label: 'Designation', value: staffProfile?.designation },
                 { label: 'Email ID', value: staffProfile?.email },
                 { label: 'SOL RM Email', value: staffProfile?.solRmEmail },
@@ -301,33 +609,60 @@ const MiscApplicationChange = ({ userId }) => {
             {currentStep === 1 && (
               <div className="p-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Step 1: Select Fields to Change</h2>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {availableFields.map((field) => (
-                    <div key={field.id} className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                      selectedFields.includes(field.id) ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'
-                    }`} onClick={() => handleFieldSelection(field.id)}>
-                      <div className="flex items-center space-x-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedFields.includes(field.id)}
-                          onChange={() => handleFieldSelection(field.id)}
-                          className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                        />
-                        <div className="flex items-center space-x-2">
-                          {getFieldIcon(field.id)}
-                          <span className="font-medium text-gray-800">{field.label}</span>
-                          {field.proofRequired && (
-                            <span className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded">
-                              📎 Proof Required
-                            </span>
-                          )}
-                          {field.sensitive && (
-                            <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded">
-                              🔒 Sensitive
-                            </span>
-                          )}
+                
+                <div className="space-y-4">
+                  {Object.entries(fieldCategories).map(([categoryId, category]) => (
+                    <div key={categoryId} className="border border-gray-200 rounded-lg">
+                      <button
+                        onClick={() => toggleCategory(categoryId)}
+                        className="w-full p-4 flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-t-lg transition-colors"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <category.icon className="w-5 h-5 text-indigo-600" />
+                          <span className="font-medium text-gray-800">{category.title}</span>
+                          <span className="text-sm text-gray-500">
+                            ({category.fields.filter(field => selectedFields.includes(field.id)).length} selected)
+                          </span>
                         </div>
-                      </div>
+                        {expandedCategories[categoryId] ? 
+                          <ChevronUp className="w-5 h-5 text-gray-400" /> : 
+                          <ChevronDown className="w-5 h-5 text-gray-400" />
+                        }
+                      </button>
+                      
+                      {expandedCategories[categoryId] && (
+                        <div className="p-4 border-t border-gray-200">
+                          <div className="grid md:grid-cols-2 gap-3">
+                            {category.fields.map((field) => (
+                              <div key={field.id} className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${
+                                selectedFields.includes(field.id) ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'
+                              }`} onClick={() => handleFieldSelection(field.id)}>
+                                <div className="flex items-center space-x-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedFields.includes(field.id)}
+                                    onChange={() => handleFieldSelection(field.id)}
+                                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                  />
+                                  <div className="flex items-center space-x-2 flex-1">
+                                    <span className="font-medium text-gray-800 text-sm">{field.label}</span>
+                                    {field.proofRequired && (
+                                      <span className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded">
+                                        📎 Proof Required
+                                      </span>
+                                    )}
+                                    {field.sensitive && (
+                                      <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded">
+                                        🔒 Sensitive
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -347,22 +682,29 @@ const MiscApplicationChange = ({ userId }) => {
 
             {currentStep === 2 && (
               <div className="p-6">
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">Step 2: Provide New Information & Upload Proof</h2>
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Step 2: Provide New Information & Upload Proof</h2>
                 <div className="space-y-6">
                   {selectedFields.map((fieldId) => {
-                    const field = availableFields.find(f => f.id === fieldId);
-                    const oldValue = staffProfile?.[fieldId] || 'Not set';
+                    const field = getFieldConfig(fieldId);
+                    const oldValue = getCurrentValue(fieldId);
 
                     return (
                       <div key={fieldId} className="border border-gray-200 rounded-lg p-6 bg-gray-50">
                         <div className="flex items-center space-x-2 mb-4">
-                          {getFieldIcon(fieldId)}
-                          <h3 className="text-lg font-medium text-gray-800">{field?.label}</h3>
+                          {Object.values(fieldCategories).map(cat => {
+                            const categoryField = cat.fields.find(f => f.id === fieldId);
+                            if (categoryField) {
+                              return <cat.icon key={cat.title} className="w-5 h-5 text-indigo-600" />;
+                            }
+                            return null;
+                          })}
+                          {/* the texts are not visible */}
+                          <h3 className="text-lg font-medium text-gray-900">{field?.label}</h3>
                         </div>
 
                         <div className="grid md:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">Current Value</label>
+                            <label className="text-sm font-medium text-gray-900">Current Value</label>
                             <div className="p-3 bg-white border border-gray-200 rounded-lg flex items-center space-x-2">
                               <Lock className="w-4 h-4 text-gray-400" />
                               <span className="text-gray-600">{oldValue}</span>
@@ -373,22 +715,16 @@ const MiscApplicationChange = ({ userId }) => {
                             <label className="text-sm font-medium text-gray-700">
                               New Value <span className="text-red-500">*</span>
                             </label>
-                            {field?.freeText ? (
-                              <textarea
-                                value={formData[fieldId] || ''}
-                                onChange={(e) => handleInputChange(fieldId, e.target.value)}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                rows="3"
-                                placeholder="Describe the changes you need..."
-                              />
-                            ) : (
-                              <input
-                                type={fieldId === 'emailAddress' ? 'email' : fieldId === 'mobileNumber' ? 'tel' : 'text'}
-                                value={formData[fieldId] || ''}
-                                onChange={(e) => handleInputChange(fieldId, e.target.value)}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500  text-gray-800"
-                                placeholder={`Enter new  ${field?.label.toLowerCase()}`}
-                              />
+                            {renderInput(field, formData[fieldId], handleInputChange)}
+                            {validationErrors[fieldId] && validationErrors[fieldId].length > 0 && (
+                              <div className="text-red-600 text-sm space-y-1">
+                                {validationErrors[fieldId].map((error, index) => (
+                                  <p key={index} className="flex items-center space-x-1">
+                                    <AlertCircle className="w-4 h-4" />
+                                    <span>{error}</span>
+                                  </p>
+                                ))}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -397,12 +733,16 @@ const MiscApplicationChange = ({ userId }) => {
                           <div className="mt-4">
                             <label className="text-sm font-medium text-gray-700 mb-2 block">
                               Upload Proof <span className="text-red-500">*</span>
+                              <span className="text-xs text-gray-500 block mt-1">
+                                You can upload multiple files. PDF format is preferred.
+                              </span>
                             </label>
                             <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-indigo-400 transition-colors">
                               <input
                                 type="file"
-                                onChange={(e) => handleFileUpload(fieldId, e.target.files[0])}
+                                onChange={(e) => handleFileUpload(fieldId, e.target.files)}
                                 accept=".pdf,.jpg,.jpeg,.png"
+                                multiple
                                 className="hidden"
                                 id={`file-${fieldId}`}
                               />
@@ -413,12 +753,25 @@ const MiscApplicationChange = ({ userId }) => {
                                 <Upload className="w-8 h-8 text-gray-400" />
                                 <div className="text-center">
                                   <span className="text-sm text-gray-600">
-                                    {uploadedFiles[fieldId] ? uploadedFiles[fieldId].name : 'Click to upload or drag and drop'}
+                                    {uploadedFiles[fieldId] && uploadedFiles[fieldId].length > 0 
+                                      ? `${uploadedFiles[fieldId].length} file(s) selected`
+                                      : 'Click to upload or drag and drop'
+                                    }
                                   </span>
-                                  <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG up to 5MB</p>
+                                  <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG up to 5MB each</p>
                                 </div>
                               </label>
                             </div>
+                            {uploadedFiles[fieldId] && uploadedFiles[fieldId].length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                {uploadedFiles[fieldId].map((file, index) => (
+                                  <p key={index} className="text-xs text-green-600 flex items-center space-x-1">
+                                    <CheckCircle className="w-3 h-3" />
+                                    <span>{file.name}</span>
+                                  </p>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -458,25 +811,35 @@ const MiscApplicationChange = ({ userId }) => {
 
                   <div className="space-y-4">
                     {selectedFields.map((fieldId) => {
-                      const field = availableFields.find(f => f.id === fieldId);
-                      const oldValue = staffProfile?.[fieldId] || 'Not set';
+                      const field = getFieldConfig(fieldId);
+                      const oldValue = getCurrentValue(fieldId);
                       const newValue = formData[fieldId] || 'Not provided';
-                      const hasFile = uploadedFiles[fieldId];
+                      const hasFiles = uploadedFiles[fieldId] && uploadedFiles[fieldId].length > 0;
 
                       return (
-                        <div key={fieldId} className="flex items-center justify-between p-3 bg-white rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            {getFieldIcon(fieldId)}
+                        <div key={fieldId} className="flex items-start justify-between p-3 bg-white rounded-lg">
+                          <div className="flex items-start space-x-3">
+                            {Object.values(fieldCategories).map(cat => {
+                              const categoryField = cat.fields.find(f => f.id === fieldId);
+                              if (categoryField) {
+                                return <cat.icon key={cat.title} className="w-5 h-5 text-indigo-600 mt-1" />;
+                              }
+                              return null;
+                            })}
                             <div>
                               <p className="font-medium text-gray-800">{field?.label}</p>
                               <p className="text-sm text-gray-600">
                                 <span className="line-through">{oldValue}</span> → <span className="font-medium text-indigo-600">{newValue}</span>
                               </p>
-                              {hasFile && (
-                                <p className="text-xs text-green-600 flex items-center space-x-1 mt-1">
-                                  <CheckCircle className="w-3 h-3" />
-                                  <span>Document uploaded: {hasFile.name}</span>
-                                </p>
+                              {hasFiles && (
+                                <div className="text-xs text-green-600 mt-1 space-y-1">
+                                  {uploadedFiles[fieldId].map((file, index) => (
+                                    <p key={index} className="flex items-center space-x-1">
+                                      <CheckCircle className="w-3 h-3" />
+                                      <span>Document {index + 1}: {file.name}</span>
+                                    </p>
+                                  ))}
+                                </div>
                               )}
                             </div>
                           </div>
@@ -517,6 +880,23 @@ const MiscApplicationChange = ({ userId }) => {
           </div>
         )}
       </div>
+
+      <style jsx>{`
+        @keyframes slide-in {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        
+        .animate-slide-in {
+          animation: slide-in 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };

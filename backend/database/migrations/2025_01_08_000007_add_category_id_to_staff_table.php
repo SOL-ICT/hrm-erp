@@ -11,11 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('staff', function (Blueprint $table) {
-            $table->unsignedBigInteger('category_id')->nullable()->after('leave_category_level');
-            $table->foreign('category_id')->references('id')->on('staff_categories')->onDelete('set null');
-            $table->index('category_id');
-        });
+        // Guard: only modify table if it already exists. This prevents failures
+        // when this migration runs before the migration that creates the `staff` table.
+        if (Schema::hasTable('staff')) {
+            Schema::table('staff', function (Blueprint $table) {
+                $table->unsignedBigInteger('category_id')->nullable()->after('leave_category_level');
+                $table->foreign('category_id')->references('id')->on('staff_categories')->onDelete('set null');
+                $table->index('category_id');
+            });
+        }
     }
 
     /**
@@ -23,10 +27,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('staff', function (Blueprint $table) {
-            $table->dropForeign(['category_id']);
-            $table->dropIndex(['category_id']);
-            $table->dropColumn('category_id');
-        });
+        if (Schema::hasTable('staff')) {
+            Schema::table('staff', function (Blueprint $table) {
+                $table->dropForeign(['category_id']);
+                $table->dropIndex(['category_id']);
+                $table->dropColumn('category_id');
+            });
+        }
     }
 };

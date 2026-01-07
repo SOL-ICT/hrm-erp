@@ -23,61 +23,85 @@ import {
   X,
   ChevronDown
 } from 'lucide-react';
+import { apiService } from '@/services/api';
 
 export default function StaffDashboard({ setActiveComponent }) {
   const [isClockInModalOpen, setIsClockInModalOpen] = useState(false);
-  const [isApplyLeaveModalOpen, setIsApplyLeaveModalOpen] = useState(false);
-  const [leaveType, setLeaveType] = useState('single');
-  const [selectedDays, setSelectedDays] = useState(2);
+  const [loading, setLoading] = useState(true);
+  
+  // Data states
+  const [statsCards, setStatsCards] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [upcomingHolidays, setUpcomingHolidays] = useState([]);
+  const [upcomingBirthdays, setUpcomingBirthdays] = useState([]);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   // Username 
   const { user } = useAuth();
 
-  // Sample data
-  const statsCards = [
-    { title: 'Completed Projects', value: 51, color: 'success', icon: FileText, bgColor: 'bg-green-100' },
-    { title: 'Total Attendance', value: 162, color: 'primary', icon: Box, bgColor: 'bg-blue-100' },
-    { title: 'Absent', value: 12, color: 'secondary', icon: Briefcase, bgColor: 'bg-gray-100' },
-    { title: 'Awards', value: 0, color: 'danger', icon: Award, bgColor: 'bg-red-100' }
-  ];
+  // API functions - replace with actual API calls
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      // Replace these with actual API endpoints
+      // const statsResponse = await apiService.get('/dashboard/stats');
+      // const activitiesResponse = await apiService.get('/dashboard/activities');
+      // const holidaysResponse = await apiService.get('/dashboard/holidays');
+      // const birthdaysResponse = await apiService.get('/dashboard/birthdays');
+      
+      // setStatsCards(statsResponse.data);
+      // setRecentActivities(activitiesResponse.data);
+      // setUpcomingHolidays(holidaysResponse.data);
+      // setUpcomingBirthdays(birthdaysResponse.data);
 
-  const recentActivities = [
-    { text: 'You Late to day', subtext: 'Your office intime is 9:42', detail: 'Late time 14min', time: 'Just Now', color: 'bg-pink-500' },
-    { text: 'Below for those interested', subtext: 'Undoubtable source', time: '1 Hour ago', color: 'bg-yellow-500' },
-    { text: 'Success! your Lunch Time', subtext: 'Lunch time 1:30 To 2:30', time: '4 hours ago', color: 'bg-blue-500' },
-    { text: 'Many desktops Publishing The', subtext: 'versions are evolved', detail: 'Page editors now use...', time: '5 hours ago', color: 'bg-green-500' },
-    { text: 'Below for those interested', subtext: 'Birthday on Feb 16', time: '11 Jan 2020', color: 'bg-orange-500' }
-  ];
+      // For now, set empty arrays
+      setStatsCards([]);
+      setRecentActivities([]);
+      setUpcomingHolidays([]);
+      setUpcomingBirthdays([]);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const upcomingHolidays = [
-    { date: '3', month: 'FEB', title: 'Office Off', desc: 'Sunday', daysLeft: '3 days to left', color: 'bg-green-100 text-green-700' },
-    { date: '10', month: 'FEB', title: 'Public Holiday', desc: 'Enjoy your day off', daysLeft: '13 days to left', color: 'bg-purple-100 text-purple-700' },
-    { date: '20', month: 'MAR', title: 'Office Off', desc: 'Sunday', daysLeft: '23 days to left', color: 'bg-orange-100 text-orange-700' },
-    { date: '17', month: 'FEB', title: 'Optional Holiday', desc: 'Sunday', daysLeft: '20 days to left', color: 'bg-yellow-100 text-yellow-700' },
-    { date: '13', month: 'MAR', title: 'Conference', desc: 'Money Update', daysLeft: '35 days to left', color: 'bg-pink-100 text-pink-700' }
-  ];
+  // Update current time every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
 
-  const leaveBalance = [
-    { type: 'Vacation', used: 16.5, available: 3.5, allowance: 20, color: 'bg-blue-500' },
-    { type: 'Sick Leave', used: 4.5, available: 16, allowance: 20, color: 'bg-orange-500' },
-    { type: 'Unpaid leave', used: 5, available: 360, allowance: 365, color: 'bg-yellow-500' },
-    { type: 'Work from Home', used: 8, available: 22, allowance: 30, color: 'bg-blue-400' }
-  ];
+    return () => clearInterval(timer);
+  }, []);
 
-  const jobApplications = [
-    { id: 1, title: 'Html Business Template', status: 'Completed', dueDate: '19 Feb 2020', checked: true, statusColor: 'bg-green-100 text-green-800' },
-    { id: 2, title: 'Adobe xd Education Template', status: 'Accept', dueDate: '24 Feb 2020', checked: false, statusColor: 'bg-blue-100 text-blue-800' },
-    { id: 3, title: 'js recent Plugin Updated', status: 'Accept', dueDate: '5 Mar 2020', checked: false, statusColor: 'bg-blue-100 text-blue-800' },
-    { id: 4, title: 'Sass Development Program', status: 'Completed', dueDate: '14 Mar 2020', checked: true, statusColor: 'bg-green-100 text-green-800' },
-    { id: 5, title: 'Angular Development', status: 'Accept', dueDate: '20 Mar 2020', checked: false, statusColor: 'bg-blue-100 text-blue-800' }
-  ];
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
-  const upcomingBirthdays = [
-    { name: 'Jennifer Kerr', date: '19 Feb 2020 26 Years Old', status: 'Today', showWish: true },
-    { name: 'Rebecca Cameron', date: '19 Feb 2020 26 Years Old', status: '22 Days To Left', showWish: false },
-    { name: 'Jessica Johnston', date: '19 Feb 2020 26 Years Old', status: '22 Days To Left', showWish: false },
-    { name: 'Lily Ball', date: '19 Feb 2020 26 Years Old', status: '22 Days To Left', showWish: false },
-    { name: 'Yadira Acklin', date: '19 Feb 2020 26 Years Old', status: '22 Days To Left', showWish: false }
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('en-US', { 
+      hour12: true,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  // Default stats card structure for when data is available
+  const defaultStatsConfig = [
+    { title: 'Completed Projects', icon: FileText, bgColor: 'bg-green-100', textColor: 'text-green-700' },
+    { title: 'Total Attendance', icon: Box, bgColor: 'bg-blue-100', textColor: 'text-blue-700' },
+    { title: 'Absent Days', icon: Briefcase, bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
+    { title: 'Awards', icon: Award, bgColor: 'bg-red-100', textColor: 'text-red-700' }
   ];
 
   return (
@@ -91,26 +115,29 @@ export default function StaffDashboard({ setActiveComponent }) {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          {/* <button 
-            onClick={() => setIsApplyLeaveModalOpen(true)}
-            className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
-          >
-            Apply Leaves
-          </button> */}
-          
           <div className="flex items-center space-x-3">
             <div className="flex items-center border border-gray-200 rounded-md">
               <div className="px-3 py-2 bg-gray-50 border-r">
                 <Calendar className="w-4 h-4 text-gray-600" />
               </div>
-              <input type="text" placeholder="19 Feb 2020" className="px-3 py-2 rounded-r-md focus:outline-none" />
+              <input 
+                type="text" 
+                value={formatDate(currentTime)}
+                readOnly
+                className="px-3 py-2 rounded-r-md focus:outline-none bg-white text-gray-900" 
+              />
             </div>
             
             <div className="flex items-center border border-gray-200 rounded-md">
               <div className="px-3 py-2 bg-gray-50 border-r">
                 <Clock className="w-4 h-4 text-gray-600" />
               </div>
-              <input type="text" placeholder="09:30am" className="px-3 py-2 rounded-r-md focus:outline-none" />
+              <input 
+                type="text" 
+                value={formatTime(currentTime)}
+                readOnly
+                className="px-3 py-2 rounded-r-md focus:outline-none bg-white text-gray-900" 
+              />
             </div>
           </div>
           
@@ -136,21 +163,58 @@ export default function StaffDashboard({ setActiveComponent }) {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
-        {statsCards.map((card, index) => (
-          <div key={index} className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h5 className="text-gray-700 text-sm mb-2">{card.title}</h5>
-                <h3 className={`text-2xl font-bold text-${card.color === 'success' ? 'green' : card.color === 'primary' ? 'blue' : card.color === 'secondary' ? 'gray' : 'red'}-700`}>
-                  {card.value}
-                </h3>
-              </div>
-              <div className={`${card.bgColor} p-3 rounded-lg`}>
-                <card.icon className={`w-6 h-6 text-${card.color === 'success' ? 'green' : card.color === 'primary' ? 'blue' : card.color === 'secondary' ? 'gray' : 'red'}-700`} />
+        {loading ? (
+          // Loading skeleton
+          Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="bg-white rounded-lg shadow p-6 animate-pulse">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+                  <div className="h-8 bg-gray-200 rounded w-16"></div>
+                </div>
+                <div className="bg-gray-200 p-3 rounded-lg w-12 h-12"></div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        ) : statsCards.length > 0 ? (
+          statsCards.map((card, index) => (
+            <div key={index} className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h5 className="text-gray-700 text-sm mb-2">{card.title}</h5>
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    {card.value || 0}
+                  </h3>
+                </div>
+                <div className={`${card.bgColor || defaultStatsConfig[index]?.bgColor} p-3 rounded-lg`}>
+                  {card.icon ? (
+                    <card.icon className={`w-6 h-6 ${card.textColor || defaultStatsConfig[index]?.textColor}`} />
+                  ) : (
+                    defaultStatsConfig[index] && (() => {
+                      const IconComponent = defaultStatsConfig[index].icon;
+                      return <IconComponent className={`w-6 h-6 ${defaultStatsConfig[index].textColor}`} />;
+                    })()
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        ) : (
+          // Empty state with default structure
+          defaultStatsConfig.map((config, index) => (
+            <div key={index} className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h5 className="text-gray-700 text-sm mb-2">{config.title}</h5>
+                  <h3 className="text-2xl font-bold text-gray-400">-</h3>
+                </div>
+                <div className={`${config.bgColor} p-3 rounded-lg opacity-50`}>
+                  <config.icon className={`w-6 h-6 ${config.textColor}`} />
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Charts and Activity Row */}
@@ -159,7 +223,7 @@ export default function StaffDashboard({ setActiveComponent }) {
         <div className="xl:col-span-2 bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-              <h4 className="text-lg font-semibold text-gray-900 mb-4 sm:mb-0">Salary And Attendance chart</h4>
+              <h4 className="text-lg font-semibold text-gray-900 mb-4 sm:mb-0">Salary And Attendance Chart</h4>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center">
                   <span className="w-3 h-3 bg-gray-300 rounded-full mr-2"></span>
@@ -179,7 +243,7 @@ export default function StaffDashboard({ setActiveComponent }) {
           </div>
           <div className="p-6">
             <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
-              <span className="text-gray-600">Chart Placeholder</span>
+              <span className="text-gray-600">Chart data will be displayed here</span>
             </div>
           </div>
         </div>
@@ -190,19 +254,38 @@ export default function StaffDashboard({ setActiveComponent }) {
             <h4 className="text-lg font-semibold text-gray-900">Recent Activity</h4>
           </div>
           <div className="p-6">
-            <div className="space-y-4">
-              {recentActivities.map((activity, index) => (
-                <div key={index} className="flex items-start space-x-3 pb-4 border-b border-gray-100 last:border-b-0">
-                  <span className={`w-3 h-3 ${activity.color} rounded-full mt-2 flex-shrink-0`}></span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900">{activity.text}</p>
-                    <p className="text-sm text-gray-700">{activity.subtext}</p>
-                    {activity.detail && <p className="text-sm text-gray-700">{activity.detail}</p>}
+            {loading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="flex items-start space-x-3 pb-4 animate-pulse">
+                    <div className="w-3 h-3 bg-gray-200 rounded-full mt-2"></div>
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                    </div>
                   </div>
-                  <span className="text-sm text-gray-600">{activity.time}</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : recentActivities.length > 0 ? (
+              <div className="space-y-4">
+                {recentActivities.map((activity, index) => (
+                  <div key={index} className="flex items-start space-x-3 pb-4 border-b border-gray-100 last:border-b-0">
+                    <span className={`w-3 h-3 ${activity.color || 'bg-gray-300'} rounded-full mt-2 flex-shrink-0`}></span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900">{activity.text}</p>
+                      <p className="text-sm text-gray-700">{activity.subtext}</p>
+                      {activity.detail && <p className="text-sm text-gray-700">{activity.detail}</p>}
+                    </div>
+                    <span className="text-sm text-gray-600">{activity.time}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-gray-400 mb-2">No recent activities</div>
+                <div className="text-sm text-gray-400">Activities will appear here when available</div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -224,144 +307,123 @@ export default function StaffDashboard({ setActiveComponent }) {
         {/* Upcoming Holidays */}
         <div className="xl:col-span-4 bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200">
-            <h4 className="text-lg font-semibold text-gray-900">Up Coming Holidays</h4>
+            <h4 className="text-lg font-semibold text-gray-900">Upcoming Holidays</h4>
           </div>
           <div className="p-6">
-            <div className="space-y-4">
-              {upcomingHolidays.map((holiday, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`${holiday.color} rounded-lg p-2 text-center min-w-16`}>
-                      <div className="text-lg font-bold">{holiday.date}</div>
-                      <div className="text-xs">{holiday.month}</div>
+            {loading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="flex items-center justify-between animate-pulse">
+                    <div className="flex items-center space-x-3">
+                      <div className="bg-gray-200 rounded-lg p-2 w-16 h-12"></div>
+                      <div>
+                        <div className="h-4 bg-gray-200 rounded w-20 mb-1"></div>
+                        <div className="h-3 bg-gray-200 rounded w-16"></div>
+                      </div>
                     </div>
-                    <div>
-                      <h6 className="font-semibold text-gray-900">{holiday.title}</h6>
-                      <p className="text-sm text-gray-700">{holiday.desc}</p>
-                    </div>
+                    <div className="h-3 bg-gray-200 rounded w-16"></div>
                   </div>
-                  <span className="text-sm text-gray-600">{holiday.daysLeft}</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : upcomingHolidays.length > 0 ? (
+              <div className="space-y-4">
+                {upcomingHolidays.map((holiday, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`${holiday.color || 'bg-gray-100 text-gray-700'} rounded-lg p-2 text-center min-w-16`}>
+                        <div className="text-lg font-bold">{holiday.date}</div>
+                        <div className="text-xs">{holiday.month}</div>
+                      </div>
+                      <div>
+                        <h6 className="font-semibold text-gray-900">{holiday.title}</h6>
+                        <p className="text-sm text-gray-700">{holiday.description}</p>
+                      </div>
+                    </div>
+                    <span className="text-sm text-gray-600">{holiday.days_left}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-gray-400 mb-2">No upcoming holidays</div>
+                <div className="text-sm text-gray-400">Holiday information will appear here</div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Leave Balance */}
         <div className="xl:col-span-5 bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-            <h4 className="text-lg font-semibold text-gray-900"></h4>
+            <h4 className="text-lg font-semibold text-gray-900">Leave Balance</h4>
             <button 
-            //i want the button to take the user to the leave application form
-            onClick={() => setActiveComponent("leave-application-entry")}
-            className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
-          >
-            Apply Leaves
-          </button>
+              onClick={() => setActiveComponent("leave-application-entry")}
+              className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+            >
+              Apply Leaves
+            </button>
           </div>
-           <LeaveOverviewCard />
+          <LeaveOverviewCard />
         </div>
       </div>
 
-      {/* Job Applications and Birthdays Row */}
+      {/* Upcoming Birthdays */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Recent Job Applications */}
-        {/* <div className="xl:col-span-2 bg-white rounded-lg shadow">
-          <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-            <h4 className="text-lg font-semibold text-gray-900">Recent Job Application</h4>
-            <div className="relative">
-              <button className="p-2 hover:bg-gray-100 rounded">
-                <MoreVertical className="w-5 h-5 text-gray-700" />
-              </button>
-            </div>
-          </div>
-          <div className="p-6">
-            <div className="mb-4">
-              <button className="bg-blue-500 text-white px-4 py-2 rounded-md flex items-center">
-                New Task <Plus className="w-4 h-4 ml-2" />
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 text-gray-700">S.no</th>
-                    <th className="text-left py-3 text-gray-700">Project Title</th>
-                    <th className="text-left py-3 text-gray-700">Assigned to</th>
-                    <th className="text-left py-3 text-gray-700">Due Date</th>
-                    <th className="text-left py-3 text-gray-700">Request Status</th>
-                    <th className="text-left py-3 text-gray-700">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {jobApplications.map((job) => (
-                    <tr key={job.id} className="border-b border-gray-100">
-                      <td className="py-4 text-gray-900">{job.id}</td>
-                      <td className="py-4">
-                        <div className="flex items-center">
-                          <div className="w-8 h-8 bg-orange-100 rounded mr-3 flex items-center justify-center">
-                            <FileText className="w-4 h-4 text-orange-600" />
-                          </div>
-                          <span className="font-medium text-gray-900">{job.title}</span>
-                        </div>
-                      </td>
-                      <td className="py-4">
-                        <div className="flex -space-x-2">
-                          {[1,2,3,4].map((i) => (
-                            <div key={i} className="w-8 h-8 bg-gray-300 rounded-full border-2 border-white"></div>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="py-4 text-gray-900">{job.dueDate}</td>
-                      <td className="py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${job.statusColor}`}>
-                          {job.status}
-                        </span>
-                      </td>
-                      <td className="py-4 flex items-center space-x-2">
-                        <button className="text-blue-600 hover:text-blue-800">
-                          <Mail className="w-4 h-4" />
-                        </button>
-                        <input type="checkbox" defaultChecked={job.checked} className="rounded" />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div> */}
-
-        {/* Upcoming Birthdays */}
         <div className="bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-            <h4 className="text-lg font-semibold text-gray-900">Up Coming Birthdays</h4>
+            <h4 className="text-lg font-semibold text-gray-900">Upcoming Birthdays</h4>
             <button className="text-blue-600 text-sm hover:text-blue-800">View All</button>
           </div>
           <div className="p-6">
-            <div className="space-y-4">
-              {upcomingBirthdays.map((person, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gray-300 rounded"></div>
-                    <div>
-                      <h6 className="font-semibold text-gray-900">{person.name}</h6>
-                      <p className="text-sm text-gray-700">{person.date}</p>
+            {loading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="flex items-center justify-between animate-pulse">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gray-200 rounded"></div>
+                      <div>
+                        <div className="h-4 bg-gray-200 rounded w-24 mb-1"></div>
+                        <div className="h-3 bg-gray-200 rounded w-32"></div>
+                      </div>
+                    </div>
+                    <div className="h-3 bg-gray-200 rounded w-16"></div>
+                  </div>
+                ))}
+              </div>
+            ) : upcomingBirthdays.length > 0 ? (
+              <div className="space-y-4">
+                {upcomingBirthdays.map((person, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gray-300 rounded">
+                        {person.avatar && (
+                          <img src={person.avatar} alt={person.name} className="w-10 h-10 rounded object-cover" />
+                        )}
+                      </div>
+                      <div>
+                        <h6 className="font-semibold text-gray-900">{person.name}</h6>
+                        <p className="text-sm text-gray-700">{person.date}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-sm ${person.is_today ? 'text-green-700' : 'text-gray-600'}`}>
+                        {person.status}
+                      </span>
+                      {person.is_today && (
+                        <button className="block mt-1 bg-orange-100 text-orange-600 px-2 py-1 rounded text-xs">
+                          🎂 Wish Now
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className={`text-sm ${person.showWish ? 'text-green-700' : 'text-gray-600'}`}>
-                      {person.status}
-                    </span>
-                    {person.showWish && (
-                      <button className="block mt-1 bg-orange-100 text-orange-600 px-2 py-1 rounded text-xs">
-                        🎂 Wish Now
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-gray-400 mb-2">No upcoming birthdays</div>
+                <div className="text-sm text-gray-400">Birthday information will appear here</div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -382,13 +444,18 @@ export default function StaffDashboard({ setActiveComponent }) {
             <div className="p-6">
               <div className="mb-4 text-center">
                 <div className="text-2xl font-mono border rounded p-4 mb-2 text-gray-900">
-                  09:30:45 AM
+                  {formatTime(currentTime)}
                 </div>
                 <label className="text-sm text-gray-700">Current Time</label>
               </div>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">IP Address</label>
-                <input type="text" value="225.192.145.1" disabled className="w-full p-2 border border-gray-200 rounded bg-gray-50 text-gray-900" />
+                <input 
+                  type="text" 
+                  value="Auto-detected"
+                  disabled 
+                  className="w-full p-2 border border-gray-200 rounded bg-gray-50 text-gray-900" 
+                />
               </div>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Working From</label>
@@ -401,7 +468,11 @@ export default function StaffDashboard({ setActiveComponent }) {
               </div>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Note:</label>
-                <textarea className="w-full p-2 border border-gray-200 rounded text-gray-900" rows="3" defaultValue="Some text here..."></textarea>
+                <textarea 
+                  className="w-full p-2 border border-gray-200 rounded text-gray-900" 
+                  rows="3" 
+                  placeholder="Add any additional notes..."
+                ></textarea>
               </div>
             </div>
             <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
@@ -418,7 +489,6 @@ export default function StaffDashboard({ setActiveComponent }) {
           </div>
         </div>
       )}
-
     </div>
   );
 }
