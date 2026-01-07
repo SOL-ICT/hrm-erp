@@ -132,12 +132,35 @@ class ApprovalController extends Controller
             ])
                 ->select([
                     'id', 'approvable_type', 'approvable_id', 'workflow_id',
-                    'current_level', 'status', 'priority', 'is_overdue',
+                    'current_approval_level', 'status', 'priority', 'is_overdue',
                     'requested_at', 'requested_by', 'current_approver_id',
                     'module_name', 'approval_type'
                 ])
-                ->where('current_approver_id', $userId)
                 ->where('status', 'pending');
+
+            // Role-based approval visibility
+            $user = Auth::user();
+            $hierarchyService = app(\App\Services\RecruitmentHierarchyService::class);
+            $permissions = $hierarchyService->getUserPermissions($user);
+            
+            if ($permissions) {
+                $query->where(function ($q) use ($permissions) {
+                    // Level 1 approvals: For supervisors and above (HR, Regional Manager)
+                    if ($permissions->hierarchy_level <= 2 && $permissions->can_approve_boarding) {
+                        $q->orWhere('current_approval_level', 1);
+                    }
+                    
+                    // Level 2 approvals: For Regional Manager and above (includes HR, Global Admin, Super Admin, Control)
+                    if ($permissions->hierarchy_level <= 2 && $permissions->can_approve_boarding) {
+                        $q->orWhere('current_approval_level', 2);
+                    }
+                    
+                    // Control users can see all levels
+                    if ($permissions->hierarchy_level === 0) {
+                        $q->orWhere('current_approval_level', '>=', 1);
+                    }
+                });
+            }
 
             // Apply additional filters using helper method
             $this->applyFilters($query, $request, ['status']); // Exclude status filter

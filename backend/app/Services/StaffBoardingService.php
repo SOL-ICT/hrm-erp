@@ -582,15 +582,33 @@ class StaffBoardingService
                 ]
             );
 
-            // Manually advance to Level 2 for Control approval (skip Level 1 for batch uploads)
-            $approval->current_approval_level = 2;
+            // Determine starting level based on boarder's permissions
+            $hierarchyService = app(\App\Services\RecruitmentHierarchyService::class);
+            $boarderPermissions = $hierarchyService->getUserPermissions($boardingUser);
+            
+            // If boarder can approve, skip level 1 (goes directly to Control)
+            // If boarder cannot approve, start at level 1 (needs supervisor then Control)
+            if ($boarderPermissions && $boarderPermissions->can_approve_boarding) {
+                $startLevel = 2; // HR/Regional Manager: Skip to Control
+                $comments = "Batch upload of {$staffCount} staff by authorized approver - submitted directly to Control for final approval";
+            } else {
+                $startLevel = 1; // Recruitment: Needs supervisor approval first
+                $comments = "Batch upload of {$staffCount} staff - requires supervisor approval before Control";
+            }
+            
+            // Set approval level and ensure total_levels is 2
+            $approval->current_approval_level = $startLevel;
+            $approval->total_approval_levels = 2; // Always 2 levels: Supervisor (optional) + Control (final)
+            $approval->current_approver_id = null; // No specific approver - role-based
             $approval->save();
 
-            // Submit for Control approval
-            $this->approvalService->submitForApproval(
-                $approval, 
-                "Batch upload of {$staffCount} staff submitted to Control for final approval"
-            );
+            // Log creation
+            $this->approvalService->logHistory($approval, 'submitted', $boardingUser->id, [
+                'from_status' => 'pending',
+                'to_status' => 'pending',
+                'comments' => $comments,
+                'approval_level' => $startLevel,
+            ]);
 
             Log::info('Batch approval created for staff upload', [
                 'batch_id' => $uploadBatchId,

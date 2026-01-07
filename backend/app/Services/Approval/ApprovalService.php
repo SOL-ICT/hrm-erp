@@ -281,6 +281,55 @@ class ApprovalService
             $approval->completed_by = $approverId;
             $approval->save();
 
+            // For staff boarding approvals, update all staff in the batch
+            if ($approval->approvable_type === 'App\\Models\\Staff') {
+                $staff = $approval->approvable;
+                if ($staff && $staff->upload_batch_id) {
+                    // Get all staff in the same batch
+                    $batchStaff = \App\Models\Staff::where('upload_batch_id', $staff->upload_batch_id)
+                        ->where('boarding_approval_status', 'pending_control_approval')
+                        ->get();
+                    
+                    foreach ($batchStaff as $batchStaffMember) {
+                        // Update staff boarding status based on approval level
+                        if ($approval->current_approval_level == 1) {
+                            $batchStaffMember->boarding_approval_status = 'rejected';
+                        } elseif ($approval->current_approval_level == 2) {
+                            $batchStaffMember->boarding_approval_status = 'control_rejected';
+                            $batchStaffMember->control_rejected_by = $approverId;
+                            $batchStaffMember->control_rejected_at = Carbon::now();
+                            $batchStaffMember->control_rejection_reason = $reason;
+                        }
+                        $batchStaffMember->save();
+                    }
+                    
+                    Log::info("Batch staff records updated after approval rejection", [
+                        'batch_id' => $staff->upload_batch_id,
+                        'batch_size' => $batchStaff->count(),
+                        'approval_level' => $approval->current_approval_level,
+                    ]);
+                } else {
+                    // Single staff record (non-batch)
+                    if ($staff) {
+                        if ($approval->current_approval_level == 1) {
+                            $staff->boarding_approval_status = 'rejected';
+                        } elseif ($approval->current_approval_level == 2) {
+                            $staff->boarding_approval_status = 'control_rejected';
+                            $staff->control_rejected_by = $approverId;
+                            $staff->control_rejected_at = Carbon::now();
+                            $staff->control_rejection_reason = $reason;
+                        }
+                        $staff->save();
+                        
+                        Log::info("Single staff record updated after approval rejection", [
+                            'staff_id' => $staff->id,
+                            'staff_code' => $staff->staff_id,
+                            'new_status' => $staff->boarding_approval_status,
+                        ]);
+                    }
+                }
+            }
+
             // Log rejection
             $this->logHistory($approval, 'rejected', $approverId, [
                 'from_status' => $previousStatus,
@@ -413,22 +462,95 @@ class ApprovalService
      */
     protected function canApprove(int $userId, Approval $approval): bool
     {
-        // User must be the current approver
-        if ($approval->current_approver_id !== $userId) {
-            // Check for delegation
-            $delegateFor = $this->checkDelegation(
-                $approval->current_approver_id,
-                $approval->module_name,
-                $approval->approval_type
-            );
-            
-            if ($delegateFor !== $userId) {
+        // For role-based approvals (current_approver_id is null), check role permissions
+        if ($approval->current_approver_id === null) {
+            $user = \App\Models\User::find($userId);
+            if (!$user) {
+                Log::warning("canApprove: User not found", ['user_id' => $userId]);
                 return false;
+            }
+
+            $hierarchyService = app(\App\Services\RecruitmentHierarchyService::class);
+            $permissions = $hierarchyService->getUserPermissions($user);
+            
+            if (!$permissions) {
+                Log::warning("canApprove: No permissions found", ['user_id' => $userId]);
+                return false;
+            }
+
+            // Approval must be pending
+            if ($approval->status !== 'pending') {
+                Log::warning("canApprove: Approval not pending", [
+                    'approval_id' => $approval->id,
+                    'status' => $approval->status
+                ]);
+                return false;
+            }
+
+            $level = $approval->current_approval_level;
+            
+            Log::info("canApprove: Checking permissions", [
+                'user_id' => $userId,
+                'approval_id' => $approval->id,
+                'level' => $level,
+                'hierarchy_level' => $permissions->hierarchy_level,
+                'can_approve_boarding' => $permissions->can_approve_boarding
+            ]);
+            
+            // Level 1: Supervisors and above can approve
+            if ($level == 1) {
+                $can = $permissions->hierarchy_level <= 2 && $permissions->can_approve_boarding;
+                Log::info("canApprove: Level 1 check", ['can_approve' => $can]);
+                return $can;
+            }
+            
+            // Level 2: Control Department and Super Admin can approve
+            if ($level == 2) {
+                $can = $permissions->hierarchy_level <= 1 && $permissions->can_approve_boarding;
+                Log::info("canApprove: Level 2 check", ['can_approve' => $can]);
+                return $can;
+            }
+            
+            // Control users can approve any level
+            if ($permissions->hierarchy_level === 0) {
+                Log::info("canApprove: Control user - can approve all levels");
+                return true;
+            }
+
+            Log::warning("canApprove: No matching conditions", ['level' => $level]);
+            return false;
+        }
+
+        // Original logic for user-assigned approvals
+        if ($approval->current_approver_id === $userId) {
+            return $approval->status === 'pending';
+        }
+
+        // For Control level approvals (level 2), check if user has Control role permissions
+        if ($approval->current_approval_level == 2) {
+            $user = \App\Models\User::find($userId);
+            if ($user) {
+                $hierarchyService = app(\App\Services\RecruitmentHierarchyService::class);
+                $permissions = $hierarchyService->getUserPermissions($user);
+                
+                if ($permissions && $permissions->hierarchy_level === 0 && $permissions->can_approve_boarding) {
+                    return $approval->status === 'pending';
+                }
             }
         }
 
-        // Approval must be pending
-        return $approval->status === 'pending';
+        // Check for delegation
+        $delegateFor = $this->checkDelegation(
+            $approval->current_approver_id,
+            $approval->module_name,
+            $approval->approval_type
+        );
+        
+        if ($delegateFor === $userId) {
+            return $approval->status === 'pending';
+        }
+
+        return false;
     }
 
     /**
@@ -455,7 +577,7 @@ class ApprovalService
      * @param array $data
      * @return void
      */
-    protected function logHistory(Approval $approval, string $action, int $actionBy, array $data): void
+    public function logHistory(Approval $approval, string $action, int $actionBy, array $data): void
     {
         ApprovalHistory::create([
             'approval_id' => $approval->id,
