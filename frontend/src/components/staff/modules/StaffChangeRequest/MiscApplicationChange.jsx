@@ -243,17 +243,17 @@ const MiscApplicationChange = ({ userId }) => {
       setErrorMessage('');
 
       try {
-        console.log('Fetching staff profile for user ID:', user.id);
+        console.log('Fetching staff profile using /me endpoint for current user (id:', user.id, ')');
 
-        // Use centralized apiService (returns parsed JSON or throws on non-OK)
-        const profileRaw = await apiService.makeRequest(`staff/staff-profiles/${user.id}`, { method: 'GET' });
+        // Use centralized apiService and the server-side /me route to resolve the correct staff profile
+        const profileRaw = await apiService.makeRequest('staff/staff-profiles/me', { method: 'GET' });
         const profileData = Array.isArray(profileRaw) ? profileRaw[0] || null : profileRaw || null;
         setStaffProfile(profileData);
 
         // Attempt to fetch current values (mock endpoint that will fail gracefully)
         try {
-          console.log('Attempting to fetch current values');
-          const currentValuesData = await apiService.makeRequest(`staff/current-values/${user.id}`, { method: 'GET' });
+          console.log('Attempting to fetch current values (using /me)');
+          const currentValuesData = await apiService.makeRequest('staff/current-values/me', { method: 'GET' });
           setCurrentValues(currentValuesData || {});
         } catch (currentValuesError) {
           console.log('Current values endpoint failed gracefully:', currentValuesError.message);
@@ -334,7 +334,7 @@ const MiscApplicationChange = ({ userId }) => {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     setErrorMessage('');
-    try {
+      try {
       const formDataToSend = new FormData();
       selectedFields.forEach(fieldId => {
         formDataToSend.append(fieldId, formData[fieldId] || '');
@@ -344,7 +344,11 @@ const MiscApplicationChange = ({ userId }) => {
           });
         }
       });
-      formDataToSend.append('userId', user.id);
+
+      // Prefer sending the staff identifier if already fetched; otherwise rely on backend auth to map the request.
+      if (staffProfile && staffProfile.staff_id) {
+        formDataToSend.append('staffId', staffProfile.staff_id);
+      }
 
       console.log('Submitting change request');
       try {
