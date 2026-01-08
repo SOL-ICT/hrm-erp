@@ -83,19 +83,29 @@ class PayrollCalculationEngine
         $rentReliefCap = $this->getPayrollSetting('RENT_RELIEF_CAP', 500000, false); // Default NGN 500,000, not a percentage
         $rentRelief = min(($annualRentPaid * $rentReliefRate), $rentReliefCap);
 
-        // Step 7: Calculate taxable income (annual)
-        // Formula (Nigeria Tax Act 2025): Annual Gross - Pension Relief - Rent Relief
-        // NO 5% gross income relief (does not exist in new act)
+        // Step 7: Calculate tax reliefs
+        // Pension Relief: 8% of pensionable components (Basic + Housing + Transport)
+        // NHIS Relief: 5% of Basic Salary only (not deducted from pay, but reduces taxable income)
+        // Rent Relief: 20% of annual rent paid (capped at NGN 500,000)
         // Reference: Nigeria Tax Act 2025, Section on Chargeable Income
         $pensionRate = $this->getPayrollSetting('PENSION_RATE', 0.08, true); // Default 8%, stored as 8
         $pensionRelief = $pensionableAmount * $pensionRate; // Pension contribution relief
-        $taxableIncome = $annualGross - $pensionRelief - $rentRelief;
+        
+        $nhisRate = $this->getPayrollSetting('NHIS_RATE', 0.05, true); // Default 5%, stored as 5
+        $basicSalary = $categorized['basic_salary'];
+        $nhisRelief = $basicSalary * $nhisRate; // NHIS relief (not deducted, only for tax)
+        
+        // Step 8: Calculate taxable income (annual)
+        // Formula: Annual Gross - Pension Relief - NHIS Relief - Rent Relief
+        $taxableIncome = $annualGross - $pensionRelief - $nhisRelief - $rentRelief;
 
-        // Step 8: Calculate PAYE (progressive tax using 2025 brackets)
+        // Step 9: Calculate PAYE (progressive tax using 2025 brackets)
         $payeTax = $this->calculateProgressiveTax($taxableIncome, $year);
         $monthlyPaye = ($payeTax / 12) * $prorationFactor;
 
-        // Step 9: Calculate deductions (all prorated)
+        // Step 10: Calculate deductions (all prorated)
+        // IMPORTANT: NHIS is NOT a deduction - it's only a tax relief
+        // Only pension is actually deducted from employee pay
         // Use the same pension rate from settings (consistency is key)
         // IMPORTANT: Round each deduction BEFORE summing to avoid cumulative rounding errors
         $monthlyPayeRounded = round($monthlyPaye, 2);
@@ -105,12 +115,12 @@ class PayrollCalculationEngine
         $otherDeductionsRounded = 0.00; // Placeholder for future: loans, advances, etc.
 
         // Calculate total deductions by summing ROUNDED values (avoids rounding errors)
-        $totalDeductions = $monthlyPayeRounded + $pensionDeductionRounded + $leaveAllowanceDeductionRounded + $thirteenthMonthDeductionRounded + $otherDeductionsRounded;
-
-        // Step 10: Calculate net pay using rounded values
+        $totalDed1: Calculate net pay using rounded values
         // Net pay uses PRORATED gross (because if staff worked 20/30 days, they get prorated pay)
         // Formula: Prorated Gross - Total Deductions (both already rounded to 2 decimals)
         $netPay = round($proratedMonthlyGross, 2) - $totalDeductions;
+
+        // Step 12round($proratedMonthlyGross, 2) - $totalDeductions;
 
         // Step 11: Calculate credit to bank (net + reimbursables)
         $creditToBank = $netPay + $proratedMonthlyReimbursables;
@@ -145,8 +155,9 @@ class PayrollCalculationEngine
             // Prorated amounts (for actual payment calculation)
             'prorated_monthly_gross' => round($proratedMonthlyGross, 2), // ← This is reduced by attendance
             'prorated_monthly_reimbursables' => round($proratedMonthlyReimbursables, 2),
-
-            // Tax calculation components
+20% of rent, max NGN 500k)
+            'pension_relief' => round($pensionRelief, 2), // Pension relief (8% of pensionable)
+            'nhis_relief' => round($nhisRelief, 2), // NHIS relief (5% of basic - NOT deducted)
             'rent_relief' => round($rentRelief, 2), // Rent relief (replaces CRA)
             'pension_relief' => round($pensionRelief, 2), // Pension relief
             'taxable_income' => round($taxableIncome, 2),
@@ -377,6 +388,7 @@ class PayrollCalculationEngine
             'annual_gross' => $annualGross,
             'annual_reimbursables' => $annualReimbursables,
             'pensionable_amount' => $pensionableAmount,
+            'basic_salary' => $allEmoluments['BASIC_SALARY'] ?? 0, // For NHIS calculation
             'leave_allowance' => $leaveAllowance,
             'thirteenth_month' => $thirteenthMonth,
             'all_emoluments' => $allEmoluments,

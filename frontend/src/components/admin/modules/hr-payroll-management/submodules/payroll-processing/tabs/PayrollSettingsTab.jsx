@@ -538,7 +538,7 @@ function StatutoryDeductionsSection({
 }) {
   const statutorySettings = [
     { key: "PENSION_RATE", name: "Pension", legal: "Pension Reform Act 2014" },
-    { key: "NHF_RATE", name: "NHF", legal: "National Housing Fund Act" },
+    { key: "NHIS_RATE", name: "NHIS", legal: "National Health Insurance Scheme Act" },
     {
       key: "NSITF_RATE",
       name: "NSITF",
@@ -547,9 +547,15 @@ function StatutoryDeductionsSection({
     { key: "ITF_RATE", name: "ITF", legal: "Industrial Training Fund Act" },
   ];
 
+  // Filter to only show active settings from database
+  const activeSettings = statutorySettings.filter(({ key }) => {
+    const setting = settings?.find((s) => s.setting_key === key);
+    return setting && setting.is_active !== false && setting.is_active !== 0;
+  });
+
   return (
     <div className="grid grid-cols-2 gap-6">
-      {statutorySettings.map(({ key, name, legal }) => {
+      {activeSettings.map(({ key, name, legal }) => {
         const setting = settings?.find((s) => s.setting_key === key);
         const isEditing = editingKey === key;
 

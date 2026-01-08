@@ -749,7 +749,7 @@ const CalculationPreview = ({ preview, formData }) => {
             </h4>
             <ul className="text-sm text-blue-800 space-y-1">
               <li>
-                • PAYE, NHF (2.5%), and NSITF (1%) are automatically calculated
+                • PAYE, Pension (8%), and NSITF (1%) are automatically calculated
               </li>
               <li>
                 • Management fee is applied to net payroll after all deductions

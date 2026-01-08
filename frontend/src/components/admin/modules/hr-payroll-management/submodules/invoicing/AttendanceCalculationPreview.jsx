@@ -82,10 +82,9 @@ const AttendanceCalculationPreview = ({
         // Simulate statutory deductions
         const paye = grossSalary * 0.075; // 7.5%
         const pension = grossSalary * 0.08; // 8%
-        const nhf = grossSalary * 0.025; // 2.5%
         const nsitf = grossSalary * 0.01; // 1%
 
-        const totalDeductions = paye + pension + nhf + nsitf;
+        const totalDeductions = paye + pension + nsitf;
         const netSalary = grossSalary - totalDeductions;
         const creditToBank = netSalary * 1.15; // Add management fee simulation
 
@@ -104,7 +103,6 @@ const AttendanceCalculationPreview = ({
           statutory_deductions: {
             paye,
             pension,
-            nhf,
             nsitf,
             total: totalDeductions,
           },
@@ -431,7 +429,6 @@ const AttendanceCalculationPreview = ({
                         <TableHead>Employee</TableHead>
                         <TableHead>PAYE (7.5%)</TableHead>
                         <TableHead>Pension (8%)</TableHead>
-                        <TableHead>NHF (2.5%)</TableHead>
                         <TableHead>NSITF (1%)</TableHead>
                         <TableHead>Total Deductions</TableHead>
                       </TableRow>
@@ -449,9 +446,6 @@ const AttendanceCalculationPreview = ({
                           </TableCell>
                           <TableCell>
                             {formatCurrency(calc.statutory_deductions.pension)}
-                          </TableCell>
-                          <TableCell>
-                            {formatCurrency(calc.statutory_deductions.nhf)}
                           </TableCell>
                           <TableCell>
                             {formatCurrency(calc.statutory_deductions.nsitf)}
