@@ -295,8 +295,17 @@ class RecruitmentRequestController extends Controller
                     ]
                 );
 
-                // Submit for approval (assigns to approver and sends notification)
-                $this->approvalService->submitForApproval($approval, 'Recruitment request created and submitted for approval');
+                // Set to role-based approval (no specific approver assigned)
+                $approval->current_approver_id = null;
+                $approval->current_approval_level = 1;
+                $approval->total_approval_levels = 1;
+                $approval->save();
+
+                // Log submission with no specific approver
+                $this->approvalService->logHistory($approval, 'submitted', Auth::id(), [
+                    'comments' => 'Recruitment request created and submitted for approval',
+                    'approval_level' => 1,
+                ]);
 
                 Log::info('Recruitment request created with approval', [
                     'recruitment_request_id' => $recruitmentRequest->id,
