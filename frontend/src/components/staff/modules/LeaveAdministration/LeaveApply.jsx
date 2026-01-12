@@ -5,6 +5,7 @@ import CalendarReact from 'react-calendar';
 import { useAuth } from '@/contexts/AuthContext';
 import 'react-calendar/dist/Calendar.css'; // Import react-calendar styles
 import { apiService } from "@/services/api";
+import { useSessionAware } from '@/hooks/useSessionAware';
 
 export default function LeaveApply() {
   const [leaveType, setLeaveType] = useState('');
@@ -23,6 +24,7 @@ export default function LeaveApply() {
   const [applications, setApplications] = useState([]);
   const [currentBalance, setCurrentBalance] = useState(20);
   const [usedDays, setUsedDays] = useState(0);
+  const [showSessionAlert, setShowSessionAlert] = useState(false);
 
   // Get today's date in YYYY-MM-DD format
   const today = new Date().toISOString().split('T')[0];
@@ -34,6 +36,7 @@ export default function LeaveApply() {
 
 
   const { user } = useAuth();
+  const { makeRequestWithRetry, sessionExpired, handleSessionExpired } = useSessionAware();
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
@@ -47,8 +50,8 @@ export default function LeaveApply() {
         console.warn('CSRF prefetch failed (ignored):', err?.message || err);
       });
 
-      // Fetch the current user's profile (apiService returns parsed JSON)
-      const data = await apiService.makeRequest('/staff/staff-profiles/me', {
+      // Fetch the current user's profile (using session-aware wrapper for better error handling)
+      const data = await makeRequestWithRetry('/staff/staff-profiles/me', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -63,7 +66,10 @@ export default function LeaveApply() {
 
     } catch (error) {
       console.error('[FETCH] Error fetching profile:', error);
-      if (!errorMessage) {
+      if (error?.message?.includes('Session expired')) {
+        setShowSessionAlert(true);
+        setErrorMessage('Your session has expired. Please log in again.');
+      } else if (!errorMessage) {
         setErrorMessage('An error occurred while fetching the profile.');
       }
       setProfile(null);
@@ -73,7 +79,7 @@ export default function LeaveApply() {
   };
 
   fetchUserProfile();
-}, [user?.id]); 
+}, [user?.id, makeRequestWithRetry]); 
 
   // Fetch leave applications
   useEffect(() => {
@@ -81,8 +87,8 @@ export default function LeaveApply() {
       setIsLoading(true);
       setErrorMessage('');
       try {
-        // apiService returns parsed JSON or throws on errors
-        const data = await apiService.makeRequest('/staff/leave-applications', {
+        // Use session-aware request wrapper for better error handling on 401
+        const data = await makeRequestWithRetry('/staff/leave-applications', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -104,14 +110,19 @@ export default function LeaveApply() {
         setUsedDays(totalUsedDays);
       } catch (error) {
         console.error('Failed to fetch leave data:', error);
-        if (!errorMessage) setErrorMessage('An error occurred while fetching leaves.');
+        if (error?.message?.includes('Session expired')) {
+          setShowSessionAlert(true);
+          setErrorMessage('Your session has expired. Please log in again.');
+        } else if (!errorMessage) {
+          setErrorMessage('An error occurred while fetching leaves.');
+        }
         setLeaves([]);
       } finally {
         setIsLoading(false);
       }
     };
     fetchLeaves();
-  }, []);
+  }, [makeRequestWithRetry]);
 
 
   //dynamic staff list fetch
@@ -263,7 +274,7 @@ useEffect(() => {
 
     try {
       const promises = applications.map(app => 
-        apiService.makeRequest('/staff/leave-applications', {
+        makeRequestWithRetry('/staff/leave-applications', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -279,7 +290,7 @@ useEffect(() => {
         })
       );
 
-      // apiService throws on non-OK responses; if Promise.all resolves, all succeeded
+      // makeRequestWithRetry throws on non-OK responses; if Promise.all resolves, all succeeded
       const responses = await Promise.all(promises);
 
       setShowSuccess(true);
@@ -291,7 +302,12 @@ useEffect(() => {
         window.location.reload();
       }, 2000);
     } catch (error) {
-      setErrorMessage('An error occurred while submitting applications. Please try again.');
+      if (error?.message?.includes('Session expired')) {
+        setShowSessionAlert(true);
+        setErrorMessage('Your session has expired. Please log in again.');
+      } else {
+        setErrorMessage('An error occurred while submitting applications. Please try again.');
+      }
       console.error('Submission error:', error);
     }
   };
@@ -333,6 +349,35 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
+      {/* Session Expired Alert */}
+      {showSessionAlert && (
+        <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md">
+            <h3 className="text-lg font-semibold text-orange-600 mb-2">Session Expired</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Your session has timed out. Please log in again to continue with your leave applications.
+            </p>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => {
+                  setShowSessionAlert(false);
+                  setErrorMessage('');
+                }}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={handleSessionExpired}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+              >
+                Log In Again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Success Overlay */}
       {showSuccess && (
         <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center z-50">

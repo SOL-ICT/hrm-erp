@@ -296,15 +296,15 @@ export default function StaffHeader({
         </button>
 
         {/* Messages Link */}
-        <button 
-          onClick={() => setActiveComponent("settings")} 
+        {/* <button 
+          onClick={() => setActiveComponent("messages")} 
           className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-50"
         >
           <MessageSquare className="w-4 h-4 text-gray-900" />
           <span className="text-sm text-gray-900">Messages</span>
-        </button>
+        </button> */}
 
-        {/* Change Password Link */}
+        {/* Change Password Link
         <button 
         // empty for now 
           onClick={() => setActiveComponent("settings")} 
@@ -312,7 +312,7 @@ export default function StaffHeader({
         >
           <Edit2 className="w-4 h-4 text-gray-900" />
           <span className="text-sm text-gray-900">Change Password</span>
-        </button>
+        </button> */}
 
         {/* Logout Button */}
         <button

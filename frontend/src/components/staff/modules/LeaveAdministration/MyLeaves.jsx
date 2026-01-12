@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Mail, PhoneCall, Info, Eye, Trash2 } from 'lucide-react';
 import { PieChart } from 'react-minimal-pie-chart';
 import { apiService } from "@/services/api";
+import { useSessionAware } from '@/hooks/useSessionAware';
 
 // Maps status to Tailwind CSS badge colors
 const statusColorMap = {
@@ -28,6 +29,9 @@ export default function MyLeaves() {
     const [selectedLeave, setSelectedLeave] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
     const [reportSubject, setReportSubject] = useState('');
+    const [showSessionAlert, setShowSessionAlert] = useState(false);
+
+    const { makeRequestWithRetry, sessionExpired, handleSessionExpired } = useSessionAware();
 
     // Compute chart data based on leave statuses
     const chartData = [
@@ -42,8 +46,8 @@ export default function MyLeaves() {
             setIsLoading(true);
             setErrorMessage('');
             try {
-                // apiService returns parsed JSON or throws on non-OK responses
-                const data = await apiService.makeRequest('/staff/leave-applications', {
+                // Use session-aware request wrapper for better 401 handling
+                const data = await makeRequestWithRetry('/staff/leave-applications', {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
@@ -56,14 +60,19 @@ export default function MyLeaves() {
                 setLeaves(data || []);
             } catch (error) {
                 console.error('Failed to fetch leave data:', error);
-                if (!errorMessage) setErrorMessage('An error occurred while fetching leaves.');
+                if (error?.message?.includes('Session expired')) {
+                    setShowSessionAlert(true);
+                    setErrorMessage('Your session has expired. Please log in again.');
+                } else if (!errorMessage) {
+                    setErrorMessage('An error occurred while fetching leaves.');
+                }
                 setLeaves([]);
             } finally {
                 setIsLoading(false);
             }
         };
         fetchLeaves();
-    }, []);
+    }, [makeRequestWithRetry]);
 
     const handleViewLeave = (leave) => {
         setSelectedLeave(leave);
@@ -78,8 +87,8 @@ export default function MyLeaves() {
         setDeleting(true);
         setErrorMessage('');
         try {
-            // apiService throws on errors; if we reach here, deletion succeeded
-            await apiService.makeRequest(`/staff/leave-applications/${leaveId}`, {
+            // Use session-aware request wrapper for better error handling
+            await makeRequestWithRetry(`/staff/leave-applications/${leaveId}`, {
                 method: 'DELETE',
                 headers: {
                     'Accept': 'application/json',
@@ -91,7 +100,12 @@ export default function MyLeaves() {
             setErrorMessage('');
         } catch (error) {
             console.error('Error deleting leave:', error);
-            if (!errorMessage) setErrorMessage('An error occurred while deleting the leave.');
+            if (error?.message?.includes('Session expired')) {
+                setShowSessionAlert(true);
+                setErrorMessage('Your session has expired. Please log in again.');
+            } else if (!errorMessage) {
+                setErrorMessage('An error occurred while deleting the leave.');
+            }
         } finally {
             setDeleting(false);
         }
@@ -100,8 +114,8 @@ export default function MyLeaves() {
     const handleReportSubmit = async () => {
         setErrorMessage('');
         try {
-            // apiService throws on non-OK responses; if this resolves, the report was submitted
-            await apiService.makeRequest('/staff/report-issue', {
+            // Use session-aware request wrapper for better error handling
+            await makeRequestWithRetry('/staff/report-issue', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -118,12 +132,46 @@ export default function MyLeaves() {
             setReportModalOpen(false);
         } catch (error) {
             console.error('Error submitting report:', error);
-            if (!errorMessage) setErrorMessage('An error occurred while submitting the report.');
+            if (error?.message?.includes('Session expired')) {
+                setShowSessionAlert(true);
+                setErrorMessage('Your session has expired. Please log in again.');
+            } else if (!errorMessage) {
+                setErrorMessage('An error occurred while submitting the report.');
+            }
         }
     };
 
     return (
         <>
+            {/* Session Expired Alert */}
+            {showSessionAlert && (
+                <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-lg shadow-lg max-w-md">
+                        <h3 className="text-lg font-semibold text-orange-600 mb-2">Session Expired</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Your session has timed out. Please log in again to continue viewing your leaves.
+                        </p>
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={() => {
+                                    setShowSessionAlert(false);
+                                    setErrorMessage('');
+                                }}
+                                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                            >
+                                Dismiss
+                            </button>
+                            <button
+                                onClick={handleSessionExpired}
+                                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                            >
+                                Log In Again
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Error Message */}
             {errorMessage && (
                 <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">

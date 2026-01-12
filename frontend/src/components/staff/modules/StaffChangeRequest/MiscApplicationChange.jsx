@@ -3,7 +3,17 @@ import { ChevronRight, ChevronLeft, Upload, Lock, Info, CheckCircle, AlertCircle
 import { useAuth } from '@/contexts/AuthContext';
 import apiService from '@/services/api';
 
+// Only render this page in development environments.
+// This prevents the page from being accessible in production builds.
+const isDevEnv = (typeof process !== 'undefined') && (
+  process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_ENV === 'development'
+);
+
 const MiscApplicationChange = ({ userId }) => {
+  if (!isDevEnv) {
+    // Return null so the page doesn't render in production.
+    return null;
+  }
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [staffProfile, setStaffProfile] = useState(null);
@@ -528,7 +538,7 @@ const MiscApplicationChange = ({ userId }) => {
               {[
                 { label: 'Entry Date', value: staffProfile?.entry_date },
                 { label: 'Employee Code', value: staffProfile?.employee_code },
-                { label: 'Client Name', value: staffProfile?.client_name },
+                { label: 'Organisation Name', value: staffProfile?.organisation_name },
                 { label: 'Service Location', value: staffProfile?.location },
                 { label: 'Employee Name', value: `${staffProfile?.first_name || ''} ${staffProfile?.middle_name ? staffProfile?.middle_name + ' ' : ''}${staffProfile?.last_name || ''}`.trim() || 'Not set' },
                 { label: 'Designation', value: staffProfile?.designation },
