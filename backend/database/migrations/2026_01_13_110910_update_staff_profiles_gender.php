@@ -29,6 +29,7 @@ return new class extends Migration
                 s.client_id AS client_id,
                 s.gender AS gender,
                 s.job_structure_id AS job_structure_id,
+                js.job_code AS job_code,
                 c.organisation_name AS organisation_name,
                 c.prefix AS prefix,
                 s.department AS department,
@@ -44,6 +45,7 @@ return new class extends Migration
                 sb.account_number AS account_number,
                 sb.bank_name AS bank_name
             FROM staff s
+            LEFT JOIN job_structures js ON s.job_structure_id = js.id
             LEFT JOIN staff_categories sc ON s.category_id = sc.id
             LEFT JOIN staff_personal_info spi ON s.id = spi.staff_id
             LEFT JOIN staff_legal_ids sli ON s.id = sli.staff_id

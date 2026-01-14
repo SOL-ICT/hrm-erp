@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Legacy\Services;
 
 use App\Models\Staff;
 use App\Models\Client;

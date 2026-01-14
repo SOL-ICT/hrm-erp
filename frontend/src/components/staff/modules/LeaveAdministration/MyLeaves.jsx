@@ -56,10 +56,14 @@ export default function MyLeaves() {
                     credentials: 'include',
                 });
 
-                console.log('Fetched leave data:', data);
-                setLeaves(data || []);
+                console.log('[FETCH] Leave applications response:', data);
+                console.log('[FETCH] Extracted data:', data?.data);
+                // Extract data array from response wrapper
+                const leaveData = data?.data || [];
+                console.log('[FETCH] Leave records count:', leaveData.length);
+                setLeaves(leaveData);
             } catch (error) {
-                console.error('Failed to fetch leave data:', error);
+                console.error('[FETCH] Failed to fetch leave data:', error);
                 if (error?.message?.includes('Session expired')) {
                     setShowSessionAlert(true);
                     setErrorMessage('Your session has expired. Please log in again.');
@@ -217,6 +221,8 @@ export default function MyLeaves() {
                                             <th scope="col" className="px-6 py-3">To</th>
                                             <th scope="col" className="px-6 py-3">Days</th>
                                             <th scope="col" className="px-6 py-3">Reason</th>
+                                            <th scope="col" className="px-6 py-3">Public Holidays</th>
+                                            <th scope="col" className="px-6 py-3">Handover To</th>
                                             <th scope="col" className="px-6 py-3">Applied On</th>
                                             <th scope="col" className="px-6 py-3">Status</th>
                                             <th scope="col" className="px-6 py-3">Action</th>
@@ -231,11 +237,13 @@ export default function MyLeaves() {
                                             leaves.map((leave) => (
                                                 <tr key={leave.id} className="bg-white border-b hover:bg-gray-50">
                                                     <td className="px-6 py-4 text-center">{leave.id}</td>
-                                                    <td className="px-6 py-4">{leave.leave_type_name || 'Unknown Leave Type'}</td>
+                                                    <td className="px-6 py-4">{leave.leave_type || 'Unknown Leave Type'}</td>
                                                     <td className="px-6 py-4">{formatDate(leave.start_date)}</td>
                                                     <td className="px-6 py-4">{leave.end_date ? formatDate(leave.end_date) : 'N/A'}</td>
                                                     <td className="px-6 py-4 font-semibold">{leave.days} Day{leave.days > 1 ? 's' : ''}</td>
                                                     <td className="px-6 py-4 max-w-xs truncate" title={leave.reason}>{leave.reason}</td>
+                                                    <td className="px-6 py-4">{leave.public_holidays || 0}</td>
+                                                    <td className="px-6 py-4">{leave.handover_staff_name || '-'}</td>
                                                     <td className="px-6 py-4">{formatDate(leave.applied_at)}</td>
                                                     <td className="px-6 py-4">
                                                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColorMap[leave.status]}`}>
@@ -362,7 +370,7 @@ export default function MyLeaves() {
                                     </tr>
                                     <tr className="border-b">
                                         <td className="py-2 font-semibold text-gray-600">Leave Type</td>
-                                        <td className="py-2 text-gray-800">: {selectedLeave.leave_type_name || 'Unknown Leave Type'}</td>
+                                        <td className="py-2 text-gray-800">: {selectedLeave.leave_type || 'Unknown Leave Type'}</td>
                                     </tr>
                                     <tr className="border-b">
                                         <td className="py-2 font-semibold text-gray-600">Start Date</td>
@@ -379,6 +387,14 @@ export default function MyLeaves() {
                                     <tr className="border-b">
                                         <td className="py-2 font-semibold text-gray-600">Reason</td>
                                         <td className="py-2 text-gray-800">: {selectedLeave.reason}</td>
+                                    </tr>
+                                    <tr className="border-b">
+                                        <td className="py-2 font-semibold text-gray-600">Public Holidays</td>
+                                        <td className="py-2 text-gray-800">: {selectedLeave.public_holidays || 0}</td>
+                                    </tr>
+                                    <tr className="border-b">
+                                        <td className="py-2 font-semibold text-gray-600">Handover To</td>
+                                        <td className="py-2 text-gray-800">: {selectedLeave.handover_staff_name || 'N/A'}</td>
                                     </tr>
                                     <tr className="border-b">
                                         <td className="py-2 font-semibold text-gray-600">Status</td>

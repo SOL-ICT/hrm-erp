@@ -3,17 +3,7 @@ import { ChevronRight, ChevronLeft, Upload, Lock, Info, CheckCircle, AlertCircle
 import { useAuth } from '@/contexts/AuthContext';
 import apiService from '@/services/api';
 
-// Only render this page in development environments.
-// This prevents the page from being accessible in production builds.
-const isDevEnv = (typeof process !== 'undefined') && (
-  process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_ENV === 'development'
-);
-
 const MiscApplicationChange = ({ userId }) => {
-  if (!isDevEnv) {
-    // Return null so the page doesn't render in production.
-    return null;
-  }
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [staffProfile, setStaffProfile] = useState(null);

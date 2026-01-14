@@ -226,3 +226,4 @@ out/
 
 # test components
 frontend/src/components/staff/Profile.jsx
+docker-compose-root.yml

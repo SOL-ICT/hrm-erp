@@ -273,4 +273,41 @@ class Staff extends Model
     {
         return $this->getAllowanceAttribute('overtime_allowance');
     }
+
+    /**
+     * Get all leave applications for this staff member
+     */
+    public function leaveApplications()
+    {
+        return $this->hasMany(LeaveEngine\LeaveApplication::class, 'staff_id');
+    }
+
+    /**
+     * Get all leave balances for this staff member
+     */
+    public function leaveBalances()
+    {
+        return $this->hasMany(LeaveEngine\LeaveBalance::class, 'staff_id');
+    }
+
+    /**
+     * Get current year leave balances
+     */
+    public function currentYearLeaveBalances()
+    {
+        return $this->leaveBalances()
+            ->where('year', now()->year)
+            ->active();
+    }
+
+    /**
+     * Get leave balance for a specific leave type in current year
+     */
+    public function getLeaveBalance($leaveTypeId)
+    {
+        return $this->leaveBalances()
+            ->forLeaveType($leaveTypeId)
+            ->currentYear()
+            ->first();
+    }
 }
