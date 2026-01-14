@@ -89,6 +89,7 @@ const AdminNavigation = ({
         { id: "employee-record", name: "Employee Record" },
         { id: "employee-management", name: "Employee Management" },
         { id: "payroll-processing", name: "Payroll Processing" },
+        { id: "leave-policies", name: "Leave Policies" },
         { id: "attendance-tracking", name: "Attendance Tracking" },
         { id: "leave-management", name: "Leave Management" },
         { id: "performance-review", name: "Performance Review" },
