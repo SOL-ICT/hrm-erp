@@ -328,6 +328,49 @@ export default function PayrollRunsTab({
     }
   };
 
+  const handleExportFromPreview = async () => {
+    if (!previewData || !previewData.id) {
+      setMessage({ type: "error", text: "No payroll data to export" });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(`${API_URL}/payroll/runs/${previewData.id}/export`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to export payroll");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const fileName = `Payroll_${previewData.client?.organisation_name || 'Unknown'}_${previewData.year}_${String(previewData.month).padStart(2, '0')}.xlsx`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setMessage({ type: "success", text: "Payroll exported successfully" });
+    } catch (error) {
+      console.error("Error exporting payroll:", error);
+      setMessage({ type: "error", text: error.message || "Export failed" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeletePayroll = async (runId) => {
     if (!confirm("Delete this payroll run? This action cannot be undone.")) {
       return;
@@ -1004,13 +1047,49 @@ export default function PayrollRunsTab({
             </div>
 
             {/* Modal Footer */}
-            <div className={`${currentTheme?.cardBg || 'bg-gray-50'} px-6 py-4 flex justify-end gap-3`}>
-              <button
-                onClick={() => setShowPreviewModal(false)}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-              >
-                Close
-              </button>
+            <div className={`${currentTheme?.cardBg || 'bg-gray-50'} px-6 py-4 flex justify-between items-center gap-3`}>
+              {/* Left side - Delete button (only for calculated/draft status) */}
+              <div>
+                {previewData && ['draft', 'calculated'].includes(previewData.status) && (
+                  <button
+                    onClick={() => {
+                      if (confirm("Delete this payroll run? This action cannot be undone.")) {
+                        setShowPreviewModal(false);
+                        handleDeletePayroll(previewData.id);
+                      }
+                    }}
+                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-2"
+                    disabled={loading}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete Run
+                  </button>
+                )}
+              </div>
+
+              {/* Right side - Export and Close buttons */}
+              <div className="flex gap-3">
+                {previewData && ['calculated', 'approved', 'exported'].includes(previewData.status) && (
+                  <button
+                    onClick={handleExportFromPreview}
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-2"
+                    disabled={loading}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export to Excel
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowPreviewModal(false)}
+                  className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

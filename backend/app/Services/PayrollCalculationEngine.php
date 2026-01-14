@@ -95,9 +95,16 @@ class PayrollCalculationEngine
         $basicSalary = $categorized['basic_salary'];
         $nhisRelief = $basicSalary * $nhisRate; // NHIS relief (not deducted, only for tax)
         
+        // Step 7b: Calculate CRA (Consolidated Relief Allowance)
+        // CRA was used in old tax law (pre-2025), but Nigeria Tax Act 2025 uses itemized reliefs instead
+        // We still calculate it for informational purposes and backward compatibility
+        $cra = $this->calculateCRA($annualGross);
+        
         // Step 8: Calculate taxable income (annual)
-        // Formula: Annual Gross - Pension Relief - NHIS Relief - Rent Relief
-        $taxableIncome = $annualGross - $pensionRelief - $nhisRelief - $rentRelief;
+        // Nigeria Tax Act 2025 (NEW LAW): Uses itemized reliefs (NHIS, Pension, NHF, Rent)
+        // Formula: Annual Gross - NHIS Relief - Pension Relief - Rent Relief
+        // Note: CRA is NOT used in the new law (it was replaced by itemized deductions)
+        $taxableIncome = $annualGross - $nhisRelief - $pensionRelief - $rentRelief;
 
         // Step 9: Calculate PAYE (progressive tax using 2025 brackets)
         $payeTax = $this->calculateProgressiveTax($taxableIncome, $year);
@@ -115,14 +122,14 @@ class PayrollCalculationEngine
         $otherDeductionsRounded = 0.00; // Placeholder for future: loans, advances, etc.
 
         // Calculate total deductions by summing ROUNDED values (avoids rounding errors)
-        $totalDed1: Calculate net pay using rounded values
+        $totalDeductions = $monthlyPayeRounded + $pensionDeductionRounded + $leaveAllowanceDeductionRounded + $thirteenthMonthDeductionRounded + $otherDeductionsRounded;
+
+        // Step 11: Calculate net pay using rounded values
         // Net pay uses PRORATED gross (because if staff worked 20/30 days, they get prorated pay)
         // Formula: Prorated Gross - Total Deductions (both already rounded to 2 decimals)
         $netPay = round($proratedMonthlyGross, 2) - $totalDeductions;
 
-        // Step 12round($proratedMonthlyGross, 2) - $totalDeductions;
-
-        // Step 11: Calculate credit to bank (net + reimbursables)
+        // Step 12: Calculate credit to bank (net + reimbursables)
         $creditToBank = $netPay + $proratedMonthlyReimbursables;
 
         // Return complete calculation
@@ -155,11 +162,12 @@ class PayrollCalculationEngine
             // Prorated amounts (for actual payment calculation)
             'prorated_monthly_gross' => round($proratedMonthlyGross, 2), // ← This is reduced by attendance
             'prorated_monthly_reimbursables' => round($proratedMonthlyReimbursables, 2),
-20% of rent, max NGN 500k)
+
+            // Tax calculation components
             'pension_relief' => round($pensionRelief, 2), // Pension relief (8% of pensionable)
-            'nhis_relief' => round($nhisRelief, 2), // NHIS relief (5% of basic - NOT deducted)
-            'rent_relief' => round($rentRelief, 2), // Rent relief (replaces CRA)
-            'pension_relief' => round($pensionRelief, 2), // Pension relief
+            'cra' => round($cra, 2), // Consolidated Relief Allowance
+            'nhis_relief' => round($nhisRelief, 2), // NHIS relief (5% of basic - NOT deducted, informational only)
+            'rent_relief' => round($rentRelief, 2), // Rent relief (20% of rent, max NGN 500k - informational only)
             'taxable_income' => round($taxableIncome, 2),
             'paye_tax' => $monthlyPayeRounded,
 
