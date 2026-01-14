@@ -568,8 +568,10 @@ class PayrollRunController extends Controller
             $period = Carbon::create($run->year, $run->month)->format('Y_m');
             $filename = "Payroll_{$clientName}_{$period}.xlsx";
 
-            // Update run status
-            if ($run->status !== 'exported') {
+            // Update run status ONLY if approved (don't change status for preview exports)
+            // If exporting from preview (calculated status), keep it as calculated
+            // If exporting after approval (approved status), change to exported
+            if ($run->status === 'approved' && $run->approved_at !== null) {
                 $run->update([
                     'status' => 'exported',
                     'exported_at' => now(),
@@ -650,12 +652,12 @@ class PayrollRunController extends Controller
                 ], 404);
             }
 
-            // Validate status (can only delete draft or cancelled runs)
-            if (!in_array($run->status, ['draft', 'cancelled'])) {
+            // Validate status (can only delete draft, cancelled, or calculated runs)
+            if (!in_array($run->status, ['draft', 'cancelled', 'calculated'])) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Can only delete payroll runs in draft or cancelled status',
-                    'error' => 'Current status: ' . $run->status . ' (Cannot delete calculated, approved, or exported runs)'
+                    'message' => 'Can only delete payroll runs in draft, cancelled, or calculated status',
+                    'error' => 'Current status: ' . $run->status . ' (Cannot delete approved, exported, or paid runs)'
                 ], 403);
             }
 

@@ -210,6 +210,44 @@ class ApprovalService
                     'approval_level' => $currentLevel,
                 ]);
 
+                // For staff boarding approvals, update all staff in the batch to control_approved
+                if ($approval->approvable_type === 'App\\Models\\Staff') {
+                    $staff = $approval->approvable;
+                    if ($staff && $staff->upload_batch_id) {
+                        // Get all staff in the same batch
+                        $batchStaff = \App\Models\Staff::where('upload_batch_id', $staff->upload_batch_id)
+                            ->where('boarding_approval_status', 'pending_control_approval')
+                            ->get();
+                        
+                        foreach ($batchStaff as $batchStaffMember) {
+                            $batchStaffMember->boarding_approval_status = 'control_approved';
+                            $batchStaffMember->control_approved_by = $approverId;
+                            $batchStaffMember->control_approved_at = Carbon::now();
+                            $batchStaffMember->save();
+                        }
+                        
+                        Log::info("Batch staff records updated to control_approved", [
+                            'batch_id' => $staff->upload_batch_id,
+                            'batch_size' => $batchStaff->count(),
+                            'approved_by' => $approverId,
+                        ]);
+                    } else {
+                        // Single staff record (non-batch)
+                        if ($staff) {
+                            $staff->boarding_approval_status = 'control_approved';
+                            $staff->control_approved_by = $approverId;
+                            $staff->control_approved_at = Carbon::now();
+                            $staff->save();
+                            
+                            Log::info("Single staff record updated to control_approved", [
+                                'staff_id' => $staff->id,
+                                'staff_code' => $staff->staff_id,
+                                'approved_by' => $approverId,
+                            ]);
+                        }
+                    }
+                }
+
                 // Notify requester
                 $this->notificationService->notifyApprovalCompleted($approval, 'approved');
 
