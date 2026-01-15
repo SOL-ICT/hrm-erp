@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
-import { apiService } from '@/services/api';
+import { useSessionAware } from '@/hooks/useSessionAware';
 
 export default function LeaveApproval() {
   const router = useRouter();
   const { token } = router.query;
+  const { makeRequestWithRetry } = useSessionAware();
   
   const [loading, setLoading] = useState(true);
   const [application, setApplication] = useState(null);
@@ -24,28 +25,13 @@ export default function LeaveApproval() {
   const fetchApplicationDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8000/api/leave-approval/${token}`, {
+      const data = await makeRequestWithRetry(`/leave-approval/${token}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          setError('Invalid approval link');
-        } else if (response.status === 410) {
-          setError('This approval link has expired');
-        } else if (response.status === 409) {
-          setError(data.message || 'This leave application has already been processed');
-        } else {
-          setError(data.message || 'Failed to load leave application');
-        }
-        return;
-      }
 
       setApplication(data.data);
     } catch (err) {
@@ -66,7 +52,7 @@ export default function LeaveApproval() {
       setSubmitting(true);
       setError('');
 
-      const response = await fetch(`http://localhost:8000/api/leave-approval/${token}/decision`, {
+      const data = await makeRequestWithRetry(`/leave-approval/${token}/decision`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -77,13 +63,6 @@ export default function LeaveApproval() {
           comments: comments.trim() || null,
         }),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || 'Failed to process decision');
-        return;
-      }
 
       setSuccess(true);
       setTimeout(() => {
@@ -167,11 +146,11 @@ export default function LeaveApproval() {
                 <div className="space-y-2">
                   <div>
                     <p className="text-xs text-gray-500">Name</p>
-                    <p className="text-base font-medium text-gray-900">{application?.staff_name}</p>
+                    <p className="text-base font-medium text-gray-900">{application?.staff?.name}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Email</p>
-                    <p className="text-base text-gray-900">{application?.staff_email}</p>
+                    <p className="text-base text-gray-900">{application?.staff?.email}</p>
                   </div>
                 </div>
               </div>
@@ -218,7 +197,7 @@ export default function LeaveApproval() {
                 <div className="space-y-2">
                   <div>
                     <p className="text-xs text-gray-500">Handover To</p>
-                    <p className="text-base text-gray-900">{application?.handover_staff || 'Not specified'}</p>
+                    <p className="text-base text-gray-900">{application?.handover_staff?.name || 'Not specified'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Applied On</p>
@@ -299,7 +278,7 @@ export default function LeaveApproval() {
 
         {/* Supervisor Info */}
         <div className="mt-6 text-center text-sm text-gray-500">
-          <p>Supervisor: {application?.supervisor_name}</p>
+          <p>Supervisor: {application?.handover_staff?.name || 'Not assigned'}</p>
         </div>
       </div>
     </div>
