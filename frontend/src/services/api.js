@@ -1,8 +1,10 @@
 // Core API Configuration and Base Service
 export class APIService {
   constructor() {
-    this.baseURL =
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+    this.baseURL = process.env.NEXT_PUBLIC_API_URL;
+    if (!this.baseURL) {
+      console.error('❌ NEXT_PUBLIC_API_URL is not set! Frontend cannot communicate with API.');
+    }
     this.authToken = null;
 
     // Try to get token from localStorage on initialization
