@@ -24,7 +24,8 @@ export default function LeaveApproval() {
   const fetchApplicationDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8000/api/leave-approval/${token}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const response = await fetch(`${apiUrl}/leave-approval/${token}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -66,7 +67,8 @@ export default function LeaveApproval() {
       setSubmitting(true);
       setError('');
 
-      const response = await fetch(`http://localhost:8000/api/leave-approval/${token}/decision`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const response = await fetch(`${apiUrl}/leave-approval/${token}/decision`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -167,11 +169,11 @@ export default function LeaveApproval() {
                 <div className="space-y-2">
                   <div>
                     <p className="text-xs text-gray-500">Name</p>
-                    <p className="text-base font-medium text-gray-900">{application?.staff_name}</p>
+                    <p className="text-base font-medium text-gray-900">{application?.staff?.name}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Email</p>
-                    <p className="text-base text-gray-900">{application?.staff_email}</p>
+                    <p className="text-base text-gray-900">{application?.staff?.email}</p>
                   </div>
                 </div>
               </div>
@@ -218,7 +220,7 @@ export default function LeaveApproval() {
                 <div className="space-y-2">
                   <div>
                     <p className="text-xs text-gray-500">Handover To</p>
-                    <p className="text-base text-gray-900">{application?.handover_staff || 'Not specified'}</p>
+                    <p className="text-base text-gray-900">{application?.handover_staff?.name || 'Not specified'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Applied On</p>
@@ -299,7 +301,7 @@ export default function LeaveApproval() {
 
         {/* Supervisor Info */}
         <div className="mt-6 text-center text-sm text-gray-500">
-          <p>Supervisor: {application?.supervisor_name}</p>
+          <p>Supervisor: {application?.handover_staff?.name || 'Not assigned'}</p>
         </div>
       </div>
     </div>

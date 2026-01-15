@@ -43,21 +43,22 @@ export default function LeaveApproval() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
       // Fetch all data in parallel
       const [leavesRes, clientsRes, typesRes, statsRes] = await Promise.all([
-        fetch('http://localhost:8000/api/admin/leave-approvals', {
+        fetch(`${apiUrl}/admin/leave-approvals`, {
           credentials: 'include',
           headers: { 'Accept': 'application/json' }
         }),
-        fetch('http://localhost:8000/api/admin/leave-approvals/clients', {
+        fetch(`${apiUrl}/admin/leave-approvals/clients`, {
           credentials: 'include',
           headers: { 'Accept': 'application/json' }
         }),
-        fetch('http://localhost:8000/api/admin/leave-approvals/types', {
+        fetch(`${apiUrl}/admin/leave-approvals/types`, {
           credentials: 'include',
           headers: { 'Accept': 'application/json' }
         }),
-        fetch('http://localhost:8000/api/admin/leave-approvals/statistics', {
+        fetch(`${apiUrl}/admin/leave-approvals/statistics`, {
           credentials: 'include',
           headers: { 'Accept': 'application/json' }
         })
@@ -131,9 +132,10 @@ export default function LeaveApproval() {
   const confirmApprove = async () => {
     setIsProcessing(true);
     try {
-      await fetch('http://localhost:8000/sanctum/csrf-cookie', { credentials: 'include' });
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      await fetch(`${apiUrl.replace('/api', '')}/sanctum/csrf-cookie`, { credentials: 'include' });
       
-      const response = await fetch(`http://localhost:8000/api/admin/leave-approvals/${selectedLeave.id}/approve`, {
+      const response = await fetch(`${apiUrl}/admin/leave-approvals/${selectedLeave.id}/approve`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -172,9 +174,10 @@ export default function LeaveApproval() {
 
     setIsProcessing(true);
     try {
-      await fetch('http://localhost:8000/sanctum/csrf-cookie', { credentials: 'include' });
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      await fetch(`${apiUrl.replace('/api', '')}/sanctum/csrf-cookie`, { credentials: 'include' });
       
-      const response = await fetch(`http://localhost:8000/api/admin/leave-approvals/${selectedLeave.id}/reject`, {
+      const response = await fetch(`${apiUrl}/admin/leave-approvals/${selectedLeave.id}/reject`, {
         method: 'POST',
         credentials: 'include',
         headers: {
