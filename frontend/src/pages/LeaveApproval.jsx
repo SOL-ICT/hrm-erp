@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
-import { apiService } from '@/services/api';
+import { useSessionAware } from '@/hooks/useSessionAware';
 
 export default function LeaveApproval() {
   const router = useRouter();
   const { token } = router.query;
+  const { makeRequestWithRetry } = useSessionAware();
   
   const [loading, setLoading] = useState(true);
   const [application, setApplication] = useState(null);
@@ -24,29 +25,13 @@ export default function LeaveApproval() {
   const fetchApplicationDetails = async () => {
     try {
       setLoading(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-      const response = await fetch(`${apiUrl}/leave-approval/${token}`, {
+      const data = await makeRequestWithRetry(`/leave-approval/${token}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          setError('Invalid approval link');
-        } else if (response.status === 410) {
-          setError('This approval link has expired');
-        } else if (response.status === 409) {
-          setError(data.message || 'This leave application has already been processed');
-        } else {
-          setError(data.message || 'Failed to load leave application');
-        }
-        return;
-      }
 
       setApplication(data.data);
     } catch (err) {
@@ -67,8 +52,7 @@ export default function LeaveApproval() {
       setSubmitting(true);
       setError('');
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-      const response = await fetch(`${apiUrl}/leave-approval/${token}/decision`, {
+      const data = await makeRequestWithRetry(`/leave-approval/${token}/decision`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -79,13 +63,6 @@ export default function LeaveApproval() {
           comments: comments.trim() || null,
         }),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || 'Failed to process decision');
-        return;
-      }
 
       setSuccess(true);
       setTimeout(() => {

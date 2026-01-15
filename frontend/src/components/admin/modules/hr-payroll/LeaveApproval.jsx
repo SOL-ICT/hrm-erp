@@ -4,8 +4,11 @@ import {
   Calendar, User, Building2, FileText, TrendingUp,
   AlertCircle, CheckCircle, XCircle, Loader2
 } from 'lucide-react';
+import { useSessionAware } from '@/hooks/useSessionAware';
 
 export default function LeaveApproval() {
+  const { makeRequestWithRetry } = useSessionAware();
+  
   const [leaves, setLeaves] = useState([]);
   const [filteredLeaves, setFilteredLeaves] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,38 +46,25 @@ export default function LeaveApproval() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
       // Fetch all data in parallel
-      const [leavesRes, clientsRes, typesRes, statsRes] = await Promise.all([
-        fetch(`${apiUrl}/admin/leave-approvals`, {
+      const [leavesData, clientsData, typesData, statsData] = await Promise.all([
+        makeRequestWithRetry('/admin/leave-approvals', {
           credentials: 'include',
           headers: { 'Accept': 'application/json' }
         }),
-        fetch(`${apiUrl}/admin/leave-approvals/clients`, {
+        makeRequestWithRetry('/admin/leave-approvals/clients', {
           credentials: 'include',
           headers: { 'Accept': 'application/json' }
         }),
-        fetch(`${apiUrl}/admin/leave-approvals/types`, {
+        makeRequestWithRetry('/admin/leave-approvals/types', {
           credentials: 'include',
           headers: { 'Accept': 'application/json' }
         }),
-        fetch(`${apiUrl}/admin/leave-approvals/statistics`, {
+        makeRequestWithRetry('/admin/leave-approvals/statistics', {
           credentials: 'include',
           headers: { 'Accept': 'application/json' }
         })
       ]);
-
-      // Debug: Check response status
-      if (!leavesRes.ok) {
-        const text = await leavesRes.text();
-        console.error('Leave approvals API error:', leavesRes.status, text);
-        throw new Error(`API error: ${leavesRes.status}`);
-      }
-
-      const leavesData = await leavesRes.json();
-      const clientsData = await clientsRes.json();
-      const typesData = await typesRes.json();
-      const statsData = await statsRes.json();
 
       setLeaves(leavesData);
       setClients(clientsData);
@@ -132,10 +122,9 @@ export default function LeaveApproval() {
   const confirmApprove = async () => {
     setIsProcessing(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-      await fetch(`${apiUrl.replace('/api', '')}/sanctum/csrf-cookie`, { credentials: 'include' });
+      await makeRequestWithRetry('/sanctum/csrf-cookie', { credentials: 'include' });
       
-      const response = await fetch(`${apiUrl}/admin/leave-approvals/${selectedLeave.id}/approve`, {
+      await makeRequestWithRetry(`/admin/leave-approvals/${selectedLeave.id}/approve`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -144,8 +133,6 @@ export default function LeaveApproval() {
           'X-Requested-With': 'XMLHttpRequest'
         }
       });
-
-      if (!response.ok) throw new Error('Approval failed');
 
       // Refresh data
       await fetchData();
@@ -174,10 +161,9 @@ export default function LeaveApproval() {
 
     setIsProcessing(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-      await fetch(`${apiUrl.replace('/api', '')}/sanctum/csrf-cookie`, { credentials: 'include' });
+      await makeRequestWithRetry('/sanctum/csrf-cookie', { credentials: 'include' });
       
-      const response = await fetch(`${apiUrl}/admin/leave-approvals/${selectedLeave.id}/reject`, {
+      await makeRequestWithRetry(`/admin/leave-approvals/${selectedLeave.id}/reject`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -187,8 +173,6 @@ export default function LeaveApproval() {
         },
         body: JSON.stringify({ reason: rejectionReason })
       });
-
-      if (!response.ok) throw new Error('Rejection failed');
 
       // Refresh data
       await fetchData();
