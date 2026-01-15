@@ -11,8 +11,10 @@ return new class extends Migration
     public function up(): void
     {
         // Use raw SQL to handle the migration safely
+        // CRITICAL: Must drop the foreign key constraint BEFORE dropping the column
         DB::statement('
             ALTER TABLE lpe_leave_entitlements
+            DROP FOREIGN KEY lpe_leave_entitlements_staff_level_id_foreign,
             DROP COLUMN staff_level_id,
             ADD COLUMN job_structure_id BIGINT UNSIGNED AFTER client_id,
             ADD CONSTRAINT lpe_leave_entitlements_job_structure_id_foreign
