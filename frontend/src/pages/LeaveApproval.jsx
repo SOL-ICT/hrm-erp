@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
 import { apiService } from '@/services/api';
 
 export default function LeaveApproval() {
-  const { token } = useParams();
-  const navigate = useNavigate();
+  const router = useRouter();
+  const { token } = router.query;
   
   const [loading, setLoading] = useState(true);
   const [application, setApplication] = useState(null);
@@ -16,7 +16,9 @@ export default function LeaveApproval() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    fetchApplicationDetails();
+    if (token) {
+      fetchApplicationDetails();
+    }
   }, [token]);
 
   const fetchApplicationDetails = async () => {
@@ -115,7 +117,7 @@ export default function LeaveApproval() {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Error</h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => router.push('/')}
             className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
           >
             Go to Home
