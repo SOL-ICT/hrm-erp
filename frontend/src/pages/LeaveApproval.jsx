@@ -25,7 +25,7 @@ export default function LeaveApproval() {
   const fetchApplicationDetails = async () => {
     try {
       setLoading(true);
-      const data = await makeRequestWithRetry(`/leave-approval/${token}`, {
+      const data = await makeRequestWithRetry(`/api/leave-approval/${token}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -52,7 +52,7 @@ export default function LeaveApproval() {
       setSubmitting(true);
       setError('');
 
-      const data = await makeRequestWithRetry(`/leave-approval/${token}/decision`, {
+      const data = await makeRequestWithRetry(`/api/leave-approval/${token}/decision`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
