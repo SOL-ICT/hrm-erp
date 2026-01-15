@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use App\Mail\LeaveApprovedMail;
+use App\Mail\LeaveRejectedMail;
 use App\Services\LeaveAdvicePDFService;
 use Carbon\Carbon;
 
@@ -25,6 +27,8 @@ class LeaveApprovalController extends Controller
                 ->leftJoin('leave_types as lt', 'la.leave_type_id', '=', 'lt.id')
                 ->leftJoin('clients as c', 's.client_id', '=', 'c.id')
                 ->leftJoin('staff_categories as sc', 's.category_id', '=', 'sc.id')
+                ->leftJoin('users as u', 'la.approved_by_admin_id', '=', 'u.id')
+                ->leftJoin('staff as handover_staff', 'la.handover_staff_id', '=', 'handover_staff.id')
             ->select(
                 'la.id',
                 'la.staff_id',
@@ -46,7 +50,17 @@ class LeaveApprovalController extends Controller
                 'la.applied_at',
                 'la.approver_id',
                 'la.comments',
-                'la.updated_at'
+                'la.updated_at',
+                'la.approval_token',
+                'la.approved_at',
+                'la.approval_method',
+                'la.approved_by_admin_id',
+                'la.approval_ip_address',
+                'la.approval_user_agent',
+                'la.supervisor_email_sent',
+                'la.approver_comments',
+                'u.name as admin_approval_name',
+                DB::raw("CONCAT(handover_staff.first_name, ' ', handover_staff.last_name) as handover_staff_name")
             );            // Filter by status
             if ($request->has('status') && $request->status !== 'all') {
                 $query->where('la.status', $request->status);
@@ -206,14 +220,53 @@ class LeaveApprovalController extends Controller
                 return response()->json(['message' => 'Leave application already processed'], 400);
             }
 
-            // Update leave status
+            // Get user agent and IP for tracking
+            $userAgent = $request->header('User-Agent');
+            $ipAddress = $request->ip();
+
+            // Update leave status with approval tracking
             DB::table('leave_applications')
                 ->where('id', $id)
                 ->update([
                     'status' => 'approved',
+                    'approved_at' => now(),
                     'approver_id' => Auth::id(),
+                    'approver_comments' => $validated['notes'] ?? null,
+                    'approval_method' => 'admin_dashboard',
+                    'approved_by_admin_id' => Auth::id(),
+                    'approval_ip_address' => $ipAddress,
+                    'approval_user_agent' => $userAgent,
                     'updated_at' => now()
                 ]);
+
+            // Send approval email to staff
+            try {
+                $staff = DB::table('staff')->where('id', $leave->staff_id)->first();
+                $admin = Auth::user();
+                
+                \Log::info('Starting admin approval notification email', [
+                    'staff_email' => $staff->email,
+                    'staff_name' => $staff->first_name . ' ' . $staff->last_name,
+                    'admin_id' => $admin->id,
+                    'admin_name' => $admin->name,
+                    'leave_id' => $id,
+                ]);
+                
+                Mail::to($staff->email)->send(
+                    new LeaveApprovedMail($staff, $leave, $admin->name)
+                );
+                
+                \Log::info('✓ Leave APPROVED admin notification email sent to ' . $staff->email);
+            } catch (\Exception $e) {
+                \Log::error('✗ FAILED to send leave approval email', [
+                    'staff_email' => $staff->email ?? 'unknown',
+                    'error_message' => $e->getMessage(),
+                    'error_code' => $e->getCode(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+            }
 
             // Generate Leave Advice PDF and send email
             try {
@@ -260,17 +313,38 @@ class LeaveApprovalController extends Controller
                 return response()->json(['message' => 'Leave application already processed'], 400);
             }
 
-            // Update leave status
+            // Get user agent and IP for tracking
+            $userAgent = $request->header('User-Agent');
+            $ipAddress = $request->ip();
+
+            // Update leave status with rejection tracking
             DB::table('leave_applications')
                 ->where('id', $id)
                 ->update([
                     'status' => 'rejected',
-                    'comments' => $validated['reason'],
+                    'approver_comments' => $validated['reason'],
                     'approver_id' => Auth::id(),
+                    'approved_at' => now(),
+                    'approval_method' => 'admin_dashboard',
+                    'approved_by_admin_id' => Auth::id(),
+                    'approval_ip_address' => $ipAddress,
+                    'approval_user_agent' => $userAgent,
                     'updated_at' => now()
                 ]);
 
-            // TODO: Send rejection email to staff
+            // Send rejection email to staff
+            try {
+                $staff = DB::table('staff')->where('id', $leave->staff_id)->first();
+                $admin = Auth::user();
+                
+                Mail::to($staff->email)->send(
+                    new LeaveRejectedMail($staff, $leave, $admin->name, $validated['reason'])
+                );
+                
+                Log::info('Leave rejection email sent to ' . $staff->email);
+            } catch (\Exception $e) {
+                Log::error('Failed to send leave rejection email: ' . $e->getMessage());
+            }
 
             return response()->json([
                 'message' => 'Leave application rejected',

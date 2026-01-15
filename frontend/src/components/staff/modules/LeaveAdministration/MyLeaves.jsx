@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Mail, PhoneCall, Info, Eye, Trash2 } from 'lucide-react';
 import { PieChart } from 'react-minimal-pie-chart';
 import { apiService } from "@/services/api";
+import { useSessionAware } from '@/hooks/useSessionAware';
 
 // Maps status to Tailwind CSS badge colors
 const statusColorMap = {
@@ -28,6 +29,9 @@ export default function MyLeaves() {
     const [selectedLeave, setSelectedLeave] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
     const [reportSubject, setReportSubject] = useState('');
+    const [showSessionAlert, setShowSessionAlert] = useState(false);
+
+    const { makeRequestWithRetry, sessionExpired, handleSessionExpired } = useSessionAware();
 
     // Compute chart data based on leave statuses
     const chartData = [
@@ -42,8 +46,8 @@ export default function MyLeaves() {
             setIsLoading(true);
             setErrorMessage('');
             try {
-                // apiService returns parsed JSON or throws on non-OK responses
-                const data = await apiService.makeRequest('/staff/leave-applications', {
+                // Use session-aware request wrapper for better 401 handling
+                const data = await makeRequestWithRetry('/staff/leave-applications', {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
@@ -52,18 +56,27 @@ export default function MyLeaves() {
                     credentials: 'include',
                 });
 
-                console.log('Fetched leave data:', data);
-                setLeaves(data || []);
+                console.log('[FETCH] Leave applications response:', data);
+                console.log('[FETCH] Extracted data:', data?.data);
+                // Extract data array from response wrapper
+                const leaveData = data?.data || [];
+                console.log('[FETCH] Leave records count:', leaveData.length);
+                setLeaves(leaveData);
             } catch (error) {
-                console.error('Failed to fetch leave data:', error);
-                if (!errorMessage) setErrorMessage('An error occurred while fetching leaves.');
+                console.error('[FETCH] Failed to fetch leave data:', error);
+                if (error?.message?.includes('Session expired')) {
+                    setShowSessionAlert(true);
+                    setErrorMessage('Your session has expired. Please log in again.');
+                } else if (!errorMessage) {
+                    setErrorMessage('An error occurred while fetching leaves.');
+                }
                 setLeaves([]);
             } finally {
                 setIsLoading(false);
             }
         };
         fetchLeaves();
-    }, []);
+    }, [makeRequestWithRetry]);
 
     const handleViewLeave = (leave) => {
         setSelectedLeave(leave);
@@ -78,8 +91,8 @@ export default function MyLeaves() {
         setDeleting(true);
         setErrorMessage('');
         try {
-            // apiService throws on errors; if we reach here, deletion succeeded
-            await apiService.makeRequest(`/staff/leave-applications/${leaveId}`, {
+            // Use session-aware request wrapper for better error handling
+            await makeRequestWithRetry(`/staff/leave-applications/${leaveId}`, {
                 method: 'DELETE',
                 headers: {
                     'Accept': 'application/json',
@@ -91,7 +104,12 @@ export default function MyLeaves() {
             setErrorMessage('');
         } catch (error) {
             console.error('Error deleting leave:', error);
-            if (!errorMessage) setErrorMessage('An error occurred while deleting the leave.');
+            if (error?.message?.includes('Session expired')) {
+                setShowSessionAlert(true);
+                setErrorMessage('Your session has expired. Please log in again.');
+            } else if (!errorMessage) {
+                setErrorMessage('An error occurred while deleting the leave.');
+            }
         } finally {
             setDeleting(false);
         }
@@ -100,8 +118,8 @@ export default function MyLeaves() {
     const handleReportSubmit = async () => {
         setErrorMessage('');
         try {
-            // apiService throws on non-OK responses; if this resolves, the report was submitted
-            await apiService.makeRequest('/staff/report-issue', {
+            // Use session-aware request wrapper for better error handling
+            await makeRequestWithRetry('/staff/report-issue', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -118,12 +136,46 @@ export default function MyLeaves() {
             setReportModalOpen(false);
         } catch (error) {
             console.error('Error submitting report:', error);
-            if (!errorMessage) setErrorMessage('An error occurred while submitting the report.');
+            if (error?.message?.includes('Session expired')) {
+                setShowSessionAlert(true);
+                setErrorMessage('Your session has expired. Please log in again.');
+            } else if (!errorMessage) {
+                setErrorMessage('An error occurred while submitting the report.');
+            }
         }
     };
 
     return (
         <>
+            {/* Session Expired Alert */}
+            {showSessionAlert && (
+                <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-lg shadow-lg max-w-md">
+                        <h3 className="text-lg font-semibold text-orange-600 mb-2">Session Expired</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Your session has timed out. Please log in again to continue viewing your leaves.
+                        </p>
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={() => {
+                                    setShowSessionAlert(false);
+                                    setErrorMessage('');
+                                }}
+                                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                            >
+                                Dismiss
+                            </button>
+                            <button
+                                onClick={handleSessionExpired}
+                                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                            >
+                                Log In Again
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Error Message */}
             {errorMessage && (
                 <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
@@ -169,6 +221,8 @@ export default function MyLeaves() {
                                             <th scope="col" className="px-6 py-3">To</th>
                                             <th scope="col" className="px-6 py-3">Days</th>
                                             <th scope="col" className="px-6 py-3">Reason</th>
+                                            <th scope="col" className="px-6 py-3">Public Holidays</th>
+                                            <th scope="col" className="px-6 py-3">Handover To</th>
                                             <th scope="col" className="px-6 py-3">Applied On</th>
                                             <th scope="col" className="px-6 py-3">Status</th>
                                             <th scope="col" className="px-6 py-3">Action</th>
@@ -183,11 +237,13 @@ export default function MyLeaves() {
                                             leaves.map((leave) => (
                                                 <tr key={leave.id} className="bg-white border-b hover:bg-gray-50">
                                                     <td className="px-6 py-4 text-center">{leave.id}</td>
-                                                    <td className="px-6 py-4">{leave.leave_type_name || 'Unknown Leave Type'}</td>
+                                                    <td className="px-6 py-4">{leave.leave_type || 'Unknown Leave Type'}</td>
                                                     <td className="px-6 py-4">{formatDate(leave.start_date)}</td>
                                                     <td className="px-6 py-4">{leave.end_date ? formatDate(leave.end_date) : 'N/A'}</td>
                                                     <td className="px-6 py-4 font-semibold">{leave.days} Day{leave.days > 1 ? 's' : ''}</td>
                                                     <td className="px-6 py-4 max-w-xs truncate" title={leave.reason}>{leave.reason}</td>
+                                                    <td className="px-6 py-4">{leave.public_holidays || 0}</td>
+                                                    <td className="px-6 py-4">{leave.handover_staff_name || '-'}</td>
                                                     <td className="px-6 py-4">{formatDate(leave.applied_at)}</td>
                                                     <td className="px-6 py-4">
                                                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColorMap[leave.status]}`}>
@@ -314,7 +370,7 @@ export default function MyLeaves() {
                                     </tr>
                                     <tr className="border-b">
                                         <td className="py-2 font-semibold text-gray-600">Leave Type</td>
-                                        <td className="py-2 text-gray-800">: {selectedLeave.leave_type_name || 'Unknown Leave Type'}</td>
+                                        <td className="py-2 text-gray-800">: {selectedLeave.leave_type || 'Unknown Leave Type'}</td>
                                     </tr>
                                     <tr className="border-b">
                                         <td className="py-2 font-semibold text-gray-600">Start Date</td>
@@ -331,6 +387,14 @@ export default function MyLeaves() {
                                     <tr className="border-b">
                                         <td className="py-2 font-semibold text-gray-600">Reason</td>
                                         <td className="py-2 text-gray-800">: {selectedLeave.reason}</td>
+                                    </tr>
+                                    <tr className="border-b">
+                                        <td className="py-2 font-semibold text-gray-600">Public Holidays</td>
+                                        <td className="py-2 text-gray-800">: {selectedLeave.public_holidays || 0}</td>
+                                    </tr>
+                                    <tr className="border-b">
+                                        <td className="py-2 font-semibold text-gray-600">Handover To</td>
+                                        <td className="py-2 text-gray-800">: {selectedLeave.handover_staff_name || 'N/A'}</td>
                                     </tr>
                                     <tr className="border-b">
                                         <td className="py-2 font-semibold text-gray-600">Status</td>

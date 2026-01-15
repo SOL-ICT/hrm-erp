@@ -126,6 +126,13 @@ const PayrollProcessingPage = lazy(() =>
   )
 );
 
+// Leave Policies Component (skeleton)
+const LeavePoliciesPage = lazy(() =>
+  import(
+    "./modules/hr-payroll-management/submodules/leave-policies/LeavePoliciesPage"
+  )
+);
+
 // Leave Approval Component
 const LeaveApproval = lazy(() =>
   import("./modules/hr-payroll/LeaveApproval")
@@ -594,6 +601,18 @@ const AdminRouter = ({
                 window.history.back();
               }}
             />
+          );
+
+        case "leave-policies":
+          return (
+            <SmartRouteCache routeKey="leave-policies">
+              <LeavePoliciesPage
+                {...commonProps}
+                onBack={() => {
+                  window.history.back();
+                }}
+              />
+            </SmartRouteCache>
           );
 
         case "leave-management":

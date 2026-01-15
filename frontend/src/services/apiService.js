@@ -42,7 +42,25 @@ class APIService {
   }
 
   async makeRequest(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
+    // Support query params passed in options.params (like axios)
+    let url = `${this.baseURL}${endpoint}`;
+    if (options.params && typeof options.params === "object") {
+      const search = new URLSearchParams();
+      Object.keys(options.params).forEach((k) => {
+        const v = options.params[k];
+        if (v === undefined || v === null) return;
+        // handle array values
+        if (Array.isArray(v)) {
+          v.forEach((item) => search.append(k, item));
+        } else {
+          search.append(k, String(v));
+        }
+      });
+      const qs = search.toString();
+      if (qs) {
+        url += (url.includes("?") ? "&" : "?") + qs;
+      }
+    }
 
     // For FormData, don't include Content-Type header - let browser set it
     const isFormData = options.body instanceof FormData;
@@ -68,11 +86,14 @@ class APIService {
       }
     }
 
+    // Remove params prop so it isn't sent to fetch
+    const { params, ...opts } = options;
+
     const config = {
-      method: options.method || "GET",
+      method: opts.method || "GET",
       headers,
-      credentials: "include", // For session-based auth
-      ...options,
+      credentials: "include",
+      ...opts,
     };
 
     try {

@@ -27,6 +27,7 @@ export default function LeaveApproval() {
   // Modal states
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -120,6 +121,11 @@ export default function LeaveApproval() {
   const handleApprove = (leave) => {
     setSelectedLeave(leave);
     setShowApproveModal(true);
+  };
+
+  const handleViewDetails = (leave) => {
+    setSelectedLeave(leave);
+    setShowDetailsModal(true);
   };
 
   const confirmApprove = async () => {
@@ -365,13 +371,14 @@ export default function LeaveApproval() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dates</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Approval Link</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredLeaves.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan="8" className="px-6 py-12 text-center text-gray-500">
                     <AlertCircle className="mx-auto mb-2" size={40} />
                     <p>No leave applications found</p>
                   </td>
@@ -406,6 +413,27 @@ export default function LeaveApproval() {
                       {getStatusBadge(leave.status)}
                     </td>
                     <td className="px-6 py-4">
+                      {leave.approval_token ? (
+                        <a
+                          href={`/leave-approval/${leave.approval_token}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 text-sm underline flex items-center gap-1"
+                        >
+                          <FileText size={14} />
+                          View Page
+                        </a>
+                      ) : (
+                        <span className="text-xs text-gray-400">No token</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => handleViewDetails(leave)}
+                        className="text-blue-600 hover:text-blue-800 text-sm underline mb-2 w-full text-left"
+                      >
+                        View Details
+                      </button>
                       {leave.status === 'pending' ? (
                         <div className="flex gap-2">
                           <button
@@ -497,6 +525,172 @@ export default function LeaveApproval() {
               >
                 {isProcessing ? <Loader2 className="animate-spin" size={16} /> : <X size={16} />}
                 {isProcessing ? 'Processing...' : 'Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Details Modal */}
+      {showDetailsModal && selectedLeave && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-blue-600 px-6 py-4 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-white">Leave Application Details</h3>
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="text-white hover:text-blue-100 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Staff Information */}
+              <div className="border-b pb-4">
+                <h4 className="font-semibold text-gray-900 mb-3">Staff Information</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500">Name</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedLeave.staff_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Staff ID</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedLeave.staff_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Email</p>
+                    <p className="text-sm text-gray-900">{selectedLeave.staff_email}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Phone</p>
+                    <p className="text-sm text-gray-900">{selectedLeave.phone_number || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Leave Details */}
+              <div className="border-b pb-4">
+                <h4 className="font-semibold text-gray-900 mb-3">Leave Details</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500">Leave Type</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedLeave.leave_type}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Duration</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedLeave.days} day(s)</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Start Date</p>
+                    <p className="text-sm text-gray-900">{formatDate(selectedLeave.start_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">End Date</p>
+                    <p className="text-sm text-gray-900">{formatDate(selectedLeave.end_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Reason</p>
+                    <p className="text-sm text-gray-900 col-span-2">{selectedLeave.reason}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Supervisor Information */}
+              <div className="border-b pb-4">
+                <h4 className="font-semibold text-gray-900 mb-3">Supervisor Information</h4>
+                <div>
+                  <p className="text-xs text-gray-500">Approval Link Sent To</p>
+                  <p className="text-sm font-medium text-gray-900">{selectedLeave.supervisor_email_sent || 'N/A'}</p>
+                </div>
+              </div>
+
+              {/* Approval/Rejection Information */}
+              {selectedLeave.status !== 'pending' && (
+                <div className="border-b pb-4">
+                  <h4 className="font-semibold text-gray-900 mb-3">
+                    {selectedLeave.status === 'approved' ? 'Approval Details' : 'Rejection Details'}
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500">Status</p>
+                      <p className="text-sm font-medium text-gray-900 capitalize">{selectedLeave.status}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Approval Method</p>
+                      <p className="text-sm font-medium text-gray-900 capitalize">
+                        {selectedLeave.approval_method === 'email_link' ? 'Email Link' : 'Admin Dashboard'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Date & Time</p>
+                      <p className="text-sm text-gray-900">
+                        {selectedLeave.approved_at ? new Date(selectedLeave.approved_at).toLocaleString() : 'N/A'}
+                      </p>
+                    </div>
+                    {selectedLeave.approved_by_admin_id && (
+                      <div>
+                        <p className="text-xs text-gray-500">Approved By (Admin)</p>
+                        <p className="text-sm font-medium text-gray-900">{selectedLeave.admin_approval_name || 'N/A'}</p>
+                      </div>
+                    )}
+                    {selectedLeave.approval_ip_address && (
+                      <div>
+                        <p className="text-xs text-gray-500">IP Address</p>
+                        <p className="text-sm font-mono text-gray-900">{selectedLeave.approval_ip_address}</p>
+                      </div>
+                    )}
+                    {selectedLeave.approval_user_agent && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-gray-500">Device/Browser Information</p>
+                        <p className="text-xs text-gray-600 break-words">{selectedLeave.approval_user_agent}</p>
+                      </div>
+                    )}
+                    {selectedLeave.approver_comments && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-gray-500">Comments</p>
+                        <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{selectedLeave.approver_comments}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Application Metadata */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Application Metadata</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500">Application ID</p>
+                    <p className="text-sm font-mono text-gray-900">{selectedLeave.id}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Client</p>
+                    <p className="text-sm text-gray-900">{selectedLeave.client_name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Applied On</p>
+                    <p className="text-sm text-gray-900">{new Date(selectedLeave.applied_at).toLocaleString()}</p>
+                  </div>
+                  {selectedLeave.approval_token && (
+                    <div>
+                      <p className="text-xs text-gray-500">Approval Token</p>
+                      <p className="text-xs font-mono text-gray-600 truncate">{selectedLeave.approval_token}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-50 px-6 py-4 flex justify-end">
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Close
               </button>
             </div>
           </div>

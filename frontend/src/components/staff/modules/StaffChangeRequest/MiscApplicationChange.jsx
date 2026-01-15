@@ -528,7 +528,7 @@ const MiscApplicationChange = ({ userId }) => {
               {[
                 { label: 'Entry Date', value: staffProfile?.entry_date },
                 { label: 'Employee Code', value: staffProfile?.employee_code },
-                { label: 'Client Name', value: staffProfile?.client_name },
+                { label: 'Organisation Name', value: staffProfile?.organisation_name },
                 { label: 'Service Location', value: staffProfile?.location },
                 { label: 'Employee Name', value: `${staffProfile?.first_name || ''} ${staffProfile?.middle_name ? staffProfile?.middle_name + ' ' : ''}${staffProfile?.last_name || ''}`.trim() || 'Not set' },
                 { label: 'Designation', value: staffProfile?.designation },

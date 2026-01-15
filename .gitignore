@@ -184,6 +184,7 @@ run_tests_safely.ps1
 test-*.ps1
 database_backups/
 
+
 # ==========================================
 # Next.js Specific
 # ==========================================
@@ -222,3 +223,7 @@ out/
 # Database
 *.sqlite
 *.db
+
+# test components
+frontend/src/components/staff/Profile.jsx
+docker-compose-root.yml

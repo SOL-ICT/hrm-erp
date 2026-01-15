@@ -96,34 +96,27 @@ export class APIService {
           data = await response.text();
         }
 
-        if (!response.ok) {
-          if (response.status === 401) {
-            // Only redirect to login if we're not already on login page
-            const currentPath =
-              typeof window !== "undefined" ? window.location.pathname : "";
-            if (currentPath !== "/login") {
-              console.warn("Authentication expired, redirecting to login");
-              this.setAuthToken(null);
-              if (typeof window !== "undefined") {
-                // Use setTimeout to prevent immediate redirect during component cleanup
-                setTimeout(() => {
-                  window.location.href = "/login";
-                }, 100);
-              }
-            }
-          }
-
-          // For 404s, return the response data so individual APIs can handle them
-          if (response.status === 404 && data && data.message) {
-            return data;
-          }
-
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Session expired: clear the token but do NOT redirect yet.
+          // Instead, throw an error and let the component handle it with a retry option.
+          console.warn("⚠️ Session expired (401) - throwing error for component to handle");
+          this.setAuthToken(null);
           throw new Error(
-            data.message || `HTTP error! status: ${response.status}`
+            "Session expired. Please log in again to continue. " +
+            "(You can try refreshing the page or logging in again.)"
           );
         }
 
-        return data;
+        // For 404s, return the response data so individual APIs can handle them
+        if (response.status === 404 && data && data.message) {
+          return data;
+        }
+
+        throw new Error(
+          data.message || `HTTP error! status: ${response.status}`
+        );
+      }        return data;
       } catch (error) {
         console.error("API Request failed:", error);
         throw error;
@@ -162,20 +155,14 @@ export class APIService {
 
       if (!response.ok) {
         if (response.status === 401) {
-          // Only redirect to login if we're not already on login page
-          // and if this isn't from an aborted request
-          const currentPath =
-            typeof window !== "undefined" ? window.location.pathname : "";
-          if (currentPath !== "/login" && !error?.name?.includes("Abort")) {
-            console.warn("Authentication expired, redirecting to login");
-            this.setAuthToken(null);
-            if (typeof window !== "undefined") {
-              // Use setTimeout to prevent immediate redirect during component cleanup
-              setTimeout(() => {
-                window.location.href = "/login";
-              }, 100);
-            }
-          }
+          // Session expired: clear the token but do NOT redirect yet.
+          // Instead, throw an error and let the component handle it with a retry option.
+          console.warn("⚠️ Session expired (401) - throwing error for component to handle");
+          this.setAuthToken(null);
+          throw new Error(
+            "Session expired. Please log in again to continue. " +
+            "(You can try refreshing the page or logging in again.)"
+          );
         }
 
         // For validation errors, include the validation details

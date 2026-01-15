@@ -12,6 +12,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UtilityController;
 use App\Http\Controllers\OfferLetterTemplateController;
 use App\Http\Controllers\PerformanceController;
+use App\Http\Controllers\LeaveApprovalController;
 
 /*
 |--------------------------------------------------------------------------
@@ -44,6 +45,10 @@ Route::post('/performance/test-endpoint', [PerformanceController::class, 'testEn
 // Auth routes (public)
 Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/register', [AuthController::class, 'register']);
+
+// Leave approval routes (public - accessed via email link with token)
+Route::get('/leave-approval/{token}', [LeaveApprovalController::class, 'show']);
+Route::post('/leave-approval/{token}/decision', [LeaveApprovalController::class, 'processDecision']);
 
 // Password reset routes (public)
 require __DIR__ . '/auth/password-reset.php';
@@ -328,6 +333,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     require __DIR__ . '/modules/hr-payroll-management/employee-record.php';
     require __DIR__ . '/modules/hr-payroll-management/calculation-templates.php';
     require __DIR__ . '/modules/hr-payroll-management/payroll-processing.php';
+    // Leave Engine (Leave Policies)
+    require __DIR__ . '/modules/leave-engine/leave-engine.php';
 
     // Employee Management Module (HR Extension)
     require __DIR__ . '/modules/employee-management/employee-actions.php';

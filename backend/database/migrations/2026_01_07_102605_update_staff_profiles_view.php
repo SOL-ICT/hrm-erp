@@ -27,6 +27,8 @@ return new class extends Migration
                 s.entry_date AS entry_date,
                 s.location AS location,
                 s.client_id AS client_id,
+                s.gender AS gender,
+                s.job_structure_id AS job_structure_id,
                 c.organisation_name AS organisation_name,
                 c.prefix AS prefix,
                 s.department AS department,
