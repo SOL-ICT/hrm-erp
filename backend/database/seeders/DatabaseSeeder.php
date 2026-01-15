@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
 
         // Procurement & Advance Management Seeders
         $this->call([
+            LeaveManagementPermissionsSeeder::class,
             BudgetAllocationSeeder::class,
             AdvanceSeeder::class,
             RetirementSeeder::class,
