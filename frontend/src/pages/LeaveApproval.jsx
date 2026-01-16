@@ -25,13 +25,22 @@ export default function LeaveApproval() {
   const fetchApplicationDetails = async () => {
     try {
       setLoading(true);
-      const data = await makeRequestWithRetry(`/api/leave-approval/${token}`, {
+      let requestOptions = {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-      });
+      };
+
+      // Fail-safe for production: if on mysol360.com and API_URL is still localhost
+      if (typeof window !== 'undefined' && window.location.hostname.includes('mysol360.com') && !process.env.NEXT_PUBLIC_API_URL?.includes('mysol360.com')) {
+        const dynamicBaseURL = `${window.location.origin}/api`;
+        requestOptions.baseURLOverride = dynamicBaseURL;
+        console.warn(`Override API URL to: ${dynamicBaseURL} for /leave-approval/${token}`);
+      }
+
+      const data = await makeRequestWithRetry(`/leave-approval/${token}`, requestOptions);
 
       setApplication(data.data);
     } catch (err) {
@@ -52,7 +61,7 @@ export default function LeaveApproval() {
       setSubmitting(true);
       setError('');
 
-      const data = await makeRequestWithRetry(`/api/leave-approval/${token}/decision`, {
+      let requestOptions = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -62,7 +71,16 @@ export default function LeaveApproval() {
           decision: decision,
           comments: comments.trim() || null,
         }),
-      });
+      };
+
+      // Fail-safe for production: if on mysol360.com and API_URL is still localhost
+      if (typeof window !== 'undefined' && window.location.hostname.includes('mysol360.com') && !process.env.NEXT_PUBLIC_API_URL?.includes('mysol360.com')) {
+        const dynamicBaseURL = `${window.location.origin}/api`;
+        requestOptions.baseURLOverride = dynamicBaseURL;
+        console.warn(`Override API URL to: ${dynamicBaseURL} for /leave-approval/${token}/decision`);
+      }
+
+      const data = await makeRequestWithRetry(`/leave-approval/${token}/decision`, requestOptions);
 
       setSuccess(true);
       setTimeout(() => {

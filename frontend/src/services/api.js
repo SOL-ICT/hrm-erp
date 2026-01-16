@@ -35,7 +35,11 @@ export class APIService {
     // endpoints keep the configured `this.baseURL`.
     const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
     const isSanctum = normalizedEndpoint.startsWith("/sanctum");
-    const effectiveBase = isSanctum ? this.baseURL.replace("/api", "") : this.baseURL;
+
+    // Use baseURLOverride from options if provided, otherwise use instance's baseURL
+    const baseToUse = options.baseURLOverride || this.baseURL;
+
+    const effectiveBase = isSanctum ? baseToUse.replace("/api", "") : baseToUse;
     const url = `${effectiveBase}${normalizedEndpoint}`;
 
     // For authenticated requests, ensure CSRF cookie is available
