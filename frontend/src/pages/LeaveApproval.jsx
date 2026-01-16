@@ -26,16 +26,29 @@ export default function LeaveApproval() {
     try {
       setLoading(true);
       
+      // DEBUG: Log environment and domain info
+      console.log('🔍 LeaveApproval fetchApplicationDetails DEBUG:');
+      console.log('  - window.location.hostname:', typeof window !== 'undefined' ? window.location.hostname : 'N/A');
+      console.log('  - window.location.origin:', typeof window !== 'undefined' ? window.location.origin : 'N/A');
+      console.log('  - NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+      console.log('  - token:', token);
+      
       const requestOptions = { method: 'GET' };
       
       // Failsafe: Override API URL if on production domain but API still points to localhost
       if (typeof window !== 'undefined' && window.location.hostname.includes('mysol360.com') && !process.env.NEXT_PUBLIC_API_URL?.includes('mysol360.com')) {
         const dynamicBaseURL = `${window.location.origin}/api`;
         requestOptions.baseURLOverride = dynamicBaseURL;
-        console.warn(`Override API URL to: ${dynamicBaseURL} for /leave-approval/${token}`);
+        console.warn(`🚨 FAILSAFE TRIGGERED: Override API URL to: ${dynamicBaseURL}`);
+      } else if (typeof window !== 'undefined') {
+        console.log('✅ Failsafe check passed - no override needed');
+        console.log('  - Is production domain?', window.location.hostname.includes('mysol360.com'));
+        console.log('  - API URL includes mysol360.com?', process.env.NEXT_PUBLIC_API_URL?.includes('mysol360.com'));
       }
       
+      console.log('📤 Making request to /leave-approval/' + token, requestOptions);
       const response = await makeRequestWithRetry(`/leave-approval/${token}`, requestOptions);
+      console.log('✅ Response received:', response);
 
       setApplication(response.data);
     } catch (err) {
@@ -66,6 +79,13 @@ export default function LeaveApproval() {
       setSubmitting(true);
       setError('');
 
+      // DEBUG: Log decision submission
+      console.log('🔍 LeaveApproval handleSubmitDecision DEBUG:');
+      console.log('  - decision:', decision);
+      console.log('  - token:', token);
+      console.log('  - window.location.hostname:', typeof window !== 'undefined' ? window.location.hostname : 'N/A');
+      console.log('  - NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+
       const requestOptions = {
         method: 'POST',
         body: JSON.stringify({
@@ -78,10 +98,14 @@ export default function LeaveApproval() {
       if (typeof window !== 'undefined' && window.location.hostname.includes('mysol360.com') && !process.env.NEXT_PUBLIC_API_URL?.includes('mysol360.com')) {
         const dynamicBaseURL = `${window.location.origin}/api`;
         requestOptions.baseURLOverride = dynamicBaseURL;
-        console.warn(`Override API URL to: ${dynamicBaseURL} for /leave-approval/${token}/decision`);
+        console.warn(`🚨 FAILSAFE TRIGGERED: Override API URL to: ${dynamicBaseURL}`);
+      } else if (typeof window !== 'undefined') {
+        console.log('✅ Failsafe check passed - no override needed');
       }
 
+      console.log('📤 Making POST request to /leave-approval/' + token + '/decision', requestOptions);
       const response = await makeRequestWithRetry(`/leave-approval/${token}/decision`, requestOptions);
+      console.log('✅ Decision response received:', response);
 
       setSuccess(true);
       setTimeout(() => {
