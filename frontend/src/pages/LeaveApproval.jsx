@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
-import { apiService } from '@/services/api';
+import { useSessionAware } from '@/hooks/useSessionAware';
 
 export default function LeaveApproval() {
   const router = useRouter();
   const { token } = router.query;
+  const { makeRequestWithRetry } = useSessionAware();
   
   const [loading, setLoading] = useState(true);
   const [application, setApplication] = useState(null);
@@ -24,33 +25,32 @@ export default function LeaveApproval() {
   const fetchApplicationDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8000/api/leave-approval/${token}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          setError('Invalid approval link');
-        } else if (response.status === 410) {
-          setError('This approval link has expired');
-        } else if (response.status === 409) {
-          setError(data.message || 'This leave application has already been processed');
-        } else {
-          setError(data.message || 'Failed to load leave application');
-        }
-        return;
+      
+      const requestOptions = { method: 'GET' };
+      
+      // Failsafe: Override API URL if on production domain but API still points to localhost
+      if (typeof window !== 'undefined' && window.location.hostname.includes('mysol360.com') && !process.env.NEXT_PUBLIC_API_URL?.includes('mysol360.com')) {
+        const dynamicBaseURL = `${window.location.origin}/api`;
+        requestOptions.baseURLOverride = dynamicBaseURL;
+        console.warn(`Override API URL to: ${dynamicBaseURL} for /leave-approval/${token}`);
       }
+      
+      const response = await makeRequestWithRetry(`/leave-approval/${token}`, requestOptions);
 
-      setApplication(data.data);
+      setApplication(response.data);
     } catch (err) {
       console.error('Error fetching application:', err);
-      setError('Failed to load leave application. Please try again.');
+      const errorMsg = err?.message || String(err);
+      
+      if (errorMsg.includes('Invalid approval link')) {
+        setError('Invalid approval link');
+      } else if (errorMsg.includes('expired')) {
+        setError('This approval link has expired');
+      } else if (errorMsg.includes('already been processed')) {
+        setError('This leave application has already been processed');
+      } else {
+        setError(errorMsg || 'Failed to load leave application');
+      }
     } finally {
       setLoading(false);
     }
@@ -66,24 +66,22 @@ export default function LeaveApproval() {
       setSubmitting(true);
       setError('');
 
-      const response = await fetch(`http://localhost:8000/api/leave-approval/${token}/decision`, {
+      const requestOptions = {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
         body: JSON.stringify({
           decision: decision,
           comments: comments.trim() || null,
         }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || 'Failed to process decision');
-        return;
+      };
+      
+      // Failsafe: Override API URL if on production domain but API still points to localhost
+      if (typeof window !== 'undefined' && window.location.hostname.includes('mysol360.com') && !process.env.NEXT_PUBLIC_API_URL?.includes('mysol360.com')) {
+        const dynamicBaseURL = `${window.location.origin}/api`;
+        requestOptions.baseURLOverride = dynamicBaseURL;
+        console.warn(`Override API URL to: ${dynamicBaseURL} for /leave-approval/${token}/decision`);
       }
+
+      const response = await makeRequestWithRetry(`/leave-approval/${token}/decision`, requestOptions);
 
       setSuccess(true);
       setTimeout(() => {
@@ -92,7 +90,8 @@ export default function LeaveApproval() {
 
     } catch (err) {
       console.error('Error submitting decision:', err);
-      setError('Failed to submit decision. Please try again.');
+      const errorMsg = err?.message || String(err);
+      setError(errorMsg || 'Failed to submit decision. Please try again.');
     } finally {
       setSubmitting(false);
     }

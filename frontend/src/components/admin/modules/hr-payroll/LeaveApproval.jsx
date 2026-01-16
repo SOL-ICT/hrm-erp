@@ -4,8 +4,10 @@ import {
   Calendar, User, Building2, FileText, TrendingUp,
   AlertCircle, CheckCircle, XCircle, Loader2
 } from 'lucide-react';
+import { useSessionAware } from '@/hooks/useSessionAware';
 
 export default function LeaveApproval() {
+  const { makeRequestWithRetry } = useSessionAware();
   const [leaves, setLeaves] = useState([]);
   const [filteredLeaves, setFilteredLeaves] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,41 +46,17 @@ export default function LeaveApproval() {
     setIsLoading(true);
     try {
       // Fetch all data in parallel
-      const [leavesRes, clientsRes, typesRes, statsRes] = await Promise.all([
-        fetch('http://localhost:8000/api/admin/leave-approvals', {
-          credentials: 'include',
-          headers: { 'Accept': 'application/json' }
-        }),
-        fetch('http://localhost:8000/api/admin/leave-approvals/clients', {
-          credentials: 'include',
-          headers: { 'Accept': 'application/json' }
-        }),
-        fetch('http://localhost:8000/api/admin/leave-approvals/types', {
-          credentials: 'include',
-          headers: { 'Accept': 'application/json' }
-        }),
-        fetch('http://localhost:8000/api/admin/leave-approvals/statistics', {
-          credentials: 'include',
-          headers: { 'Accept': 'application/json' }
-        })
+      const [leavesData, clientsData, typesData, statsData] = await Promise.all([
+        makeRequestWithRetry('/admin/leave-approvals', { method: 'GET' }),
+        makeRequestWithRetry('/admin/leave-approvals/clients', { method: 'GET' }),
+        makeRequestWithRetry('/admin/leave-approvals/types', { method: 'GET' }),
+        makeRequestWithRetry('/admin/leave-approvals/statistics', { method: 'GET' })
       ]);
 
-      // Debug: Check response status
-      if (!leavesRes.ok) {
-        const text = await leavesRes.text();
-        console.error('Leave approvals API error:', leavesRes.status, text);
-        throw new Error(`API error: ${leavesRes.status}`);
-      }
-
-      const leavesData = await leavesRes.json();
-      const clientsData = await clientsRes.json();
-      const typesData = await typesRes.json();
-      const statsData = await statsRes.json();
-
-      setLeaves(leavesData);
-      setClients(clientsData);
-      setLeaveTypes(typesData);
-      setStatistics(statsData);
+      setLeaves(leavesData.data || leavesData);
+      setClients(clientsData.data || clientsData);
+      setLeaveTypes(typesData.data || typesData);
+      setStatistics(statsData.data || statsData);
       
     } catch (err) {
       setError('Failed to load leave data');
@@ -131,19 +109,16 @@ export default function LeaveApproval() {
   const confirmApprove = async () => {
     setIsProcessing(true);
     try {
-      await fetch('http://localhost:8000/sanctum/csrf-cookie', { credentials: 'include' });
+      const requestOptions = { method: 'POST' };
       
-      const response = await fetch(`http://localhost:8000/api/admin/leave-approvals/${selectedLeave.id}/approve`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        }
-      });
+      // Failsafe: Override API URL if on production domain
+      if (typeof window !== 'undefined' && window.location.hostname.includes('mysol360.com') && !process.env.NEXT_PUBLIC_API_URL?.includes('mysol360.com')) {
+        const dynamicBaseURL = `${window.location.origin}/api`;
+        requestOptions.baseURLOverride = dynamicBaseURL;
+        console.warn(`Override API URL to: ${dynamicBaseURL}`);
+      }
 
-      if (!response.ok) throw new Error('Approval failed');
+      await makeRequestWithRetry(`/admin/leave-approvals/${selectedLeave.id}/approve`, requestOptions);
 
       // Refresh data
       await fetchData();
@@ -152,7 +127,7 @@ export default function LeaveApproval() {
       alert('Leave approved successfully! Email sent to staff.');
       
     } catch (err) {
-      alert('Failed to approve leave: ' + err.message);
+      alert('Failed to approve leave: ' + (err?.message || String(err)));
     } finally {
       setIsProcessing(false);
     }
@@ -172,20 +147,19 @@ export default function LeaveApproval() {
 
     setIsProcessing(true);
     try {
-      await fetch('http://localhost:8000/sanctum/csrf-cookie', { credentials: 'include' });
-      
-      const response = await fetch(`http://localhost:8000/api/admin/leave-approvals/${selectedLeave.id}/reject`, {
+      const requestOptions = {
         method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
         body: JSON.stringify({ reason: rejectionReason })
-      });
+      };
+      
+      // Failsafe: Override API URL if on production domain
+      if (typeof window !== 'undefined' && window.location.hostname.includes('mysol360.com') && !process.env.NEXT_PUBLIC_API_URL?.includes('mysol360.com')) {
+        const dynamicBaseURL = `${window.location.origin}/api`;
+        requestOptions.baseURLOverride = dynamicBaseURL;
+        console.warn(`Override API URL to: ${dynamicBaseURL}`);
+      }
 
-      if (!response.ok) throw new Error('Rejection failed');
+      await makeRequestWithRetry(`/admin/leave-approvals/${selectedLeave.id}/reject`, requestOptions);
 
       // Refresh data
       await fetchData();
@@ -195,7 +169,7 @@ export default function LeaveApproval() {
       alert('Leave rejected successfully');
       
     } catch (err) {
-      alert('Failed to reject leave: ' + err.message);
+      alert('Failed to reject leave: ' + (err?.message || String(err)));
     } finally {
       setIsProcessing(false);
     }
