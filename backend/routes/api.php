@@ -38,6 +38,10 @@ Route::get('/utilities/states-lgas', [CandidateController::class, 'getStatesLgas
 Route::get('/utilities/industry-categories', [UtilityController::class, 'getIndustryCategories']);
 Route::get('/utilities/client-categories', [UtilityController::class, 'getClientCategories']);
 
+// Public job board endpoints (no authentication required)
+Route::get('/public/jobs', [\App\Http\Controllers\CurrentVacanciesController::class, 'publicIndex']);
+Route::get('/public/jobs/{ticketId}', [\App\Http\Controllers\CurrentVacanciesController::class, 'publicShow']);
+
 // Performance testing endpoints (development)
 Route::get('/performance/diagnostics', [PerformanceController::class, 'diagnostics']);
 Route::post('/performance/test-endpoint', [PerformanceController::class, 'testEndpoint']);

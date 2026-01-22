@@ -23,6 +23,35 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
     expectedSalary: '',
     availableStartDate: '',
   });
+  const [pendingJobHighlight, setPendingJobHighlight] = useState(null);
+
+  // Check for pending job application from registration
+  useEffect(() => {
+    const pendingJobId = sessionStorage.getItem('pending_job_application');
+    if (pendingJobId) {
+      console.log('📋 Found pending job application:', pendingJobId);
+      setPendingJobHighlight(pendingJobId);
+      // Don't clear yet - wait until jobs are loaded
+    }
+  }, []);
+
+  // Auto-open job details when pending job is found and jobs are loaded
+  useEffect(() => {
+    if (pendingJobHighlight && availableJobs.length > 0) {
+      const targetJob = availableJobs.find(
+        (job) => job.ticketId === pendingJobHighlight || job.ticket_id === pendingJobHighlight
+      );
+      
+      if (targetJob) {
+        console.log('✅ Found target job, opening details:', targetJob);
+        handleViewDetails(targetJob);
+        // Clear from storage after opening
+        sessionStorage.removeItem('pending_job_application');
+        // Clear highlight after 5 seconds
+        setTimeout(() => setPendingJobHighlight(null), 5000);
+      }
+    }
+  }, [pendingJobHighlight, availableJobs]);
 
   // Fetch available jobs from API
   useEffect(() => {
@@ -337,9 +366,31 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
     return `₦${min.toLocaleString()} - ₦${max.toLocaleString()}`;
   };
 
-  const getJobCard = (job) => (
-    <div key={job.id} className={`p-6 border rounded-lg ${currentTheme.border} ${currentTheme.cardBg} hover:shadow-md transition-shadow`}>
-      {/* Job Header */}
+  const getJobCard = (job) => {
+    const isHighlighted = 
+      pendingJobHighlight && 
+      (job.ticketId === pendingJobHighlight || job.ticket_id === pendingJobHighlight);
+    
+    return (
+      <div 
+        key={job.id} 
+        className={`p-6 border rounded-lg ${currentTheme.border} ${currentTheme.cardBg} hover:shadow-md transition-all ${
+          isHighlighted 
+            ? 'ring-4 ring-blue-500 ring-opacity-50 animate-pulse shadow-xl' 
+            : ''
+        }`}
+      >
+        {/* Pending Application Badge */}
+        {isHighlighted && (
+          <div className="mb-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-2 rounded-lg flex items-center justify-between">
+            <div className="flex items-center">
+              <Star className="w-5 h-5 mr-2 fill-current" />
+              <span className="font-semibold">You were applying for this position!</span>
+            </div>
+          </div>
+        )}
+        
+        {/* Job Header */}
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1">
           <h3 className={`text-lg font-semibold ${currentTheme.textPrimary} mb-1`}>
@@ -523,7 +574,8 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className={`min-h-screen ${currentTheme.bgSecondary}`}>
