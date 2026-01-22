@@ -580,4 +580,106 @@ class CurrentVacanciesController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get public job listings (no authentication required)
+     * For use in public career board
+     */
+    public function publicIndex(Request $request): JsonResponse
+    {
+        try {
+            $perPage = $request->get('per_page', 12);
+            $search = $request->get('search', '');
+            $location = $request->get('location', '');
+            $jobType = $request->get('job_type', '');
+
+            $query = RecruitmentRequest::with([
+                'jobStructure', 
+                'client'
+            ])
+                ->where('status', 'active')
+                ->where('recruitment_period_end', '>=', now());
+
+            // Search filter
+            if ($search) {
+                $query->where(function($q) use ($search) {
+                    $q->where('description', 'like', "%{$search}%")
+                      ->orWhereHas('jobStructure', function ($subQ) use ($search) {
+                          $subQ->where('job_title', 'like', "%{$search}%");
+                      })
+                      ->orWhereHas('client', function ($subQ) use ($search) {
+                          $subQ->where('organisation_name', 'like', "%{$search}%");
+                      });
+                });
+            }
+
+            // Location filter
+            if ($location) {
+                $query->where('lga', $location);
+            }
+
+            // Job type filter (SOL service type)
+            if ($jobType) {
+                $query->where('sol_service_type', $jobType);
+            }
+
+            $jobs = $query->orderBy('priority_level', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $jobs
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch public jobs:', [
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch job listings'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get single job details (no authentication required)
+     * For use in public career board
+     */
+    public function publicShow(Request $request, string $ticketId): JsonResponse
+    {
+        try {
+            $job = RecruitmentRequest::with([
+                'jobStructure',
+                'client'
+            ])
+                ->where('ticket_id', $ticketId)
+                ->where('status', 'active')
+                ->where('recruitment_period_end', '>=', now())
+                ->first();
+
+            if (!$job) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Job not found or no longer available'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $job
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch public job details:', [
+                'ticket_id' => $ticketId,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch job details'
+            ], 500);
+        }
+    }
 }

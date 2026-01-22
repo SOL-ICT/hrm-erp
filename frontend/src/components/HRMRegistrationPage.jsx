@@ -1,11 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "../contexts/AuthContext";
 import API from "@/services/api";
 
 const HRMRegistrationPage = () => {
   const { register, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const jobId = searchParams?.get("job_id");
+  
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -13,6 +18,7 @@ const HRMRegistrationPage = () => {
   const [notification, setNotification] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [registrationError, setRegistrationError] = useState("");
+  const [jobDetails, setJobDetails] = useState(null);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -88,6 +94,40 @@ const HRMRegistrationPage = () => {
 
   const passwordStrength = checkPasswordStrength(formData.password);
 
+  // Fetch job details if job_id is present
+  useEffect(() => {
+    if (jobId) {
+      fetchJobDetails(jobId);
+    }
+  }, [jobId]);
+
+  const fetchJobDetails = async (ticketId) => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/public/jobs/${ticketId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.warn(`Failed to fetch job details: HTTP ${response.status}`);
+        return;
+      }
+
+      const result = await response.json();
+      if (result.success && result.data) {
+        setJobDetails(result.data);
+        console.log("Job details loaded:", result.data);
+      }
+    } catch (error) {
+      console.error("Error fetching job details:", error);
+    }
+  };
+
   const showNotification = (message, type = "info") => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
@@ -153,11 +193,23 @@ const HRMRegistrationPage = () => {
       console.log("📊 Registration result:", result);
 
       if (result.success) {
+        // Store job_id in sessionStorage if present
+        if (jobId) {
+          sessionStorage.setItem("pending_job_application", jobId);
+        }
+        
         setCurrentStep(3);
         showNotification(
-          "Registration successful! You can now login to access your candidate dashboard.",
+          jobId 
+            ? "Registration successful! Redirecting to job application..."
+            : "Registration successful! You can now login to access your candidate dashboard.",
           "success"
         );
+
+        // Auto-redirect after 2 seconds
+        setTimeout(() => {
+          router.push("/candidate/dashboard");
+        }, 2000);
       } else {
         const errorMessage =
           result.message || "Registration failed. Please try again.";
@@ -346,6 +398,43 @@ const HRMRegistrationPage = () => {
 
     return (
       <div className="space-y-6">
+        {/* Job Application Banner */}
+        {jobId && jobDetails && (
+          <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded-lg">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg
+                  className="h-5 w-5 text-blue-500 mt-0.5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-blue-800">
+                  You're Applying For:
+                </h3>
+                <div className="mt-2 text-sm text-blue-700">
+                  <p className="font-semibold">
+                    {jobDetails.job_structure?.job_title || "Position"}
+                  </p>
+                  <p className="text-xs">
+                    at {jobDetails.client?.organisation_name || "SOL"} • {jobDetails.lga}, {jobDetails.zone}
+                  </p>
+                </div>
+                <p className="mt-2 text-xs text-blue-600">
+                  Complete registration to proceed with your application
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Registration Error Display */}
         {registrationError && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
