@@ -600,15 +600,21 @@ class CurrentVacanciesController extends Controller
                 ->where('status', 'active')
                 ->where('recruitment_period_end', '>=', now());
 
-            // Search filter
+            // Search filter - comprehensive search across multiple fields
             if ($search) {
                 $query->where(function($q) use ($search) {
                     $q->where('description', 'like', "%{$search}%")
+                      ->orWhere('lga', 'like', "%{$search}%")
+                      ->orWhere('zone', 'like', "%{$search}%")
+                      ->orWhere('sol_service_type', 'like', "%{$search}%")
+                      ->orWhere('experience_requirement', 'like', "%{$search}%")
+                      ->orWhere('special_requirements', 'like', "%{$search}%")
                       ->orWhereHas('jobStructure', function ($subQ) use ($search) {
                           $subQ->where('job_title', 'like', "%{$search}%");
                       })
                       ->orWhereHas('client', function ($subQ) use ($search) {
-                          $subQ->where('organisation_name', 'like', "%{$search}%");
+                          $subQ->where('organisation_name', 'like', "%{$search}%")
+                               ->orWhere('industry_category', 'like', "%{$search}%");
                       });
                 });
             }

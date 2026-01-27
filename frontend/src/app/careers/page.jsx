@@ -300,12 +300,6 @@ const CareersPage = () => {
                       {/* Job Details */}
                       <div className="space-y-2 mb-4 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-gray-500">Vacancies:</span>
-                          <span className="font-medium text-gray-900">
-                            {job.number_of_vacancies} positions
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
                           <span className="text-gray-500">Compensation:</span>
                           <span className="font-medium text-gray-900">
                             {formatSalary(job.compensation)}
@@ -403,13 +397,7 @@ const CareersPage = () => {
               </div>
               
 
-              {/* Description */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-2 text-gray-900">Job Description</h3>
-                <p className="text-gray-900 whitespace-pre-wrap">
-                  {selectedJob.description}
-                </p>
-              </div>
+              
 
 
               {/* Job Details Grid */}
@@ -418,14 +406,6 @@ const CareersPage = () => {
                   <div className="text-sm text-gray-500 mb-1">Location</div>
                   <div className="font-medium text-gray-900">
                     {selectedJob.lga}, {selectedJob.zone}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500 mb-1">
-                    Number of Vacancies
-                  </div>
-                  <div className="font-medium text-gray-900">
-                    {selectedJob.number_of_vacancies} positions10
                   </div>
                 </div>
                 <div>
@@ -469,6 +449,14 @@ const CareersPage = () => {
                   </p>
                 </div>
               )}
+              
+              {/* Description */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-2 text-gray-900">Job Description</h3>
+                <p className="text-gray-900 whitespace-pre-wrap">
+                  {selectedJob.description}
+                </p>
+              </div>
 
               {/* Qualifications */}
               {selectedJob.qualifications &&
