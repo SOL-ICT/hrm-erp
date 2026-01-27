@@ -285,7 +285,7 @@ const CareersPage = () => {
                       <div className="flex items-center text-gray-600 mb-3">
                         <Building className="w-4 h-4 mr-2" />
                         <span className="font-medium">
-                          {job.client?.organisation_name || "SOL"}
+                          {job.client?.industry_category || "Various Industries"}
                         </span>
                       </div>
 
@@ -389,7 +389,9 @@ const CareersPage = () => {
                   </h2>
                   <div className="flex items-center text-gray-600">
                     <Building className="w-4 h-4 mr-2" />
-                    <span>{selectedJob.client?.organisation_name}</span>
+                    <span>
+                      <span className="font-medium">Industry - </span> {selectedJob.client?.industry_category || "Various Industries"}
+                    </span>
                   </div>
                 </div>
                 <button
@@ -399,6 +401,16 @@ const CareersPage = () => {
                   ×
                 </button>
               </div>
+              
+
+              {/* Description */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-2 text-gray-900">Job Description</h3>
+                <p className="text-gray-900 whitespace-pre-wrap">
+                  {selectedJob.description}
+                </p>
+              </div>
+
 
               {/* Job Details Grid */}
               <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
@@ -445,13 +457,6 @@ const CareersPage = () => {
                 </div>
               </div>
 
-              {/* Description */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-2">Job Description</h3>
-                <p className="text-gray-900 whitespace-pre-wrap">
-                  {selectedJob.description}
-                </p>
-              </div>
 
               {/* Experience Requirement */}
               {selectedJob.experience_requirement && (
