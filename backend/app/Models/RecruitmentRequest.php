@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use App\Models\Candidate\CandidateJobApplication;
 use App\Models\Staff;
 use App\Models\SOLOffice;
@@ -84,6 +85,19 @@ class RecruitmentRequest extends Model
     public function serviceLocation(): BelongsTo
     {
         return $this->belongsTo(ServiceLocation::class);
+    }
+
+    /**
+     * Get all service locations for this recruitment request (many-to-many)
+     */
+    public function serviceLocations(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            ServiceLocation::class,
+            'recruitment_request_locations',
+            'recruitment_request_id',
+            'service_location_id'
+        )->withTimestamps();
     }
 
     public function solOffice(): BelongsTo

@@ -682,11 +682,13 @@ const ClientServiceLocation = ({ currentTheme, preferences, onBack }) => {
             setShowLocationForm(false);
             setEditingLocation(null);
           }}
-          onSubmit={
-            editingLocation
-              ? (data) => handleUpdateLocation(editingLocation.id, data)
-              : handleCreateLocation
-          }
+          onSubmit={() => {
+            // Form already makes the API call internally
+            // Just refresh the list after successful creation/update
+            setShowLocationForm(false);
+            setEditingLocation(null);
+            loadLocations(currentPage);
+          }}
           clients={clients}
           states={states}
           lgas={lgas}

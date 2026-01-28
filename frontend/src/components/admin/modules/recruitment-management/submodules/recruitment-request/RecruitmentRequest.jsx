@@ -56,7 +56,9 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
     qualifications: [{ name: "", class: "" }],
 
     // Section 3: Service Details & Requirements
-    service_location_id: "",
+    selected_state: "", // NEW: State filter for locations
+    service_location_ids: [], // NEW: Array of selected location IDs
+    service_location_id: "", // Keep for backward compatibility
     number_of_vacancies: 1,
     compensation: "",
     sol_service_type: "RS",
@@ -77,6 +79,9 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
   const [clients, setClients] = useState([]);
   const [jobStructures, setJobStructures] = useState([]);
   const [serviceLocations, setServiceLocations] = useState([]);
+  const [availableStates, setAvailableStates] = useState([]); // NEW: Unique states from service locations
+  const [filteredLocations, setFilteredLocations] = useState([]); // NEW: Locations filtered by state
+  const [selectedLocations, setSelectedLocations] = useState([]); // NEW: Selected location objects for display
   const [autoPopulatedData, setAutoPopulatedData] = useState({
     lga: "",
     zone: "",
@@ -136,6 +141,7 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
     fetchRecruitmentRequests();
     fetchUserPermissions(); // Task 3.2
     fetchAssignableUsers(); // Task 3.2
+    fetchAllStates(); // NEW: Load all Nigerian states
 
     // Cleanup function to cancel pending requests
     return () => {
@@ -223,7 +229,22 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
         setUserPermissions(response.data);
       }
     } catch (error) {
-      console.error("Failed to fetch user permissions:", error);
+      console.error("Failed to fetch permissions:", error);
+    }
+  };
+
+  // NEW: Fetch all Nigerian states from database
+  const fetchAllStates = async () => {
+    try {
+      const response = await fetch('/api/states-lgas');
+      const data = await response.json();
+      if (data.success && Array.isArray(data.data)) {
+        // Extract unique state names
+        const states = [...new Set(data.data.map(item => item.state_name))].sort();
+        setAvailableStates(states);
+      }
+    } catch (error) {
+      console.error("Failed to fetch states:", error);
     }
   };
 
@@ -270,9 +291,19 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
       }
 
       setServiceLocations(serviceLocationsData);
+      
+      // Reset state-related form fields when client changes
+      setFormData(prev => ({
+        ...prev,
+        selected_state: "",
+        service_location_ids: [],
+      }));
+      setFilteredLocations([]);
+      setSelectedLocations([]);
     } catch (error) {
       console.error("Failed to fetch service locations:", error);
       setServiceLocations([]);
+      setFilteredLocations([]);
     }
   };
 
@@ -399,11 +430,62 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
       const updatedQualifications = formData.qualifications.filter(
         (_, i) => i !== index
       );
-      setFormData((prev) => ({
-        ...prev,
-        qualifications: updatedQualifications,
-      }));
+      setFormData((prev) => ({ ...prev, qualifications: updatedQualifications }));
     }
+  };
+
+  // NEW: Handle state selection - filters locations by state
+  const handleStateChange = (e) => {
+    const selectedState = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      selected_state: selectedState,
+      service_location_ids: [], // Reset selected locations when state changes
+    }));
+    
+    // Filter locations by selected state
+    const filtered = serviceLocations.filter(loc => loc.state === selectedState);
+    setFilteredLocations(filtered);
+    setSelectedLocations([]);
+  };
+
+  // NEW: Add a location to the selected list
+  const handleAddLocation = (locationId) => {
+    if (!locationId || formData.service_location_ids.includes(parseInt(locationId))) {
+      return; // Already added or invalid
+    }
+
+    const location = filteredLocations.find(loc => loc.id == locationId);
+    if (location) {
+      setFormData(prev => ({
+        ...prev,
+        service_location_ids: [...prev.service_location_ids, parseInt(locationId)],
+        service_location_id: prev.service_location_ids.length === 0 ? parseInt(locationId) : prev.service_location_id, // Set first as primary
+      }));
+      setSelectedLocations(prev => [...prev, location]);
+      
+      // Auto-populate from first location
+      if (formData.service_location_ids.length === 0) {
+        setAutoPopulatedData({
+          lga: location.lga || location.state || "",
+          zone: location.sol_zone || "",
+          sol_office_name: location.sol_office?.office_name || "",
+          sol_office_code: location.sol_office?.office_code || "",
+        });
+      }
+    }
+  };
+
+  // NEW: Remove a location from the selected list
+  const handleRemoveLocation = (locationId) => {
+    setFormData(prev => ({
+      ...prev,
+      service_location_ids: prev.service_location_ids.filter(id => id !== locationId),
+      service_location_id: prev.service_location_ids[0] === locationId && prev.service_location_ids.length > 1 
+        ? prev.service_location_ids[1] 
+        : prev.service_location_id,
+    }));
+    setSelectedLocations(prev => prev.filter(loc => loc.id !== locationId));
   };
 
   const handleSubmit = async (e) => {
@@ -557,6 +639,8 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
       age_limit_max: "",
       experience_requirement: "",
       qualifications: [{ name: "", class: "" }],
+      selected_state: "",
+      service_location_ids: [],
       service_location_id: "",
       number_of_vacancies: 1,
       compensation: "",
@@ -566,7 +650,15 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
       description: "",
       special_requirements: "",
       priority_level: "medium",
+      assigned_to: "",
+      assignment_notes: "",
     });
+
+    // Clear location-related state
+    setServiceLocations([]);
+    setAvailableStates([]);
+    setFilteredLocations([]);
+    setSelectedLocations([]);
 
     // Navigate back to dashboard view first
     setCurrentView("dashboard");
@@ -980,37 +1072,100 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
         Section 3: Service Details & Requirements
       </h3>
 
-      {/* Service Location */}
+      {/* State Filter */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Available Service Location <span className="text-red-500">*</span>
+          Select State <span className="text-red-500">*</span>
         </label>
         <select
-          name="service_location_id"
-          value={formData.service_location_id}
-          onChange={handleInputChange}
+          value={formData.selected_state}
+          onChange={handleStateChange}
           className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-            errors.service_location_id ? "border-red-500" : "border-gray-300"
+            errors.selected_state ? "border-red-500" : "border-gray-300"
           }`}
           disabled={!formData.client_id || loading}
         >
-          <option value="">Select Service Location</option>
-          {Array.isArray(serviceLocations) &&
-            serviceLocations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.location_name} ({location.city})
-              </option>
-            ))}
+          <option value="">Select a state first...</option>
+          {availableStates.map((state) => (
+            <option key={state} value={state}>
+              {state}
+            </option>
+          ))}
         </select>
-        {errors.service_location_id && (
-          <p className="text-red-500 text-sm mt-1">
-            {errors.service_location_id}
-          </p>
+        {errors.selected_state && (
+          <p className="text-red-500 text-sm mt-1">{errors.selected_state}</p>
         )}
       </div>
 
+      {/* Service Location - Multi-select */}
+      {formData.selected_state && (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Available Service Locations <span className="text-red-500">*</span>
+            <span className="text-xs text-gray-500 ml-2">(Add one or more)</span>
+          </label>
+          <div className="flex gap-2">
+            <select
+              className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-gray-300"
+              disabled={!filteredLocations.length}
+              onChange={(e) => {
+                if (e.target.value) {
+                  handleAddLocation(e.target.value);
+                  e.target.value = ""; // Reset dropdown
+                }
+              }}
+            >
+              <option value="">Select a location to add...</option>
+              {filteredLocations
+                .filter(loc => !formData.service_location_ids.includes(loc.id))
+                .map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.location_name} - {location.city}
+                  </option>
+                ))}
+            </select>
+          </div>
+          
+          {/* Selected Locations Display */}
+          {selectedLocations.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <p className="text-sm font-medium text-gray-700">
+                Selected Locations ({selectedLocations.length}):
+              </p>
+              {selectedLocations.map((location) => (
+                <div
+                  key={location.id}
+                  className="flex items-center justify-between bg-blue-50 p-3 rounded-lg border border-blue-200"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-semibold">
+                      {selectedLocations.indexOf(location) + 1}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-800">{location.location_name}</p>
+                      <p className="text-sm text-gray-600">{location.city}, {location.state}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveLocation(location.id)}
+                    className="text-red-600 hover:text-red-800 font-medium text-sm px-3 py-1 rounded hover:bg-red-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {errors.service_location_ids && (
+            <p className="text-red-500 text-sm mt-1">{errors.service_location_ids}</p>
+          )}
+        </div>
+      )}
+
       {/* Auto-populated Location Data */}
-      {autoPopulatedData.lga && (
+      {autoPopulatedData.lga && selectedLocations.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

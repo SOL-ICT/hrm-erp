@@ -387,7 +387,7 @@ const CurrentVacancies = ({ currentTheme, preferences, onBack }) => {
             ) : (
               vacancies.map((vacancy) => (
                 <TicketGroup
-                  key={vacancy.id}
+                  key={vacancy.listing_id || vacancy.id}
                   vacancy={vacancy}
                   expanded={expandedTickets.has(vacancy.id)}
                   onToggleExpansion={toggleTicketExpansion}

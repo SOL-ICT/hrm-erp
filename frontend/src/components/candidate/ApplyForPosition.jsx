@@ -129,13 +129,16 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
 
               return {
                 id: job.id,
+                listing_id: job.listing_id, // NEW: Preserve unique listing ID for multi-location tickets
+                service_location: job.service_location, // NEW: Preserve service location object for tracking applications
                 ticketId: job.ticket_id || `TCK_${job.id}`,
                 title: job.job_structure?.job_title || job.job_title || `Position ${job.id}`,
                 industryCategory: job.client?.industry_category || 'General',
-                location: job.location || job.lga || 'Lagos',
-                state: job.state || 'Lagos',
-                salaryMin: job.min_salary || 200000,
-                salaryMax: job.max_salary || 400000,
+                location: job.service_location?.location_name || job.location || job.lga || 'Lagos',
+                city: job.service_location?.city || job.lga,
+                state: job.service_location?.state || job.state || 'Lagos',
+                salaryMin: job.compensation || 200000,
+                salaryMax: job.compensation || 200000, // Use same value if only compensation provided
                 ageMin: job.age_limit_min || 18,
                 ageMax: job.age_limit_max || 65,
                 experience: job.experience_requirement || '1-3 years',
@@ -353,6 +356,7 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
       const applicationPayload = {
         candidate_id: candidateProfile.id, // Add candidate ID from profile
         recruitment_request_id: selectedJob.id, // Use the actual recruitment request ID
+        service_location_id: selectedJob.service_location?.id || null, // NEW: Track which location they applied to
         cover_letter: applicationData.coverLetter,
         expected_salary: applicationData.expectedSalary ? parseFloat(applicationData.expectedSalary) : null,
         available_start_date: applicationData.availableStartDate,
@@ -402,6 +406,10 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
   };
 
   const formatSalary = (min, max) => {
+    // If min and max are the same, show single value
+    if (min === max) {
+      return `₦${min.toLocaleString()}`;
+    }
     return `₦${min.toLocaleString()} - ₦${max.toLocaleString()}`;
   };
 
@@ -412,7 +420,7 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
     
     return (
       <div 
-        key={job.id} 
+        key={job.listing_id || job.id} 
         className={`p-6 border rounded-lg ${currentTheme.border} ${currentTheme.cardBg} hover:shadow-md transition-all ${
           isHighlighted 
             ? 'ring-4 ring-blue-500 ring-opacity-50 animate-pulse shadow-xl' 
@@ -438,7 +446,7 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
           <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
             <div className="flex items-center">
               <MapPin className="w-4 h-4 mr-1" />
-              {job.location}, {job.state}
+              {job.location}{job.city ? `, ${job.city}` : ''}
             </div>
             <div className="flex items-center">
               <Calendar className="w-4 h-4 mr-1" />
@@ -481,11 +489,11 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
       </div>
 
       {/* Job Details */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
         <div>
           <div className="flex items-center text-sm text-gray-500 mb-1">
             <DollarSign className="w-4 h-4 mr-1" />
-            Salary Range
+            Salary
           </div>
           <div className={`font-medium ${currentTheme.textPrimary}`}>
             {formatSalary(job.salaryMin, job.salaryMax)}
@@ -507,15 +515,6 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
           </div>
           <div className={`font-medium ${currentTheme.textPrimary}`}>
             {job.ageMin} - {job.ageMax} years
-          </div>
-        </div>
-        <div>
-          <div className="flex items-center text-sm text-gray-500 mb-1">
-            <Calendar className="w-4 h-4 mr-1" />
-            Deadline
-          </div>
-          <div className={`font-medium ${currentTheme.textPrimary}`}>
-            {new Date(job.deadline).toLocaleDateString()}
           </div>
         </div>
       </div>

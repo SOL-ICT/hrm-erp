@@ -79,7 +79,11 @@ const ClientMaster = ({ currentTheme, onClose }) => {
   useEffect(() => {
     // For paginated results, just display what the API returns
     // The backend handles search and filtering
-    setFilteredClients(clients);
+    // Sort alphabetically by organisation_name
+    const sortedClients = [...clients].sort((a, b) => 
+      (a.organisation_name || '').localeCompare(b.organisation_name || '')
+    );
+    setFilteredClients(sortedClients);
   }, [clients]);
 
   // Initialize data on component mount

@@ -17,6 +17,7 @@ class CandidateJobApplication extends Model
     protected $fillable = [
         'candidate_id',
         'recruitment_request_id',
+        'service_location_id', // NEW: Track which specific location candidate applied to
         'application_status',
         'cover_letter',
         'salary_expectations',

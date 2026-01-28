@@ -304,8 +304,12 @@ const recruitmentRequestAPI = {
     if (!data.client_id) errors.client_id = "Client is required";
     if (!data.job_structure_id)
       errors.job_structure_id = "Job structure is required";
-    if (!data.service_location_id)
-      errors.service_location_id = "Service location is required";
+    
+    // Support both single and multiple locations
+    if (!data.service_location_id && (!data.service_location_ids || data.service_location_ids.length === 0)) {
+      errors.service_location_ids = "At least one service location is required";
+    }
+    
     if (!data.number_of_vacancies || data.number_of_vacancies < 1) {
       errors.number_of_vacancies = "Number of vacancies must be at least 1";
     }

@@ -253,8 +253,13 @@ class RecruitmentRequestController extends Controller
 
             DB::beginTransaction();
 
-            // Auto-populate location data from service location
-            $serviceLocation = ServiceLocation::with('solOffice')->find($request->service_location_id);
+            // Handle multiple service locations
+            $serviceLocationIds = $request->has('service_location_ids') && is_array($request->service_location_ids)
+                ? $request->service_location_ids
+                : [$request->service_location_id];
+
+            // Auto-populate location data from first service location
+            $serviceLocation = ServiceLocation::with('solOffice')->find($serviceLocationIds[0]);
 
             // Generate ticket ID
             $ticketId = RecruitmentRequest::generateTicketId();
@@ -264,6 +269,9 @@ class RecruitmentRequestController extends Controller
             $data['ticket_id'] = $ticketId;
             $data['created_by'] = Auth::id();
             $data['status'] = 'active';
+            
+            // Keep first location in service_location_id for backward compatibility
+            $data['service_location_id'] = $serviceLocationIds[0];
 
             // Auto-populate location data
             if ($serviceLocation) {
@@ -273,6 +281,9 @@ class RecruitmentRequestController extends Controller
             }
 
             $recruitmentRequest = RecruitmentRequest::create($data);
+
+            // Attach all service locations to the junction table
+            $recruitmentRequest->serviceLocations()->attach($serviceLocationIds);
 
             // Check if approval is required using centralized approval system
             $user = Auth::user();

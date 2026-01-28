@@ -162,6 +162,10 @@ class StaffTemplateExport implements FromArray, WithHeadings, WithStyles, WithCo
                 case 'passport_number':
                     $widths[$columnLetter] = 20;
                     break;
+                case 'pay_grade_structure_id':
+                case 'service_location_id':
+                    $widths[$columnLetter] = 18;
+                    break;
                 default:
                     $widths[$columnLetter] = 15;
             }
@@ -244,6 +248,42 @@ class StaffTemplateExport implements FromArray, WithHeadings, WithStyles, WithCo
                     $sheet->setCellValue('B' . $row, $pg['name'] ?? $pg['grade_name']);
                     $sheet->setCellValue('C' . $row, '₦' . number_format($pg['total_compensation'] ?? 0));
                     $row++;
+                }
+
+                // Add service locations information after pay grades
+                $locationStartRow = $row + 2;
+                $sheet->setCellValue('A' . $locationStartRow, 'AVAILABLE SERVICE LOCATIONS (Use Location ID in column P above):');
+                $sheet->setCellValue('A' . ($locationStartRow + 1), 'Location ID');
+                $sheet->setCellValue('B' . ($locationStartRow + 1), 'Location Name');
+                $sheet->setCellValue('C' . ($locationStartRow + 1), 'City');
+                $sheet->setCellValue('D' . ($locationStartRow + 1), 'State');
+
+                // Style service locations header
+                $sheet->getStyle('A' . $locationStartRow)->applyFromArray([
+                    'font' => ['bold' => true, 'size' => 12, 'color' => ['rgb' => '1F2937']],
+                ]);
+                $sheet->getStyle('A' . ($locationStartRow + 1) . ':D' . ($locationStartRow + 1))->applyFromArray([
+                    'font' => ['bold' => true],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => 'E5E7EB'],
+                    ],
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                            'color' => ['rgb' => '000000'],
+                        ],
+                    ],
+                ]);
+
+                // Add service location data
+                $locRow = $locationStartRow + 2;
+                foreach ($this->templateData['service_locations'] as $location) {
+                    $sheet->setCellValue('A' . $locRow, $location['id']);
+                    $sheet->setCellValue('B' . $locRow, $location['location_name']);
+                    $sheet->setCellValue('C' . $locRow, $location['city']);
+                    $sheet->setCellValue('D' . $locRow, $location['state'] ?? 'N/A');
+                    $locRow++;
                 }
             },
         ];

@@ -278,7 +278,7 @@ const CareersPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 {jobs.map((job) => (
                   <div
-                    key={job.id}
+                    key={job.listing_id || job.id}
                     className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 overflow-hidden"
                   >
                     {/* Priority Badge */}
@@ -306,7 +306,7 @@ const CareersPage = () => {
                       <div className="flex items-center text-gray-600 mb-4">
                         <MapPin className="w-4 h-4 mr-2" />
                         <span>
-                          {job.lga}, {job.zone}
+                          {job.service_location?.city || job.lga}, {job.service_location?.state || job.zone}
                         </span>
                       </div>
 

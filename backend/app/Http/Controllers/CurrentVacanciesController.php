@@ -34,6 +34,8 @@ class CurrentVacanciesController extends Controller
             $query = RecruitmentRequest::with([
                 'jobStructure', 
                 'client',
+                'serviceLocation', // Load single location (for backward compatibility)
+                'serviceLocations', // Load all associated locations (many-to-many)
                 'candidateJobApplications.candidate' // Include applications with candidate details
             ])
                 ->withCount('candidateJobApplications')
@@ -59,24 +61,59 @@ class CurrentVacanciesController extends Controller
                 $query->where('client_id', $clientId);
             }
 
-            $vacancies = $query->orderBy('created_at', 'desc')
-                ->paginate($perPage);
+            $recruitmentRequests = $query->orderBy('created_at', 'desc')->get();
 
-            // Transform the data to include applications array for frontend
-            $vacanciesData = $vacancies->getCollection()->map(function ($vacancy) {
-                $vacancyArray = $vacancy->toArray();
-                // Rename candidateJobApplications to applications for frontend compatibility
-                $vacancyArray['applications'] = $vacancy->candidateJobApplications->toArray();
-                // Remove the original candidateJobApplications key to avoid confusion
-                unset($vacancyArray['candidate_job_applications']);
-                return $vacancyArray;
+            // Expand each recruitment request into separate listings per location
+            $expandedJobs = [];
+            foreach ($recruitmentRequests as $recruitmentRequest) {
+                $locations = $recruitmentRequest->serviceLocations;
+                
+                // If no locations in junction table, use the main service_location_id
+                if ($locations->isEmpty() && $recruitmentRequest->service_location_id) {
+                    $locations = collect([$recruitmentRequest->serviceLocation]);
+                }
+
+                foreach ($locations as $location) {
+                    $jobData = $recruitmentRequest->toArray();
+                    $jobData['service_location'] = [
+                        'id' => $location->id,
+                        'location_name' => $location->location_name,
+                        'city' => $location->city,
+                        'state' => $location->state,
+                        'full_address' => $location->full_address,
+                    ];
+                    // Add unique identifier for this job+location combination
+                    $jobData['listing_id'] = $recruitmentRequest->id . '_' . $location->id;
+                    // Rename candidateJobApplications to applications for frontend compatibility
+                    $jobData['applications'] = $recruitmentRequest->candidateJobApplications->toArray();
+                    unset($jobData['candidate_job_applications']);
+                    $expandedJobs[] = $jobData;
+                }
+            }
+
+            // Sort by created_at descending (newest first)
+            usort($expandedJobs, function($a, $b) {
+                return strtotime($b['created_at']) - strtotime($a['created_at']);
             });
 
-            $vacancies->setCollection($vacanciesData);
+            // Manual pagination of expanded results
+            $page = $request->get('page', 1);
+            $total = count($expandedJobs);
+            $lastPage = ceil($total / $perPage);
+            $offset = ($page - 1) * $perPage;
+            $paginatedJobs = array_slice($expandedJobs, $offset, $perPage);
 
             return response()->json([
                 'success' => true,
-                'data' => $vacancies
+                'data' => [
+                    'data' => $paginatedJobs,
+                    'current_page' => (int)$page,
+                    'per_page' => (int)$perPage,
+                    'total' => $total,
+                    'last_page' => $lastPage,
+                    'from' => $offset + 1,
+                    'to' => min($offset + $perPage, $total),
+                ]
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -593,9 +630,12 @@ class CurrentVacanciesController extends Controller
             $location = $request->get('location', '');
             $jobType = $request->get('job_type', '');
 
+            // Get active recruitment requests with their service locations
             $query = RecruitmentRequest::with([
                 'jobStructure', 
-                'client'
+                'client',
+                'serviceLocation', // Load single location (for backward compatibility)
+                'serviceLocations' // Load all associated locations (many-to-many)
             ])
                 ->where('status', 'active')
                 ->where('recruitment_period_end', '>=', now());
@@ -619,9 +659,13 @@ class CurrentVacanciesController extends Controller
                 });
             }
 
-            // Location filter
+            // Location filter - check in serviceLocations relationship
             if ($location) {
-                $query->where('lga', $location);
+                $query->whereHas('serviceLocations', function($q) use ($location) {
+                    $q->where('city', 'like', "%{$location}%")
+                      ->orWhere('location_name', 'like', "%{$location}%")
+                      ->orWhere('state', 'like', "%{$location}%");
+                });
             }
 
             // Job type filter (SOL service type)
@@ -629,13 +673,58 @@ class CurrentVacanciesController extends Controller
                 $query->where('sol_service_type', $jobType);
             }
 
-            $jobs = $query->orderBy('priority_level', 'desc')
+            $recruitmentRequests = $query->orderBy('priority_level', 'desc')
                 ->orderBy('created_at', 'desc')
-                ->paginate($perPage);
+                ->get();
+
+            // Expand each recruitment request into separate listings per location
+            $expandedJobs = [];
+            foreach ($recruitmentRequests as $recruitmentRequest) {
+                $locations = $recruitmentRequest->serviceLocations;
+                
+                // If no locations in junction table, use the main service_location_id
+                if ($locations->isEmpty() && $recruitmentRequest->service_location_id) {
+                    $locations = collect([$recruitmentRequest->serviceLocation]);
+                }
+
+                foreach ($locations as $location) {
+                    $jobData = $recruitmentRequest->toArray();
+                    $jobData['service_location'] = [
+                        'id' => $location->id,
+                        'location_name' => $location->location_name,
+                        'city' => $location->city,
+                        'state' => $location->state,
+                        'full_address' => $location->full_address,
+                    ];
+                    // Add unique identifier for this job+location combination
+                    $jobData['listing_id'] = $recruitmentRequest->id . '_' . $location->id;
+                    $expandedJobs[] = $jobData;
+                }
+            }
+
+            // Sort by created_at descending (newest first)
+            usort($expandedJobs, function($a, $b) {
+                return strtotime($b['created_at']) - strtotime($a['created_at']);
+            });
+
+            // Manual pagination of expanded results
+            $page = $request->get('page', 1);
+            $total = count($expandedJobs);
+            $lastPage = ceil($total / $perPage);
+            $offset = ($page - 1) * $perPage;
+            $paginatedJobs = array_slice($expandedJobs, $offset, $perPage);
 
             return response()->json([
                 'success' => true,
-                'data' => $jobs
+                'data' => [
+                    'data' => $paginatedJobs,
+                    'current_page' => (int)$page,
+                    'per_page' => (int)$perPage,
+                    'total' => $total,
+                    'last_page' => $lastPage,
+                    'from' => $offset + 1,
+                    'to' => min($offset + $perPage, $total),
+                ]
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to fetch public jobs:', [

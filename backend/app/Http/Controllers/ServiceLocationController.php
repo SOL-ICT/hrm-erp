@@ -248,8 +248,19 @@ class ServiceLocationController extends Controller
             // ✅ AUTO-ASSIGN SOL OFFICE
             $autoAssignment = $this->autoAssignSOLOffice($request->city);
             $solOfficeId = null;
+            $stateName = null;
+            
             if (isset($autoAssignment['office']) && $autoAssignment['office'] !== null) {
                 $solOfficeId = $autoAssignment['office']->id;
+                // ✅ AUTO-POPULATE STATE from SOL office
+                $stateName = $autoAssignment['office']->state_name;
+            } else {
+                // ⚠️ WARNING: SOL office not found for this city
+                Log::warning('SOL office not found for service location', [
+                    'city' => $request->city,
+                    'location_name' => $request->location_name,
+                    'client_id' => $request->client_id
+                ]);
             }
 
             // Generate location code if not provided
@@ -262,6 +273,7 @@ class ServiceLocationController extends Controller
                 'location_name' => $request->location_name,
                 'location_code' => $locationCode,
                 'city' => $request->city,
+                'state' => $stateName, // ✅ AUTO-POPULATED from SOL office
                 'unique_id' => $request->unique_id,
                 'short_name' => $request->short_name,
                 'full_address' => $request->full_address,
@@ -334,13 +346,17 @@ class ServiceLocationController extends Controller
             // ✅ AUTO-ASSIGN SOL OFFICE if city changed
             $autoAssignment = null;
             $solOfficeId = $existingLocation->sol_office_id;
+            $stateName = $existingLocation->state;
 
             if ($existingLocation->city !== $request->city) {
                 $autoAssignment = $this->autoAssignSOLOffice($request->city);
                 if (isset($autoAssignment['office']) && $autoAssignment['office'] !== null) {
                     $solOfficeId = $autoAssignment['office']->id;
+                    // ✅ AUTO-POPULATE STATE from SOL office
+                    $stateName = $autoAssignment['office']->state_name;
                 } else {
                     $solOfficeId = null;
+                    $stateName = null;
                 }
             }
 
@@ -352,6 +368,7 @@ class ServiceLocationController extends Controller
                     'sol_office_id' => $solOfficeId,
                     'location_name' => $request->location_name,
                     'city' => $request->city,
+                    'state' => $stateName, // ✅ AUTO-POPULATED from SOL office
                     'unique_id' => $request->unique_id,
                     'short_name' => $request->short_name,
                     'full_address' => $request->full_address,
@@ -424,6 +441,7 @@ class ServiceLocationController extends Controller
             $successCount = 0;
             $errorCount = 0;
             $errors = [];
+            $warnings = []; // Track locations with missing SOL offices
             $assignmentSummary = [
                 'lga_assignments' => 0,
                 'state_assignments' => 0,
@@ -463,6 +481,13 @@ class ServiceLocationController extends Controller
                         $solOfficeId = $autoAssignment['office']->id;
                     } else {
                         $solOfficeId = null;
+                        // ⚠️ Add warning for missing SOL office
+                        $warnings[] = [
+                            'row' => $rowNumber,
+                            'city' => $city,
+                            'location_name' => $locationName,
+                            'message' => "No SOL office found for city '{$city}'. State will be NULL."
+                        ];
                     }
 
                     // Track assignment statistics
@@ -545,6 +570,7 @@ class ServiceLocationController extends Controller
                     'success_count' => $successCount,
                     'error_count' => $errorCount,
                     'errors' => $errors,
+                    'warnings' => $warnings, // Locations with missing SOL offices
                     'assignment_summary' => $assignmentSummary
                 ]
             ]);

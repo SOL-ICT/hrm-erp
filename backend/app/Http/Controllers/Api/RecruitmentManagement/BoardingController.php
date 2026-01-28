@@ -545,10 +545,23 @@ class BoardingController extends Controller
                     // Get recruitment request for additional details
                     $recruitmentRequest = $boardingRequest->recruitmentRequest;
                     
+                    // Get the specific service location the candidate applied to
+                    $candidateServiceLocationId = null;
+                    $candidateApplication = \App\Models\Candidate\CandidateJobApplication::where('candidate_id', $boardingRequest->candidate_id)
+                        ->where('recruitment_request_id', $recruitmentRequest->id)
+                        ->first();
+                    
+                    if ($candidateApplication && $candidateApplication->service_location_id) {
+                        $candidateServiceLocationId = $candidateApplication->service_location_id;
+                    } else {
+                        // Fallback to ticket's service_location_id if no application found
+                        $candidateServiceLocationId = $recruitmentRequest->service_location_id;
+                    }
+                    
                     // Determine sol_office_id from ticket or service location
                     $solOfficeId = $recruitmentRequest->sol_office_id;
-                    if (!$solOfficeId && $recruitmentRequest->service_location_id) {
-                        $serviceLocation = \App\Models\ServiceLocation::find($recruitmentRequest->service_location_id);
+                    if (!$solOfficeId && $candidateServiceLocationId) {
+                        $serviceLocation = \App\Models\ServiceLocation::find($candidateServiceLocationId);
                         $solOfficeId = $serviceLocation?->sol_office_id;
                     }
 
@@ -570,7 +583,7 @@ class BoardingController extends Controller
                         // Job details from recruitment request
                         'job_structure_id' => $recruitmentRequest->job_structure_id,
                         'job_title' => $recruitmentRequest->jobStructure->job_title ?? null,
-                        'service_location_id' => $recruitmentRequest->service_location_id,
+                        'service_location_id' => $candidateServiceLocationId, // Use candidate's applied location
                         'sol_office_id' => $solOfficeId,
                         'pay_grade_structure_id' => null, // TODO: Add pay grade selection during boarding
                         // Boarding metadata

@@ -78,7 +78,7 @@ class ManualBoardingController extends Controller
             $tickets = RecruitmentRequest::where('client_id', $request->client_id)
                 ->where('status', 'active')
                 ->whereRaw('number_of_vacancies > staff_accepted_offer')
-                ->with(['jobStructure'])
+                ->with(['jobStructure', 'serviceLocations']) // Load multi-location relationship
                 ->get()
                 ->map(function ($ticket) {
                     $totalPositions = $ticket->number_of_vacancies;
@@ -93,7 +93,12 @@ class ManualBoardingController extends Controller
                         'total_positions' => $totalPositions,
                         'filled_positions' => $filledPositions,
                         'available_positions' => $availablePositions,
-                        'service_location_id' => $ticket->service_location_id,
+                        'service_locations' => $ticket->serviceLocations->map(fn($loc) => [
+                            'id' => $loc->id,
+                            'location_name' => $loc->location_name,
+                            'city' => $loc->city,
+                            'state' => $loc->state
+                        ]),
                         'description' => $ticket->description,
                         'status' => $ticket->status
                     ];
@@ -206,6 +211,7 @@ class ManualBoardingController extends Controller
             $validated = $request->validate([
                 'client_id' => 'required|exists:clients,id',
                 'recruitment_request_id' => 'required|exists:recruitment_requests,id',
+                'service_location_id' => 'required|exists:service_locations,id', // Required for multi-location tickets
                 'pay_grade_structure_id' => 'nullable|exists:pay_grade_structures,id',
                 'first_name' => 'required|string|max:255',
                 'middle_name' => 'nullable|string|max:255',
@@ -223,6 +229,19 @@ class ManualBoardingController extends Controller
 
             // Validate ticket capacity
             $ticket = RecruitmentRequest::findOrFail($validated['recruitment_request_id']);
+            
+            // Verify the selected service_location_id is associated with this ticket
+            $ticketHasLocation = \DB::table('recruitment_request_locations')
+                ->where('recruitment_request_id', $ticket->id)
+                ->where('service_location_id', $validated['service_location_id'])
+                ->exists();
+            
+            if (!$ticketHasLocation) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The selected service location is not associated with this recruitment request'
+                ], 400);
+            }
             $availablePositions = $ticket->number_of_vacancies - ($ticket->staff_accepted_offer ?? 0);
 
             if ($availablePositions <= 0) {
@@ -269,10 +288,10 @@ class ManualBoardingController extends Controller
             $employeeCode = $this->generateEmployeeCode($client);
             $staffId = $this->generateStaffId($employeeCode);
 
-            // Determine sol_office_id from ticket or service location
+            // Determine sol_office_id from the selected service location
             $solOfficeId = $ticket->sol_office_id;
-            if (!$solOfficeId && $ticket->service_location_id) {
-                $serviceLocation = \App\Models\ServiceLocation::find($ticket->service_location_id);
+            if (!$solOfficeId && $validated['service_location_id']) {
+                $serviceLocation = \App\Models\ServiceLocation::find($validated['service_location_id']);
                 $solOfficeId = $serviceLocation?->sol_office_id;
             }
 
@@ -297,7 +316,7 @@ class ManualBoardingController extends Controller
                 'job_structure_id' => $ticket->job_structure_id,
                 'job_title' => $validated['job_title'] ?? $ticket->jobStructure->job_title ?? 'Staff Member',
                 'department' => $validated['department'] ?? null,
-                'service_location_id' => $ticket->service_location_id,
+                'service_location_id' => $validated['service_location_id'], // Use user-selected location
                 'sol_office_id' => $solOfficeId,
                 'pay_grade_structure_id' => $validated['pay_grade_structure_id'],
                 'salary_effective_date' => $validated['entry_date'],
@@ -439,7 +458,7 @@ class ManualBoardingController extends Controller
 
             // Get client and ticket information
             $client = Client::find($clientId);
-            $ticket = RecruitmentRequest::find($ticketId);
+            $ticket = RecruitmentRequest::with('serviceLocations')->find($ticketId);
 
             if (!$client || !$ticket) {
                 return response()->json([
@@ -453,8 +472,11 @@ class ManualBoardingController extends Controller
                 ->where(DatabaseFields::PAY_GRADE_STRUCTURES['IS_ACTIVE'], true)
                 ->get();
 
+            // Get service locations for this ticket
+            $serviceLocations = $ticket->serviceLocations;
+
             // Generate template data
-            $templateData = $this->generateTemplateData($client, $ticket, $payGrades);
+            $templateData = $this->generateTemplateData($client, $ticket, $payGrades, $serviceLocations);
 
             // Create client info for the export
             $clientInfo = [
@@ -482,7 +504,7 @@ class ManualBoardingController extends Controller
     /**
      * Generate template data structure
      */
-    private function generateTemplateData($client, $ticket, $payGrades)
+    private function generateTemplateData($client, $ticket, $payGrades, $serviceLocations)
     {
         // Define template headers with field mapping
         $templateHeaders = [
@@ -501,6 +523,7 @@ class ManualBoardingController extends Controller
             'contract_start_date' => 'Contract Start Date (YYYY-MM-DD)',
             'contract_end_date' => 'Contract End Date (YYYY-MM-DD)',
             'pay_grade_structure_id' => 'Pay Grade ID *',
+            'service_location_id' => 'Service Location ID *',
             'emergency_contact_name' => 'Emergency Contact Name',
             'emergency_contact_phone' => 'Emergency Contact Phone',
             'emergency_contact_address' => 'Emergency Contact Address'
@@ -523,6 +546,7 @@ class ManualBoardingController extends Controller
             'contract_start_date' => now()->format('Y-m-d'),
             'contract_end_date' => now()->addYear()->format('Y-m-d'),
             'pay_grade_structure_id' => $payGrades->first()?->id ?? '',
+            'service_location_id' => $serviceLocations->first()?->id ?? '',
             'emergency_contact_name' => 'Jane Doe',
             'emergency_contact_phone' => '+1234567891',
             'emergency_contact_address' => '456 Oak Street, City, Country'
@@ -536,6 +560,14 @@ class ManualBoardingController extends Controller
                     'id' => $pg->{DatabaseFields::PAY_GRADE_STRUCTURES['ID']},
                     'grade_name' => $pg->{DatabaseFields::PAY_GRADE_STRUCTURES['GRADE_NAME']},
                     'total_compensation' => $pg->{DatabaseFields::PAY_GRADE_STRUCTURES['TOTAL_COMPENSATION']}
+                ];
+            })->toArray(),
+            'service_locations' => $serviceLocations->map(function ($sl) {
+                return [
+                    'id' => $sl->id,
+                    'location_name' => $sl->location_name,
+                    'city' => $sl->city,
+                    'state' => $sl->state
                 ];
             })->toArray(),
             'client_info' => [
@@ -715,6 +747,7 @@ class ManualBoardingController extends Controller
                 'contract_start_date' => ['contract start date (yyyy-mm-dd)', 'contract_start_date', 'contract start', 'start date'],
                 'contract_end_date' => ['contract end date (yyyy-mm-dd)', 'contract_end_date', 'contract end', 'end date'],
                 'pay_grade_structure_id' => ['pay grade id *', 'pay_grade_structure_id', 'pay grade id', 'grade id', 'pay grade'],
+                'service_location_id' => ['service location id *', 'service_location_id', 'service location id', 'location id', 'location'],
                 'emergency_contact_name' => ['emergency contact name', 'emergency_contact_name', 'emergency name'],
                 'emergency_contact_phone' => ['emergency contact phone', 'emergency_contact_phone', 'emergency phone'],
                 'emergency_contact_address' => ['emergency contact address', 'emergency_contact_address', 'emergency address']
@@ -969,6 +1002,17 @@ class ManualBoardingController extends Controller
             // Get client and ticket information for staff creation
             $client = Client::findOrFail($clientId);
             $ticket = RecruitmentRequest::findOrFail($ticketId);
+            $ticket->load('serviceLocations'); // Load multi-location relationship
+            
+            // Determine which service_location_id to use for bulk upload
+            // Priority: ticket's old single location -> first from serviceLocations relationship
+            $bulkServiceLocationId = null;
+            if ($ticket->service_location_id) {
+                $bulkServiceLocationId = $ticket->service_location_id;
+            } elseif ($ticket->serviceLocations->isNotEmpty()) {
+                $bulkServiceLocationId = $ticket->serviceLocations->first()->id;
+            }
+            
             $defaultStaffType = ClientStaffType::where('client_id', $clientId)->first();
 
             // Process each row and create staff records
@@ -1050,6 +1094,25 @@ class ManualBoardingController extends Controller
                         }
                     }
 
+                    // Determine service_location_id
+                    $serviceLocationId = null;
+                    if (!empty($mappedData['service_location_id'])) {
+                        $serviceLocationId = (int)$mappedData['service_location_id'];
+                        // Verify location belongs to ticket
+                        $isValidLocation = \DB::table('recruitment_request_locations')
+                            ->where('recruitment_request_id', $ticket->id)
+                            ->where('service_location_id', $serviceLocationId)
+                            ->exists();
+                        
+                        if (!$isValidLocation) {
+                            $failedRecords++;
+                            $errors[] = "Row " . ($headersRowIndex + $index + 2) . ": Invalid service location ID";
+                            continue;
+                        }
+                    } else {
+                        $serviceLocationId = $bulkServiceLocationId; // Fallback to determined location
+                    }
+
                     // Create staff record
                     $staff = Staff::create([
                         'candidate_id' => null,
@@ -1070,8 +1133,8 @@ class ManualBoardingController extends Controller
                         'salary_effective_date' => $mappedData['hire_date'] ?: now()->format('Y-m-d'),
                         'job_title' => $ticket->jobStructure->job_title ?? 'Staff Member',
                         'department' => null,
-                        'service_location_id' => $ticket->service_location_id,
-                        'onboarding_method' => 'bulk_upload', // Use valid enum value
+                        'service_location_id' => $serviceLocationId, // Use validated location
+                        'onboarding_method' => 'bulk_upload',
                         'onboarded_by' => Auth::id() ?? 1
                     ]);
 

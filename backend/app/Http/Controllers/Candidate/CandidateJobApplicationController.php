@@ -65,6 +65,7 @@ class CandidateJobApplicationController extends Controller
             $validator = Validator::make($request->all(), [
                 'candidate_id' => 'nullable|exists:candidates,id',
                 'recruitment_request_id' => 'required|exists:recruitment_requests,id',
+                'service_location_id' => 'nullable|exists:service_locations,id', // NEW: Track applied location
                 'cover_letter' => 'nullable|string|max:5000',
                 'expected_salary' => 'nullable|numeric|min:0',
                 'available_start_date' => 'nullable|date', // Removed after:today to test
@@ -148,6 +149,7 @@ class CandidateJobApplicationController extends Controller
                 $applicationData = [
                     'candidate_id' => $candidateId,
                     'recruitment_request_id' => $request->recruitment_request_id,
+                    'service_location_id' => $request->service_location_id, // NEW: Save which location they applied to
                     'application_status' => 'applied',
                     'cover_letter' => $request->cover_letter,
                     'salary_expectations' => $salaryExpectations,
