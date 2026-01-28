@@ -144,12 +144,13 @@ const StaffDetailView = ({ staff, onBack, onSave }) => {
           client: apiData.client || {},
           location: apiData.service_location || {},
           
-          // Job Details (job_structure, service_location, sol_office, pay_grade)
+          // Job Details (job_structure, service_location, sol_office, pay_grade, pay_structure_type)
           jobDetails: {
             job_structure: apiData.job_structure || null,
             service_location: apiData.service_location || null,
             sol_office: apiData.sol_office || null,
             pay_grade: apiData.pay_grade_structure || null,
+            pay_structure_type: apiData.pay_structure_type || null,
             recruitment_request: apiData.recruitment_request || null
           }
         };

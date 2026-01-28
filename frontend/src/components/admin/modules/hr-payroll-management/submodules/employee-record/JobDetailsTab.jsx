@@ -135,6 +135,32 @@ const JobDetailsTab = ({ staffData, isEditing }) => {
             </div>
           </div>
 
+          {/* Contract Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Contract Type
+              </div>
+            </label>
+            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+              {staffData.jobDetails?.pay_structure_type ? (
+                <div>
+                  <p className="font-semibold text-gray-900">
+                    {staffData.jobDetails.pay_structure_type.type_name}
+                  </p>
+                  {staffData.jobDetails.pay_structure_type.type_code && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Code: {staffData.jobDetails.pay_structure_type.type_code}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-gray-400 italic">Not assigned</p>
+              )}
+            </div>
+          </div>
+
           {/* Date of Join */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

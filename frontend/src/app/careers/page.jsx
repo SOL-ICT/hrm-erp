@@ -95,6 +95,19 @@ const CareersPage = () => {
     router.push(`/register?job_id=${job.ticket_id}`);
   };
 
+  const handleSignIn = () => {
+    // Store the current URL params to preserve context after login
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentJobId = urlParams.get('job_id');
+    
+    if (currentJobId) {
+      // Store job_id in sessionStorage to persist through login
+      sessionStorage.setItem('pending_job_application', currentJobId);
+    }
+    
+    router.push("/login");
+  };
+
   const handleViewDetails = (job) => {
     setSelectedJob(job);
     setShowDetailsModal(true);
@@ -132,7 +145,7 @@ const CareersPage = () => {
             </div>
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => router.push("/login")}
+                onClick={handleSignIn}
                 className="px-6 py-2 border border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors"
               >
                 Sign In

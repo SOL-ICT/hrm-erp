@@ -28,6 +28,7 @@ class Staff extends Model
         'employment_type',
         'status',
         'pay_grade_structure_id',
+        'pay_structure_types_id',
         'salary_effective_date',
         'salary_currency',
         'job_title',
@@ -177,6 +178,14 @@ class Staff extends Model
     public function controlApprovedBy()
     {
         return $this->belongsTo(User::class, 'control_approved_by');
+    }
+
+    /**
+     * Get the pay structure type (contract type) for this staff member
+     */
+    public function payStructureType()
+    {
+        return $this->belongsTo(PayStructureType::class, 'pay_structure_types_id');
     }
 
     /**

@@ -62,7 +62,7 @@ services:
   nextjs-frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: hrm-nextjs-frontend
     restart: unless-stopped
     volumes:
@@ -82,18 +82,10 @@ services:
       - CHOKIDAR_USEPOLLING=true
       - CHOKIDAR_INTERVAL=1000
       - WATCHPACK_POLLING=true
-      # Stability fixes for Docker
-      - NEXT_PRIVATE_STANDALONE=true
-      - NEXT_PRIVATE_SKIP_STATIC_GENERATION=true
     depends_on:
       - laravel-api
     networks:
       - hrm-network
-    command: >
-      sh -c "
-        npm install &&
-        npm run dev
-      "
 
   # MySQL Database - Development Optimized
   mysql:

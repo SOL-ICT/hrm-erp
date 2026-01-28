@@ -108,98 +108,125 @@ class AuthController extends Controller
             // Get final preferences
             $preferences = $this->getUserPreferences($user);
 
-            // ✅ ENHANCED: Determine dashboard type and include staff information
+            // ✅ SECURITY FIX: Determine dashboard type based on ACTUAL user profile, not frontend login_type
             $staffInfo = null;
-            $loginType = $data['login_type'] ?? 'staff'; // Default to staff if not specified
-
-            if ($loginType === 'candidate') {
-                // Route 1: Candidate login -> candidate dashboard
+            $requestedLoginType = $data['login_type'] ?? null;
+            
+            // CRITICAL: Validate user type against database, not frontend parameter
+            // Candidates MUST have candidate_profile_id and CANNOT access staff/admin dashboards
+            // Staff CAN access candidate dashboard if they have both profiles (for testing/HR purposes)
+            // Staff MUST have staff_profile_id to access staff/admin dashboards
+            
+            if ($user->user_type === 'candidate' && $user->candidate_profile_id) {
+                // Pure candidate user - ALWAYS route to candidate dashboard
+                // SECURITY: Candidates cannot access staff systems even if they somehow have staff_profile_id
                 $dashboardType = 'candidate';
-            } elseif ($loginType === 'staff') {
-                // Staff login - check if admin access is requested
-                if (isset($data['is_admin']) && $data['is_admin'] === true) {
-                    // Admin toggle is ON - verify if user is SOL staff using staff_profile_id
-                    if (in_array($user->user_type, ['staff', 'admin']) && $user->staff_profile_id) {
+                
+                if ($requestedLoginType !== 'candidate') {
+                    Log::warning('Candidate attempted to access non-candidate dashboard - BLOCKED', [
+                        'user_id' => $user->id,
+                        'requested_login_type' => $requestedLoginType,
+                        'user_type' => $user->user_type,
+                        'forced_dashboard' => 'candidate'
+                    ]);
+                }
+            } elseif (in_array($user->user_type, ['staff', 'admin']) && $user->staff_profile_id) {
+                // Staff/Admin user with staff profile
+                
+                // ✅ DUAL LOGIN SUPPORT: Allow staff to access candidate dashboard if they have candidate profile
+                if ($requestedLoginType === 'candidate' && $user->candidate_profile_id) {
+                    $dashboardType = 'candidate';
+                    
+                    Log::info('Staff user accessing candidate dashboard (dual profile)', [
+                        'user_id' => $user->id,
+                        'user_type' => $user->user_type,
+                        'has_staff_profile' => true,
+                        'has_candidate_profile' => true,
+                        'dashboard' => 'candidate'
+                    ]);
+                } elseif (isset($data['is_admin']) && $data['is_admin'] === true) {
+                    // Admin toggle is ON - verify if user is SOL staff
+                    $solStaff = DB::table('staff')
+                        ->where('id', $user->staff_profile_id)
+                        ->where('client_id', 1) // SOL Nigeria client_id
+                        ->where('status', 'active')
+                        ->first();
 
-                        $solStaff = DB::table('staff')
-                            ->where('id', $user->staff_profile_id) // ✅ Use staff_profile_id directly
-                            ->where('client_id', 1) // SOL Nigeria client_id
-                            ->where('status', 'active')
-                            ->first();
+                    Log::info('Admin access check', [
+                        'user_id' => $user->id,
+                        'staff_profile_id' => $user->staff_profile_id,
+                        'is_sol_staff' => $solStaff ? 'YES' : 'NO',
+                        'admin_requested' => true
+                    ]);
 
-                        Log::info('Admin access check using staff_profile_id', [
-                            'user_id' => $user->id,
-                            'staff_profile_id' => $user->staff_profile_id,
-                            'is_sol_staff' => $solStaff ? 'YES' : 'NO',
-                            'admin_requested' => true
-                        ]);
+                    if ($solStaff) {
+                        // SOL staff with admin toggle -> admin dashboard
+                        $dashboardType = 'admin';
+                        $staffInfo = $solStaff;
 
-                        if ($solStaff) {
-                            // SOL staff with admin toggle -> admin dashboard
-                            $dashboardType = 'admin';
-                            $staffInfo = $solStaff; // ✅ Store staff info for session
+                        // Check if admin role is already assigned
+                        $hasAdminRole = DB::table('staff_roles')
+                            ->join('roles', 'staff_roles.role_id', '=', 'roles.id')
+                            ->where('staff_roles.staff_id', $user->staff_profile_id)
+                            ->whereIn('roles.slug', ['super-admin', 'admin'])
+                            ->exists();
 
-                            // Check if admin role is already assigned
-                            $hasAdminRole = DB::table('staff_roles')
-                                ->join('roles', 'staff_roles.role_id', '=', 'roles.id')
-                                ->where('staff_roles.staff_id', $user->staff_profile_id) // ✅ Use staff_profile_id directly
-                                ->whereIn('roles.slug', ['super-admin', 'admin'])
-                                ->exists();
+                        if (!$hasAdminRole) {
+                            // Assign admin role to SOL staff
+                            DB::table('staff_roles')->insert([
+                                'staff_id' => $user->staff_profile_id,
+                                'role_id' => 2, // Admin role ID
+                                'assigned_at' => now(),
+                                'created_at' => now(),
+                                'updated_at' => now()
+                            ]);
 
-                            if (!$hasAdminRole) {
-                                // Assign admin role to SOL staff
-                                DB::table('staff_roles')->insert([
-                                    'staff_id' => $user->staff_profile_id, // ✅ Use staff_profile_id directly
-                                    'role_id' => 2, // Admin role ID
-                                    'assigned_at' => now(),
-                                    'created_at' => now(),
-                                    'updated_at' => now()
-                                ]);
-
-                                Log::info('Admin role assigned to SOL staff', [
-                                    'staff_id' => $user->staff_profile_id,
-                                    'user_id' => $user->id
-                                ]);
-                            }
-                        } else {
-                            // Not SOL staff but tried admin toggle -> staff dashboard
-                            $dashboardType = 'staff';
-                            Log::warning('Non-SOL staff attempted admin access', [
-                                'user_id' => $user->id,
-                                'staff_profile_id' => $user->staff_profile_id
+                            Log::info('Admin role assigned to SOL staff', [
+                                'staff_id' => $user->staff_profile_id,
+                                'user_id' => $user->id
                             ]);
                         }
                     } else {
-                        // No staff_profile_id or wrong user type -> staff dashboard
+                        // Not SOL staff but tried admin toggle -> regular staff dashboard
                         $dashboardType = 'staff';
-                        Log::warning('Invalid user type or missing staff_profile_id for admin access', [
+                        Log::warning('Non-SOL staff attempted admin access', [
                             'user_id' => $user->id,
-                            'user_type' => $user->user_type,
                             'staff_profile_id' => $user->staff_profile_id
                         ]);
                     }
                 } else {
-                    // No admin toggle -> regular staff dashboard (including SOL staff)
+                    // No admin toggle -> regular staff dashboard
                     $dashboardType = 'staff';
 
-                    // Still get staff info for regular staff dashboard
-                    if (in_array($user->user_type, ['staff', 'admin']) && $user->staff_profile_id) {
-                        $staffInfo = DB::table('staff')
-                            ->where('id', $user->staff_profile_id)
-                            ->where('status', 'active')
-                            ->first();
-                    }
+                    // Get staff info for regular staff dashboard
+                    $staffInfo = DB::table('staff')
+                        ->where('id', $user->staff_profile_id)
+                        ->where('status', 'active')
+                        ->first();
                 }
             } else {
-                // Fallback
-                $dashboardType = $user->user_type ?? $user->role ?? 'candidate';
+                // No valid profile found - reject login
+                Auth::logout();
+                
+                Log::error('Login rejected: Invalid user profile configuration', [
+                    'user_id' => $user->id,
+                    'user_type' => $user->user_type,
+                    'has_staff_profile_id' => (bool)$user->staff_profile_id,
+                    'has_candidate_profile_id' => (bool)$user->candidate_profile_id
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid user profile configuration. Please contact administrator.',
+                ], 401);
             }
 
             // Log the final decision
             Log::info('Dashboard routing decision', [
-                'login_type' => $data['login_type'] ?? 'not_set',
+                'requested_login_type' => $requestedLoginType,
                 'is_admin_requested' => $data['is_admin'] ?? false,
                 'user_id' => $user->id,
+                'user_type_in_db' => $user->user_type,
                 'staff_profile_id' => $user->staff_profile_id,
                 'candidate_profile_id' => $user->candidate_profile_id,
                 'final_dashboard_type' => $dashboardType,

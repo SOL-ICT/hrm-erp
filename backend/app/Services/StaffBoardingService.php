@@ -37,12 +37,31 @@ class StaffBoardingService
             $offerAlreadyAccepted = $staffData['offer_already_accepted'] ?? false;
             $offerStatus = $offerAlreadyAccepted ? 'accepted' : 'pending';
 
+            // Get pay_structure_types_id from the recruitment request's job structure
+            $payStructureTypesId = null;
+            if ($ticket->job_structure_id) {
+                $jobStructure = DB::table('job_structures')->find($ticket->job_structure_id);
+                if ($jobStructure && $jobStructure->pay_structures) {
+                    $payStructures = json_decode($jobStructure->pay_structures, true);
+                    if (!empty($payStructures)) {
+                        // Get the first pay structure type ID (primary contract type)
+                        $payStructureType = DB::table('pay_structure_types')
+                            ->where('type_code', $payStructures[0])
+                            ->first();
+                        if ($payStructureType) {
+                            $payStructureTypesId = $payStructureType->id;
+                        }
+                    }
+                }
+            }
+
             $staff = Staff::create(array_merge($staffData, [
                 'recruitment_request_id' => $ticket->id,
                 'onboarded_by' => $boardingUser->id,
                 'boarding_approval_status' => $approvalStatus,
                 'offer_acceptance_status' => $offerStatus,
                 'offer_already_accepted' => $offerAlreadyAccepted,
+                'pay_structure_types_id' => $payStructureTypesId,
                 'status' => 'inactive', // Always inactive until Control approves
             ]));
 
@@ -539,12 +558,31 @@ class StaffBoardingService
             // Override approval status for batch uploads - will be handled by batch approval
             $approvalStatus = 'pending_control_approval';
 
+            // Get pay_structure_types_id from the recruitment request's job structure
+            $payStructureTypesId = null;
+            if ($ticket->job_structure_id) {
+                $jobStructure = DB::table('job_structures')->find($ticket->job_structure_id);
+                if ($jobStructure && $jobStructure->pay_structures) {
+                    $payStructures = json_decode($jobStructure->pay_structures, true);
+                    if (!empty($payStructures)) {
+                        // Get the first pay structure type ID (primary contract type)
+                        $payStructureType = DB::table('pay_structure_types')
+                            ->where('type_code', $payStructures[0])
+                            ->first();
+                        if ($payStructureType) {
+                            $payStructureTypesId = $payStructureType->id;
+                        }
+                    }
+                }
+            }
+
             $staff = Staff::create(array_merge($staffData, [
                 'recruitment_request_id' => $ticket->id,
                 'onboarded_by' => $boardingUser->id,
                 'boarding_approval_status' => $approvalStatus,
                 'offer_acceptance_status' => $offerStatus,
                 'offer_already_accepted' => $offerAlreadyAccepted,
+                'pay_structure_types_id' => $payStructureTypesId,
                 'status' => 'inactive', // Always inactive until Control approves
             ]));
 

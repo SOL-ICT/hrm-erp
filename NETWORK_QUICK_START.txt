@@ -1,0 +1,100 @@
+╔══════════════════════════════════════════════════════════════╗
+║         HRM-ERP LOCAL NETWORK TESTING - QUICK START         ║
+╚══════════════════════════════════════════════════════════════╝
+
+📍 YOUR NETWORK IP: 192.168.1.143
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 QUICK SETUP (Run this command):
+
+    .\setup-network.ps1
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📱 ACCESS URLS:
+
+   From This Machine:
+   └─ http://localhost:3000
+   └─ http://192.168.1.143:3000
+
+   From Other Devices (Same Network):
+   └─ http://192.168.1.143:3000
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ WHAT'S CONFIGURED:
+
+   ✓ Docker containers running on 0.0.0.0 (all interfaces)
+   ✓ Frontend: Port 3000 accessible
+   ✓ Backend: Port 8000 accessible  
+   ✓ Windows Firewall rules created
+   ✓ CORS configured for network IP
+   ✓ Laravel Sanctum configured
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👥 SHARE WITH TEAM:
+
+   Tell your team members:
+   1. Connect to the same WiFi/Network
+   2. Open: http://192.168.1.143:3000
+   3. Use their normal login credentials
+
+   No installation needed on their devices! 🎉
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 MANUAL SETUP (If script doesn't work):
+
+   1. Copy network configs:
+      Copy-Item frontend\.env.network frontend\.env.local -Force
+      Copy-Item backend\.env.network backend\.env -Force
+
+   2. Restart containers:
+      docker-compose down
+      docker-compose up -d
+
+   3. Wait 30 seconds for startup
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 TEST CONNECTION:
+
+   From your machine:
+   Test-NetConnection -ComputerName 192.168.1.143 -Port 3000
+
+   From team member's device:
+   Open browser → http://192.168.1.143:3000
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️  TROUBLESHOOTING:
+
+   Can't access from other devices?
+   1. Check Windows network is "Private" not "Public"
+   2. Verify IP hasn't changed: ipconfig
+   3. Check containers: docker ps
+   4. Verify firewall: Get-NetFirewallRule -DisplayName "HRM-ERP*"
+
+   Still issues?
+   See: LOCAL_NETWORK_SETUP.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔄 REVERT TO LOCALHOST:
+
+   Copy-Item frontend\.env.development frontend\.env.local -Force
+   Copy-Item backend\.env.local backend\.env -Force
+   docker-compose restart
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 CURRENT STATUS: ✅ READY FOR NETWORK TESTING
+
+   ✓ Ports accessible
+   ✓ API responding
+   ✓ Firewall configured
+   ✓ CORS configured
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -338,6 +338,27 @@ class SalaryStructureController extends Controller
                 'updated_by' => null // Will be set when auth is working
             ]);
 
+            // Update pay_structure_type for all related pay grades
+            // When pay_structures has multiple types, we need to maintain each grade's specific type
+            // Only update if the grade's current type is not in the new pay_structures array
+            $newPayStructures = $request->pay_structures;
+            $payGrades = DB::table('pay_grade_structures')
+                ->where('job_structure_id', $jobStructure->id)
+                ->get();
+
+            foreach ($payGrades as $grade) {
+                // If the grade's current pay_structure_type is not in the updated list,
+                // update it to the first available pay structure type
+                if (!in_array($grade->pay_structure_type, $newPayStructures)) {
+                    DB::table('pay_grade_structures')
+                        ->where('id', $grade->id)
+                        ->update([
+                            'pay_structure_type' => $newPayStructures[0],
+                            'updated_at' => now()
+                        ]);
+                }
+            }
+
             DB::commit();
 
             $jobStructure->load(['payGrades']);

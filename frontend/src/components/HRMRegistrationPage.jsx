@@ -208,7 +208,7 @@ const HRMRegistrationPage = () => {
 
         // Auto-redirect after 2 seconds
         setTimeout(() => {
-          router.push("/candidate/dashboard");
+          router.push("/dashboard/candidate");
         }, 2000);
       } else {
         const errorMessage =
@@ -1169,7 +1169,16 @@ const HRMRegistrationPage = () => {
                 <p className={"text-sm " + currentTheme.textSecondary}>
                   Already have an account?{" "}
                   <button
-                    onClick={() => (window.location.href = "/login")}
+                    onClick={() => {
+                      // Preserve job_id in sessionStorage if it exists
+                      if (jobId) {
+                        console.log('🎫 Storing job_id in sessionStorage:', jobId);
+                        sessionStorage.setItem('pending_job_application', jobId);
+                      } else {
+                        console.log('⚠️ No job_id found to store');
+                      }
+                      window.location.href = "/login";
+                    }}
                     className="hover:underline"
                     style={{ color: settings.primaryColor }}
                   >

@@ -160,6 +160,7 @@ class EmployeeRecordController extends Controller
                 'jobStructure:id,job_title,job_code,contract_type,contract_nature',
                 'solOffice:id,office_name,office_code,state_name,zone_name,zone',
                 'payGradeStructure:id,grade_name,grade_code',
+                'payStructureType:id,type_name,type_code',
                 'recruitmentRequest:id,ticket_id,created_at'
             ])->find($staffId);
 

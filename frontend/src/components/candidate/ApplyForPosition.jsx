@@ -24,34 +24,65 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
     availableStartDate: '',
   });
   const [pendingJobHighlight, setPendingJobHighlight] = useState(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    per_page: 20,
+    current_page: 1,
+    last_page: 1
+  });
 
-  // Check for pending job application from registration
+  // Check for pending job application from registration and fetch it directly
   useEffect(() => {
     const pendingJobId = sessionStorage.getItem('pending_job_application');
-    if (pendingJobId) {
+    if (pendingJobId && user) {
       console.log('📋 Found pending job application:', pendingJobId);
-      setPendingJobHighlight(pendingJobId);
-      // Don't clear yet - wait until jobs are loaded
-    }
-  }, []);
-
-  // Auto-open job details when pending job is found and jobs are loaded
-  useEffect(() => {
-    if (pendingJobHighlight && availableJobs.length > 0) {
-      const targetJob = availableJobs.find(
-        (job) => job.ticketId === pendingJobHighlight || job.ticket_id === pendingJobHighlight
-      );
       
-      if (targetJob) {
-        console.log('✅ Found target job, opening details:', targetJob);
-        handleViewDetails(targetJob);
-        // Clear from storage after opening
-        sessionStorage.removeItem('pending_job_application');
-        // Clear highlight after 5 seconds
-        setTimeout(() => setPendingJobHighlight(null), 5000);
-      }
+      // Fetch the specific job directly by ticket_id
+      const fetchPendingJob = async () => {
+        try {
+          const response = await sanctumRequest(`/api/public/jobs/${pendingJobId}`);
+          if (response && response.success) {
+            console.log('✅ Pending job fetched, opening details:', response.data);
+            const jobData = response.data;
+            
+            // Transform to match the expected format
+            const transformedJob = {
+              id: jobData.id,
+              ticketId: jobData.ticket_id,
+              title: jobData.job_title,
+              industryCategory: jobData.client?.industry_category || 'Not specified',
+              location: jobData.location?.lga_name || 'N/A',
+              state: jobData.location?.state_name || '',
+              jobType: jobData.job_type,
+              description: jobData.description || '',
+              requirements: jobData.requirements || '',
+              salary_range_min: jobData.salary_range_min,
+              salary_range_max: jobData.salary_range_max,
+              experience: jobData.experience,
+              age_range_min: jobData.age_range_min,
+              age_range_max: jobData.age_range_max,
+              deadline: jobData.deadline,
+              status: jobData.status,
+              applications: jobData.applications_count || 0
+            };
+            
+            handleViewDetails(transformedJob);
+            // Clear from storage after opening
+            sessionStorage.removeItem('pending_job_application');
+          }
+        } catch (error) {
+          console.error('❌ Failed to fetch pending job:', error);
+          // If fetch fails, set highlight for manual search
+          setPendingJobHighlight(pendingJobId);
+        }
+      };
+      
+      fetchPendingJob();
     }
-  }, [pendingJobHighlight, availableJobs]);
+  }, [user]);
 
   // Fetch available jobs from API
   useEffect(() => {
@@ -67,8 +98,8 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
         
         console.log('🔐 Token available:', !!token);
         
-        // Fetch available jobs with application status from current vacancies
-        const response = await sanctumRequest('/api/current-vacancies', {
+        // Fetch available jobs with application status from current vacancies with pagination
+        const response = await sanctumRequest(`/api/current-vacancies?per_page=${pagination.per_page}&page=${currentPage}`, {
           method: 'GET'
         });
 
@@ -100,7 +131,7 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
                 id: job.id,
                 ticketId: job.ticket_id || `TCK_${job.id}`,
                 title: job.job_structure?.job_title || job.job_title || `Position ${job.id}`,
-                company: job.client?.organisation_name || job.client_name || 'SOL Nigeria',
+                industryCategory: job.client?.industry_category || 'General',
                 location: job.location || job.lga || 'Lagos',
                 state: job.state || 'Lagos',
                 salaryMin: job.min_salary || 200000,
@@ -136,6 +167,14 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
             });
 
             setAvailableJobs(jobsWithEligibility);
+            
+            // Update pagination info
+            setPagination({
+              total: data.data.total || 0,
+              per_page: data.data.per_page || 20,
+              current_page: data.data.current_page || 1,
+              last_page: data.data.last_page || 1
+            });
           } else {
             throw new Error(data.message || 'Failed to fetch jobs');
           }
@@ -152,7 +191,7 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
     };
 
     fetchAvailableJobs();
-  }, [candidateProfile]);
+  }, [candidateProfile, currentPage]);
 
   // Fetch states/LGAs data for proper state matching
   useEffect(() => {
@@ -394,13 +433,9 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1">
           <h3 className={`text-lg font-semibold ${currentTheme.textPrimary} mb-1`}>
-            {job.title}
+            {job.industryCategory}
           </h3>
           <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
-            <div className="flex items-center">
-              <Building className="w-4 h-4 mr-1" />
-              {job.company}
-            </div>
             <div className="flex items-center">
               <MapPin className="w-4 h-4 mr-1" />
               {job.location}, {job.state}
@@ -679,6 +714,59 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
                 </div>
               )}
             </div>
+            
+            {/* Pagination */}
+            {pagination.last_page > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-8">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`px-4 py-2 border rounded-lg ${currentTheme.border} ${currentTheme.textPrimary} disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors`}
+                >
+                  Previous
+                </button>
+                
+                <div className="flex gap-2">
+                  {[...Array(pagination.last_page)].map((_, index) => {
+                    const pageNum = index + 1;
+                    // Show first page, last page, current page, and pages around current
+                    if (
+                      pageNum === 1 ||
+                      pageNum === pagination.last_page ||
+                      (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+                    ) {
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-4 py-2 border rounded-lg transition-colors ${
+                            currentPage === pageNum
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : `${currentTheme.border} ${currentTheme.textPrimary} hover:bg-gray-50`
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    } else if (
+                      pageNum === currentPage - 2 ||
+                      pageNum === currentPage + 2
+                    ) {
+                      return <span key={pageNum} className={currentTheme.textSecondary}>...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+                
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(pagination.last_page, prev + 1))}
+                  disabled={currentPage === pagination.last_page}
+                  className={`px-4 py-2 border rounded-lg ${currentTheme.border} ${currentTheme.textPrimary} disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors`}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -760,7 +848,7 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <h2 className="text-2xl font-bold text-gray-800">
-                  {viewingJob.title}
+                  {viewingJob.industryCategory}
                 </h2>
                 <button
                   onClick={() => {
@@ -776,8 +864,8 @@ const ApplyForPosition = ({ candidateProfile, currentTheme, onClose }) => {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Department</p>
-                    <p className="text-gray-800">{viewingJob.department}</p>
+                    <p className="text-sm font-medium text-gray-600">Industry</p>
+                    <p className="text-gray-800">{viewingJob.industryCategory}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-600">Location</p>
