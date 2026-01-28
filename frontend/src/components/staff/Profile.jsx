@@ -8,7 +8,15 @@ const Profile = () => {
   const [profile, setProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isDevMode, setIsDevMode] = useState(false);
   const { user } = useAuth();
+
+  // Check dev mode status
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsDevMode(localStorage.getItem('hrm_dev_mode') === 'true');
+    }
+  }, []);
 
 
 useEffect(() => {
@@ -77,12 +85,14 @@ useEffect(() => {
             ))}
           </div>
 
-          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Raw JSON Response:</h4>
-            <pre className="bg-white dark:bg-gray-900 text-black dark:text-gray-100 p-3 rounded text-xs overflow-auto max-h-96 border border-gray-300 dark:border-gray-700">
-              {JSON.stringify(profile, null, 2)}
-            </pre>
-          </div>
+          {isDevMode && (
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">🔧 Dev Mode - Raw JSON Response:</h4>
+              <pre className="bg-white dark:bg-gray-900 text-black dark:text-gray-100 p-3 rounded text-xs overflow-auto max-h-96 border border-gray-300 dark:border-gray-700">
+                {JSON.stringify(profile, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
