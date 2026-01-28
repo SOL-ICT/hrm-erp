@@ -21,6 +21,19 @@ import {
 // We've added a `componentKey` to each menu item and child.
 // This is the value that will be passed to the parent component's state.
 
+// Enable dev mode from console: window.enableDevMode()
+// Disable dev mode: window.disableDevMode()
+if (typeof window !== 'undefined') {
+  window.enableDevMode = () => {
+    localStorage.setItem('hrm_dev_mode', 'true');
+    console.log('✅ Dev mode enabled! Reload the page to see dev features.');
+  };
+  window.disableDevMode = () => {
+    localStorage.removeItem('hrm_dev_mode');
+    console.log('❌ Dev mode disabled! Reload the page.');
+  };
+}
+
 
 
 
@@ -103,6 +116,19 @@ export default function StaffSidebar({
   const { profile, isLoading, error } = useStaffProfile();
 
   const [expandedSections, setExpandedSections] = useState([]);
+  const [isDevMode, setIsDevMode] = useState(false);
+
+  // Check dev mode on mount and listen for storage changes
+  useEffect(() => {
+    const checkDevMode = () => {
+      if (typeof window !== 'undefined') {
+        setIsDevMode(localStorage.getItem('hrm_dev_mode') === 'true');
+      }
+    };
+    checkDevMode();
+    window.addEventListener('storage', checkDevMode);
+    return () => window.removeEventListener('storage', checkDevMode);
+  }, []);
 
   useEffect(() => {
     // We can still use this effect to auto-expand the parent section of the active component
@@ -171,7 +197,11 @@ export default function StaffSidebar({
 
         {/* Menu Sections */}
         <nav className="mt-4">
-          {menuItems.map((section) => {
+          {menuItems.filter(section => {
+            // Hide "My Profile" unless dev mode is enabled
+            if (section.componentKey === 'my-profile' && !isDevMode) return false;
+            return true;
+          }).map((section) => {
             const isExpanded = expandedSections.includes(section.title);
             const isSectionActive = section.children?.some(child => isActive(child.componentKey)) || isActive(section.componentKey);
 
