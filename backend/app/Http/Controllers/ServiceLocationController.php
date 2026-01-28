@@ -255,11 +255,14 @@ class ServiceLocationController extends Controller
             
             if (isset($autoAssignment['office']) && $autoAssignment['office'] !== null) {
                 $solOfficeId = $autoAssignment['office']->id;
-                // ✅ AUTO-POPULATE STATE from SOL office
-                $stateName = $autoAssignment['office']->state_name;
+            }
+            
+            // ✅ Get state from LGA's actual state (NOT from SOL office)
+            if (isset($autoAssignment['location_info'])) {
+                $stateName = $autoAssignment['location_info']->state_name;
             } else {
-                // ⚠️ WARNING: SOL office not found for this city
-                Log::warning('SOL office not found for service location', [
+                // ⚠️ WARNING: LGA not found - SOL office might still be assigned
+                Log::warning('LGA state not found for service location', [
                     'city' => $request->city,
                     'location_name' => $request->location_name,
                     'client_id' => $request->client_id
@@ -353,12 +356,18 @@ class ServiceLocationController extends Controller
 
             if ($existingLocation->city !== $request->city) {
                 $autoAssignment = $this->autoAssignSOLOffice($request->city);
+                
+                // Update SOL office assignment
                 if (isset($autoAssignment['office']) && $autoAssignment['office'] !== null) {
                     $solOfficeId = $autoAssignment['office']->id;
-                    // ✅ AUTO-POPULATE STATE from SOL office
-                    $stateName = $autoAssignment['office']->state_name;
                 } else {
                     $solOfficeId = null;
+                }
+                
+                // ✅ Get state from LGA's actual state (NOT from SOL office)
+                if (isset($autoAssignment['location_info'])) {
+                    $stateName = $autoAssignment['location_info']->state_name;
+                } else {
                     $stateName = null;
                 }
             }
@@ -550,10 +559,11 @@ class ServiceLocationController extends Controller
                     // Generate location code
                     $locationCode = $data['unique_id'] ?? $this->generateLocationCode($client->prefix, $city);
 
-                    // Get state from SOL office if assigned
+                    // ✅ Get state from the LGA's actual state (NOT from SOL office controlling it)
+                    // Example: Abeokuta is in Ogun state, even if controlled by Ibadan (Oyo) office
                     $state = null;
-                    if ($solOfficeId && isset($autoAssignment['office'])) {
-                        $state = $autoAssignment['office']->state_name ?? null;
+                    if (isset($autoAssignment['location_info'])) {
+                        $state = $autoAssignment['location_info']->state_name;
                     }
 
                     // Insert service location
