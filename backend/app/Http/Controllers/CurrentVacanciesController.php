@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class CurrentVacanciesController extends Controller
 {
@@ -627,16 +628,29 @@ class CurrentVacanciesController extends Controller
         try {
             $perPage = $request->get('per_page', 12);
             $search = $request->get('search', '');
-            $location = $request->get('location', '');
+            $locationFilter = $request->get('location', '');
             $jobType = $request->get('job_type', '');
 
-            // Get active recruitment requests with their service locations
-            $query = RecruitmentRequest::with([
-                'jobStructure', 
-                'client',
-                'serviceLocation', // Load single location (for backward compatibility)
-                'serviceLocations' // Load all associated locations (many-to-many)
+            // Create cache key based on filters
+            $cacheKey = 'public_jobs_' . md5($search . $locationFilter . $jobType . $perPage);
+            
+            // Cache for 5 minutes for non-search queries, 2 minutes for searches
+            $cacheDuration = $search ? 120 : 300;
+
+            // Get active recruitment requests with only necessary fields
+            $query = RecruitmentRequest::select([
+                'id', 'ticket_id', 'description', 'compensation', 'lga', 'zone',
+                'priority_level', 'age_limit_min', 'age_limit_max', 'gender_requirement',
+                'experience_requirement', 'special_requirements', 'recruitment_period_end',
+                'created_at', 'job_structure_id', 'client_id', 'service_location_id', 'sol_service_type',
+                'qualifications'
             ])
+                ->with([
+                    'jobStructure:id,job_title',
+                    'client:id,industry_category',
+                    'serviceLocation:id,location_name,city,state,full_address',
+                    'serviceLocations:id,location_name,city,state,full_address'
+                ])
                 ->where('status', 'active')
                 ->where('recruitment_period_end', '>=', now());
 
@@ -672,11 +686,11 @@ class CurrentVacanciesController extends Controller
             }
 
             // Location filter - check in serviceLocations relationship
-            if ($location) {
-                $query->whereHas('serviceLocations', function($q) use ($location) {
-                    $q->where('city', 'like', "%{$location}%")
-                      ->orWhere('location_name', 'like', "%{$location}%")
-                      ->orWhere('state', 'like', "%{$location}%");
+            if ($locationFilter) {
+                $query->whereHas('serviceLocations', function($q) use ($locationFilter) {
+                    $q->where('city', 'like', "%{$locationFilter}%")
+                      ->orWhere('location_name', 'like', "%{$locationFilter}%")
+                      ->orWhere('state', 'like', "%{$locationFilter}%");
                 });
             }
 
@@ -700,16 +714,115 @@ class CurrentVacanciesController extends Controller
                 }
 
                 foreach ($locations as $location) {
-                    $jobData = $recruitmentRequest->toArray();
-                    $jobData['service_location'] = [
-                        'id' => $location->id,
-                        'location_name' => $location->location_name,
-                        'city' => $location->city,
-                        'state' => $location->state,
-                        'full_address' => $location->full_address,
+                    // Apply location-specific search filter to expanded results
+                    if ($search) {
+                        $searchLower = strtolower($search);
+                        $locationName = strtolower($location->location_name ?? '');
+                        $city = strtolower($location->city ?? '');
+                        $state = strtolower($location->state ?? '');
+                        $fullAddress = strtolower($location->full_address ?? '');
+                        
+                        // Check if search term matches THIS specific location
+                        $locationMatches = str_contains($locationName, $searchLower) ||
+                                          str_contains($city, $searchLower) ||
+                                          str_contains($state, $searchLower) ||
+                                          str_contains($fullAddress, $searchLower);
+                        
+                        // Check if search matches job-level fields
+                        $jobMatches = str_contains(strtolower($recruitmentRequest->description ?? ''), $searchLower) ||
+                                     str_contains(strtolower($recruitmentRequest->lga ?? ''), $searchLower) ||
+                                     str_contains(strtolower($recruitmentRequest->zone ?? ''), $searchLower) ||
+                                     str_contains(strtolower($recruitmentRequest->sol_service_type ?? ''), $searchLower) ||
+                                     str_contains(strtolower($recruitmentRequest->experience_requirement ?? ''), $searchLower) ||
+                                     str_contains(strtolower($recruitmentRequest->special_requirements ?? ''), $searchLower) ||
+                                     str_contains(strtolower($recruitmentRequest->jobStructure->job_title ?? ''), $searchLower) ||
+                                     str_contains(strtolower($recruitmentRequest->client->organisation_name ?? ''), $searchLower) ||
+                                     str_contains(strtolower($recruitmentRequest->client->industry_category ?? ''), $searchLower);
+                        
+                        // Check qualifications if they exist (stored as JSON in qualifications column)
+                        $qualificationsMatch = false;
+                        if ($recruitmentRequest->qualifications) {
+                            $quals = is_string($recruitmentRequest->qualifications) 
+                                ? json_decode($recruitmentRequest->qualifications, true) 
+                                : $recruitmentRequest->qualifications;
+                            
+                            if (is_array($quals)) {
+                                // Split search by comma to handle "bsc, second class" type searches
+                                $searchTerms = array_map('trim', explode(',', $searchLower));
+                                
+                                foreach ($quals as $qual) {
+                                    $qualName = strtolower($qual['name'] ?? '');
+                                    $qualClass = strtolower($qual['class'] ?? '');
+                                    $qualCombined = $qualName . ' ' . $qualClass;
+                                    
+                                    foreach ($searchTerms as $term) {
+                                        if (str_contains($qualName, $term) || 
+                                            str_contains($qualClass, $term) ||
+                                            str_contains($qualCombined, $term)) {
+                                            $qualificationsMatch = true;
+                                            break 2;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Only include this location if search matches location OR job fields OR qualifications
+                        if (!$locationMatches && !$jobMatches && !$qualificationsMatch) {
+                            continue;
+                        }
+                    }
+                    
+                    // Apply location filter to expanded results
+                    if ($locationFilter) {
+                        $locationFilterLower = strtolower($locationFilter);
+                        $cityLower = strtolower($location->city ?? '');
+                        $locationNameLower = strtolower($location->location_name ?? '');
+                        $stateLower = strtolower($location->state ?? '');
+                        
+                        if (!str_contains($cityLower, $locationFilterLower) && 
+                            !str_contains($locationNameLower, $locationFilterLower) && 
+                            !str_contains($stateLower, $locationFilterLower)) {
+                            continue;
+                        }
+                    }
+
+                    // Build minimal response with only necessary fields
+                    $jobData = [
+                        'id' => $recruitmentRequest->id,
+                        'ticket_id' => $recruitmentRequest->ticket_id,
+                        'listing_id' => $recruitmentRequest->id . '_' . $location->id,
+                        'description' => $recruitmentRequest->description,
+                        'compensation' => $recruitmentRequest->compensation,
+                        'lga' => $recruitmentRequest->lga,
+                        'zone' => $recruitmentRequest->zone,
+                        'priority_level' => $recruitmentRequest->priority_level,
+                        'age_limit_min' => $recruitmentRequest->age_limit_min,
+                        'age_limit_max' => $recruitmentRequest->age_limit_max,
+                        'gender_requirement' => $recruitmentRequest->gender_requirement,
+                        'experience_requirement' => $recruitmentRequest->experience_requirement,
+                        'special_requirements' => $recruitmentRequest->special_requirements,
+                        'recruitment_period_end' => $recruitmentRequest->recruitment_period_end,
+                        'created_at' => $recruitmentRequest->created_at,
+                        'job_structure' => $recruitmentRequest->jobStructure ? [
+                            'id' => $recruitmentRequest->jobStructure->id,
+                            'job_title' => $recruitmentRequest->jobStructure->job_title,
+                        ] : null,
+                        'client' => $recruitmentRequest->client ? [
+                            'id' => $recruitmentRequest->client->id,
+                            'industry_category' => $recruitmentRequest->client->industry_category,
+                        ] : null,
+                        'service_location' => [
+                            'id' => $location->id,
+                            'location_name' => $location->location_name,
+                            'city' => $location->city,
+                            'state' => $location->state,
+                            'full_address' => $location->full_address,
+                        ],
+                        'qualifications' => is_string($recruitmentRequest->qualifications)
+                            ? json_decode($recruitmentRequest->qualifications, true)
+                            : $recruitmentRequest->qualifications,
                     ];
-                    // Add unique identifier for this job+location combination
-                    $jobData['listing_id'] = $recruitmentRequest->id . '_' . $location->id;
                     $expandedJobs[] = $jobData;
                 }
             }
