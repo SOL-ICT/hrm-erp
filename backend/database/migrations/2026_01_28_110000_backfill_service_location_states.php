@@ -14,7 +14,7 @@ return new class extends Migration
     public function up(): void
     {
         // Update service locations that have NULL state but have a linked SOL office
-        DB::statement("
+        $updatedCount = DB::update("
             UPDATE service_locations sl
             INNER JOIN sol_offices so ON sl.sol_office_id = so.id
             SET sl.state = so.state_name
@@ -22,8 +22,6 @@ return new class extends Migration
             AND sl.sol_office_id IS NOT NULL
             AND so.state_name IS NOT NULL
         ");
-        
-        $updatedCount = DB::affectedRows();
         
         // Log the result
         if ($updatedCount > 0) {
