@@ -298,7 +298,7 @@ const CareersPage = () => {
                       <div className="flex items-center text-gray-600 mb-3">
                         <Building className="w-4 h-4 mr-2" />
                         <span className="font-medium">
-                          {job.client?.organisation_name || "SOL"}
+                          {job.client?.industry_category || "Various Industries"}
                         </span>
                       </div>
 
@@ -312,12 +312,6 @@ const CareersPage = () => {
 
                       {/* Job Details */}
                       <div className="space-y-2 mb-4 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Vacancies:</span>
-                          <span className="font-medium text-gray-900">
-                            {job.number_of_vacancies} positions
-                          </span>
-                        </div>
                         <div className="flex justify-between">
                           <span className="text-gray-500">Compensation:</span>
                           <span className="font-medium text-gray-900">
@@ -402,7 +396,9 @@ const CareersPage = () => {
                   </h2>
                   <div className="flex items-center text-gray-600">
                     <Building className="w-4 h-4 mr-2" />
-                    <span>{selectedJob.client?.organisation_name}</span>
+                    <span>
+                      <span className="font-medium">Industry - </span> {selectedJob.client?.industry_category || "Various Industries"}
+                    </span>
                   </div>
                 </div>
                 <button
@@ -412,6 +408,10 @@ const CareersPage = () => {
                   ×
                 </button>
               </div>
+              
+
+              
+
 
               {/* Job Details Grid */}
               <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
@@ -419,14 +419,6 @@ const CareersPage = () => {
                   <div className="text-sm text-gray-500 mb-1">Location</div>
                   <div className="font-medium text-gray-900">
                     {selectedJob.lga}, {selectedJob.zone}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500 mb-1">
-                    Number of Vacancies
-                  </div>
-                  <div className="font-medium text-gray-900">
-                    {selectedJob.number_of_vacancies} positions10
                   </div>
                 </div>
                 <div>
@@ -458,13 +450,6 @@ const CareersPage = () => {
                 </div>
               </div>
 
-              {/* Description */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-2">Job Description</h3>
-                <p className="text-gray-900 whitespace-pre-wrap">
-                  {selectedJob.description}
-                </p>
-              </div>
 
               {/* Experience Requirement */}
               {selectedJob.experience_requirement && (
@@ -477,6 +462,14 @@ const CareersPage = () => {
                   </p>
                 </div>
               )}
+              
+              {/* Description */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-2 text-gray-900">Job Description</h3>
+                <p className="text-gray-900 whitespace-pre-wrap">
+                  {selectedJob.description}
+                </p>
+              </div>
 
               {/* Qualifications */}
               {selectedJob.qualifications &&
