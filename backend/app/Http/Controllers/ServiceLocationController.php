@@ -18,9 +18,12 @@ class ServiceLocationController extends Controller
     {
         try {
             // Step 1: Find city in states_lgas table to get LGA and state codes
+            // Normalize city name: remove hyphens, extra spaces for fuzzy matching
+            $normalizedCity = preg_replace('/[-\s]+/', ' ', trim($city));
+            
             $locationInfo = DB::table('states_lgas')
-                ->where('lga_name', 'LIKE', "%{$city}%")
-                ->orWhere('state_name', 'LIKE', "%{$city}%")
+                ->whereRaw("REPLACE(REPLACE(lga_name, '-', ' '), '  ', ' ') LIKE ?", ["%{$normalizedCity}%"])
+                ->orWhereRaw("REPLACE(REPLACE(state_name, '-', ' '), '  ', ' ') LIKE ?", ["%{$normalizedCity}%"])
                 ->select('lga_code', 'state_code', 'lga_name', 'state_name')
                 ->first();
 
@@ -426,8 +429,23 @@ class ServiceLocationController extends Controller
                 throw new Exception('Client not found');
             }
 
-            // Read CSV file
-            $csvData = array_map('str_getcsv', file($file->getPathname()));
+            // Read CSV file with proper encoding handling
+            $handle = fopen($file->getPathname(), 'r');
+            
+            // Detect and handle BOM (Byte Order Mark)
+            $bom = fread($handle, 3);
+            if ($bom !== "\xEF\xBB\xBF") {
+                // No BOM found, rewind to start
+                rewind($handle);
+            }
+            
+            // Read all CSV data
+            $csvData = [];
+            while (($row = fgetcsv($handle)) !== false) {
+                $csvData[] = $row;
+            }
+            fclose($handle);
+            
             $headers = array_map('trim', array_shift($csvData));
 
             // Validate required headers
@@ -464,7 +482,23 @@ class ServiceLocationController extends Controller
                     // Map CSV data to fields (handle missing columns gracefully)
                     $data = [];
                     foreach ($headers as $i => $header) {
-                        $data[$header] = isset($row[$i]) ? trim($row[$i]) : '';
+                        $value = isset($row[$i]) ? trim($row[$i]) : '';
+                        
+                        // Sanitize value: remove invalid UTF-8 characters
+                        // Replace non-breaking spaces (\xA0) with regular spaces
+                        // Remove or replace other problematic characters
+                        $value = str_replace("\xC2\xA0", ' ', $value); // Non-breaking space
+                        $value = str_replace("\xA0", ' ', $value); // Non-breaking space (single byte)
+                        $value = str_replace("\x96", '-', $value); // Em-dash
+                        $value = str_replace("\x92", "'", $value); // Smart quote
+                        $value = str_replace("\x93", '"', $value); // Smart quote
+                        $value = str_replace("\x94", '"', $value); // Smart quote
+                        
+                        // Remove any remaining non-UTF-8 characters
+                        $value = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+                        $value = preg_replace('/[\x00-\x1F\x7F-\x9F]/u', '', $value); // Remove control characters
+                        
+                        $data[$header] = $value;
                     }
 
                     // Clean and validate required data
@@ -562,6 +596,26 @@ class ServiceLocationController extends Controller
 
             DB::commit();
 
+            // Ensure all strings are UTF-8 encoded for JSON response
+            $cleanErrors = array_map(function($error) {
+                return [
+                    'row' => $error['row'],
+                    'message' => mb_convert_encoding($error['message'], 'UTF-8', 'UTF-8'),
+                    'data' => array_map(function($val) {
+                        return is_string($val) ? mb_convert_encoding($val, 'UTF-8', 'UTF-8') : $val;
+                    }, $error['data'] ?? [])
+                ];
+            }, $errors);
+
+            $cleanWarnings = array_map(function($warning) {
+                return [
+                    'row' => $warning['row'],
+                    'city' => mb_convert_encoding($warning['city'], 'UTF-8', 'UTF-8'),
+                    'location_name' => mb_convert_encoding($warning['location_name'], 'UTF-8', 'UTF-8'),
+                    'message' => mb_convert_encoding($warning['message'], 'UTF-8', 'UTF-8')
+                ];
+            }, $warnings);
+
             return response()->json([
                 'success' => true,
                 'message' => "Bulk import completed. {$successCount} locations imported successfully.",
@@ -569,8 +623,8 @@ class ServiceLocationController extends Controller
                     'total_processed' => $totalProcessed,
                     'success_count' => $successCount,
                     'error_count' => $errorCount,
-                    'errors' => $errors,
-                    'warnings' => $warnings, // Locations with missing SOL offices
+                    'errors' => $cleanErrors,
+                    'warnings' => $cleanWarnings, // Locations with missing SOL offices
                     'assignment_summary' => $assignmentSummary
                 ]
             ]);

@@ -266,14 +266,33 @@ const LocationMasterForm = ({
           successCount: response.data.success_count || 0,
           errorCount: response.data.error_count || 0,
           errors: response.data.errors || [],
+          warnings: response.data.warnings || [],
           assignmentSummary,
         });
 
-        let message = `Bulk upload completed!\n${response.data.success_count} locations imported successfully.`;
+        let message = `✅ Bulk Upload Completed!\n\n`;
+        message += `📊 ${response.data.success_count} locations imported successfully`;
+        
+        if (response.data.total_processed) {
+          message += ` out of ${response.data.total_processed} processed`;
+        }
+        message += `.`;
 
-        // Show errors if any
+        // Show warnings (non-fatal: created but missing SOL office)
+        if (response.data.warnings && response.data.warnings.length > 0) {
+          message += `\n\n⚠️ ${response.data.warnings.length} locations created with warnings:\n`;
+          message += `(These locations were saved but have NULL state - no SOL office found)\n`;
+          response.data.warnings.slice(0, 8).forEach(warn => {
+            message += `\n  Row ${warn.row}: ${warn.city} - ${warn.location_name}`;
+          });
+          if (response.data.warnings.length > 8) {
+            message += `\n  ... and ${response.data.warnings.length - 8} more warnings`;
+          }
+        }
+
+        // Show errors (fatal: not created)
         if (response.data.error_count > 0) {
-          message += `\n\n❌ ${response.data.error_count} rows had errors:`;
+          message += `\n\n❌ ${response.data.error_count} rows FAILED (not created):`;
           response.data.errors.slice(0, 5).forEach(err => {
             message += `\n  Row ${err.row}: ${err.message}`;
           });
@@ -283,27 +302,37 @@ const LocationMasterForm = ({
         }
 
         // Show assignment summary
+        message += `\n\n📈 Assignment Summary:`;
         if (assignmentSummary.lga_assignments > 0) {
-          message += `\n\n📍 LGA-level assignments: ${assignmentSummary.lga_assignments}`;
+          message += `\n  📍 LGA-level: ${assignmentSummary.lga_assignments}`;
         }
         if (assignmentSummary.state_assignments > 0) {
-          message += `\n🏢 State-level assignments: ${assignmentSummary.state_assignments}`;
+          message += `\n  🏢 State-level: ${assignmentSummary.state_assignments}`;
         }
         if (assignmentSummary.no_assignments > 0) {
-          message += `\n⚠️ No SOL office found: ${assignmentSummary.no_assignments}`;
+          message += `\n  ⚠️ No SOL office: ${assignmentSummary.no_assignments}`;
         }
 
+        // Log full details to console for copying
+        console.log('=== BULK UPLOAD COMPLETE DETAILS ===');
+        console.log('Success Count:', response.data.success_count);
+        console.log('Total Processed:', response.data.total_processed);
+        console.log('\nWARNINGS (created but missing SOL office):');
+        console.table(response.data.warnings);
+        console.log('\nERRORS (not created):');
+        console.table(response.data.errors);
+        console.log('\nAssignment Summary:', assignmentSummary);
+        console.log('====================================');
+        console.log('👆 You can right-click and copy the tables above');
+
+        // Show results in alert (won't auto-close the modal anymore)
         alert(message);
 
-        // Reset after successful upload
-        setTimeout(() => {
-          setUploadFile(null);
-          setUploadProgress(0);
-          setUploadResults(null);
-          // Don't call onSubmit for bulk upload - it's already saved on the backend
-          // Just close the modal - parent will refresh the list
-          onClose();
-        }, 2000);
+        // DON'T auto-close - let user manually close after reviewing
+        // Remove auto-close timeout so user can review warnings/errors
+        setUploadFile(null);
+        setUploadProgress(0);
+        // Keep uploadResults visible in modal
       } else {
         alert(response.message || "Error uploading file");
       }
