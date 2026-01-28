@@ -640,7 +640,7 @@ class CurrentVacanciesController extends Controller
                 ->where('status', 'active')
                 ->where('recruitment_period_end', '>=', now());
 
-            // Search filter - comprehensive search across multiple fields
+            // Search filter - comprehensive search across multiple fields including service locations
             if ($search) {
                 $query->where(function($q) use ($search) {
                     $q->where('description', 'like', "%{$search}%")
@@ -655,6 +655,18 @@ class CurrentVacanciesController extends Controller
                       ->orWhereHas('client', function ($subQ) use ($search) {
                           $subQ->where('organisation_name', 'like', "%{$search}%")
                                ->orWhere('industry_category', 'like', "%{$search}%");
+                      })
+                      ->orWhereHas('serviceLocations', function ($subQ) use ($search) {
+                          $subQ->where('location_name', 'like', "%{$search}%")
+                               ->orWhere('city', 'like', "%{$search}%")
+                               ->orWhere('state', 'like', "%{$search}%")
+                               ->orWhere('full_address', 'like', "%{$search}%");
+                      })
+                      ->orWhereHas('serviceLocation', function ($subQ) use ($search) {
+                          $subQ->where('location_name', 'like', "%{$search}%")
+                               ->orWhere('city', 'like', "%{$search}%")
+                               ->orWhere('state', 'like', "%{$search}%")
+                               ->orWhere('full_address', 'like', "%{$search}%");
                       });
                 });
             }

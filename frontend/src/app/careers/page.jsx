@@ -22,11 +22,13 @@ const CareersPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("");
   const [selectedJobType, setSelectedJobType] = useState("");
   const [selectedJob, setSelectedJob] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [allLocations, setAllLocations] = useState([]); // Store all available locations
   const [pagination, setPagination] = useState({
     total: 0,
     per_page: 12,
@@ -34,10 +36,56 @@ const CareersPage = () => {
     last_page: 1,
   });
 
+  // Fetch all available locations once on mount
+  useEffect(() => {
+    const fetchAllLocations = async () => {
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/public/jobs?per_page=1000`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            const jobsData = result.data.data || [];
+            // Extract unique locations from all jobs
+            const uniqueLocations = [
+              ...new Set(
+                jobsData.map((job) => 
+                  job.service_location?.city || job.lga
+                ).filter(Boolean)
+              ),
+            ].sort();
+            setAllLocations(uniqueLocations);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching locations:", err);
+      }
+    };
+    
+    fetchAllLocations();
+  }, []);
+
+  // Debounce search term to avoid spamming API
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Fetch public jobs
   useEffect(() => {
     fetchJobs();
-  }, [currentPage, searchTerm, selectedLocation, selectedJobType]);
+  }, [currentPage, debouncedSearchTerm, selectedLocation, selectedJobType]);
 
   const fetchJobs = async () => {
     try {
@@ -47,7 +95,7 @@ const CareersPage = () => {
         per_page: 12,
       });
 
-      if (searchTerm) params.append("search", searchTerm);
+      if (debouncedSearchTerm) params.append("search", debouncedSearchTerm);
       if (selectedLocation) params.append("location", selectedLocation);
       if (selectedJobType) params.append("job_type", selectedJobType);
 
@@ -126,11 +174,6 @@ const CareersPage = () => {
     });
   };
 
-  // Get unique locations for filter
-  const locations = [
-    ...new Set(jobs.map((job) => job.lga).filter(Boolean)),
-  ].sort();
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-600">
       {/* Header */}
@@ -195,7 +238,7 @@ const CareersPage = () => {
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none text-gray-900"
                 >
                   <option value="">All Locations</option>
-                  {locations.map((location) => (
+                  {allLocations.map((location) => (
                     <option key={location} value={location}>
                       {location}
                     </option>
@@ -228,10 +271,11 @@ const CareersPage = () => {
               <span className="font-semibold">{pagination.total}</span> open
               positions available
             </p>
-            {searchTerm && (
+            {(searchTerm || debouncedSearchTerm) && (
               <button
                 onClick={() => {
                   setSearchTerm("");
+                  setDebouncedSearchTerm("");
                   setSelectedLocation("");
                   setSelectedJobType("");
                 }}
@@ -303,11 +347,19 @@ const CareersPage = () => {
                       </div>
 
                       {/* Location */}
-                      <div className="flex items-center text-gray-600 mb-4">
-                        <MapPin className="w-4 h-4 mr-2" />
-                        <span>
-                          {job.service_location?.city || job.lga}, {job.service_location?.state || job.zone}
-                        </span>
+                      <div className="mb-4">
+                        <div className="flex items-center text-gray-600 mb-1">
+                          <MapPin className="w-4 h-4 mr-2" />
+                          <span>
+                            {job.service_location?.city || job.lga}, {job.service_location?.state || job.zone}
+                          </span>
+                        </div>
+                        {job.service_location?.full_address && (
+                          <div className="flex items-start ml-6 text-xs text-gray-500 mt-1">
+                            <span className="font-medium mr-1">Address:</span>
+                            <span>{job.service_location.full_address}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Job Details */}
@@ -316,12 +368,6 @@ const CareersPage = () => {
                           <span className="text-gray-500">Compensation:</span>
                           <span className="font-medium text-gray-900">
                             {formatSalary(job.compensation)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Deadline:</span>
-                          <span className="font-medium text-gray-900">
-                            {formatDate(job.recruitment_period_end)}
                           </span>
                         </div>
                       </div>
@@ -355,17 +401,67 @@ const CareersPage = () => {
 
             {/* Pagination */}
             {pagination.last_page > 1 && (
-              <div className="flex justify-center items-center space-x-2">
+              <div className="flex justify-center items-center space-x-2 flex-wrap gap-2">
+                {/* Previous Button */}
                 <button
                   onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
-                  className="px-4 py-2 bg-white text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  className="px-4 py-2 bg-white text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
                 >
                   Previous
                 </button>
-                <span className="text-white">
-                  Page {pagination.current_page} of {pagination.last_page}
-                </span>
+
+                {/* First Page */}
+                {currentPage > 3 && (
+                  <>
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      className="px-3 py-2 bg-white text-gray-700 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                    >
+                      1
+                    </button>
+                    {currentPage > 4 && (
+                      <span className="text-white px-2">...</span>
+                    )}
+                  </>
+                )}
+
+                {/* Page Numbers */}
+                {Array.from({ length: pagination.last_page }, (_, i) => i + 1)
+                  .filter((page) => {
+                    // Show current page, 2 before, and 2 after
+                    return page >= currentPage - 2 && page <= currentPage + 2;
+                  })
+                  .map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-2 rounded-lg transition-colors ${
+                        page === currentPage
+                          ? "bg-indigo-600 text-white font-semibold"
+                          : "bg-white text-gray-700 hover:bg-indigo-50 hover:text-indigo-600"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+
+                {/* Last Page */}
+                {currentPage < pagination.last_page - 2 && (
+                  <>
+                    {currentPage < pagination.last_page - 3 && (
+                      <span className="text-white px-2">...</span>
+                    )}
+                    <button
+                      onClick={() => setCurrentPage(pagination.last_page)}
+                      className="px-3 py-2 bg-white text-gray-700 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                    >
+                      {pagination.last_page}
+                    </button>
+                  </>
+                )}
+
+                {/* Next Button */}
                 <button
                   onClick={() =>
                     setCurrentPage((prev) =>
@@ -373,7 +469,7 @@ const CareersPage = () => {
                     )
                   }
                   disabled={currentPage === pagination.last_page}
-                  className="px-4 py-2 bg-white text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  className="px-4 py-2 bg-white text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
                 >
                   Next
                 </button>
@@ -415,24 +511,25 @@ const CareersPage = () => {
 
               {/* Job Details Grid */}
               <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-                <div>
+                <div className="col-span-2">
                   <div className="text-sm text-gray-500 mb-1">Location</div>
                   <div className="font-medium text-gray-900">
-                    {selectedJob.lga}, {selectedJob.zone}
+                    {selectedJob.service_location?.city || selectedJob.lga}, {selectedJob.service_location?.state || selectedJob.zone}
                   </div>
+                  {selectedJob.service_location?.full_address && (
+                    <div className="flex items-start text-sm text-gray-600 mt-2">
+                      <MapPin className="w-4 h-4 mr-1 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium">Address: </span>
+                        <span>{selectedJob.service_location.full_address}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <div className="text-sm text-gray-500 mb-1">Compensation</div>
                   <div className="font-medium text-gray-900">
                     {formatSalary(selectedJob.compensation)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500 mb-1">
-                    Application Deadline
-                  </div>
-                  <div className="font-medium text-gray-900">
-                    {formatDate(selectedJob.recruitment_period_end)}
                   </div>
                 </div>
                 <div>

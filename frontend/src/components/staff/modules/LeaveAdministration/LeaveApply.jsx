@@ -508,30 +508,27 @@ useEffect(() => {
   const pendingDays = applications.reduce((acc, app) => acc + parseInt(app.numberOfDays), 0);
   const availableBalance = currentBalance - usedDays - pendingDays;
 
-  // Compute chart data based on leave types
-  const chartColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A569BD', '#58D68D'];
-  const currentYearLeaves = leaves.filter(leave => 
-    new Date(leave.start_date).getFullYear() === currentYear
-  );
-  
-  const typeCounts = currentYearLeaves.reduce((acc, leave) => {
-    // Handle both snake_case and direct relationship access
-    const typeName = leave.leave_type?.name || leave.leave_type_name || 'Other';
-    acc[typeName] = {
-      count: (acc[typeName]?.count || 0) + 1,
-      days: (acc[typeName]?.days || 0) + (leave.days || 0)
-    };
-    return acc;
-  }, {});
-
-  const chartData = Object.entries(typeCounts)
-    .map(([label, data], index) => ({
-      label,
-      value: data.count,
-      color: chartColors[index % chartColors.length],
-      days: data.days
-    }))
-    .filter(item => item.value > 0);
+  // Compute chart data based on leave status (like MyLeaves) - compact and accurate
+  const chartData = [
+    { 
+      label: 'Pending', 
+      value: leaves.filter(l => l.status === 'pending').length, 
+      color: '#FBBF24',
+      totalDays: leaves.filter(l => l.status === 'pending').reduce((sum, l) => sum + (l.days || 0), 0)
+    },
+    { 
+      label: 'Approved', 
+      value: leaves.filter(l => l.status === 'approved').length, 
+      color: '#10B981',
+      totalDays: leaves.filter(l => l.status === 'approved').reduce((sum, l) => sum + (l.days || 0), 0)
+    },
+    { 
+      label: 'Rejected', 
+      value: leaves.filter(l => l.status === 'rejected').length, 
+      color: '#EF4444',
+      totalDays: leaves.filter(l => l.status === 'rejected').reduce((sum, l) => sum + (l.days || 0), 0)
+    },
+  ].filter(item => item.value > 0);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -696,14 +693,15 @@ useEffect(() => {
             </div>
             
             <div className="p-6">
-              <div className="h-64 flex items-center justify-center mb-6">
+              {/* Compact Chart - Similar to MyLeaves */}
+              <div className="h-48 flex items-center justify-center mb-4">
                 {isLoading ? (
                   <p className="text-gray-500 text-sm">Loading chart...</p>
                 ) : chartData.length > 0 ? (
-                  <div style={{ width: '200px', height: '200px' }}>
+                  <div style={{ width: '180px', height: '180px' }}>
                     <PieChart
                       data={chartData}
-                      radius={40}
+                      radius={35}
                       lineWidth={50}
                       label={({ dataEntry }) => `${Math.round(dataEntry.percentage)}%`}
                       labelStyle={{
@@ -715,49 +713,37 @@ useEffect(() => {
                     />
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-sm">No leave applications found for {currentYear}.</p>
+                  <p className="text-gray-500 text-sm">No leave applications yet</p>
                 )}
               </div>
 
-              {/* Legend and Numerical Breakdown */}
-              <div className="space-y-3">
-                <div className="text-sm font-semibold text-gray-900 border-b pb-2">
-                  Leave Applications This Year:
+              {/* Compact Legend - Status Based */}
+              <div className="pt-4 text-center space-y-2 font-semibold text-gray-600 text-sm">
+                <div className="flex items-center justify-center">
+                  <span className="h-3 w-3 rounded-full bg-yellow-400 mr-2"></span>
+                  Pending
                 </div>
-                {chartData.length > 0 ? (
-                  <div className="space-y-2">
-                    {chartData.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between text-sm hover:bg-gray-50 p-2 rounded transition">
-                        <div className="flex items-center flex-1">
-                          <span className="w-3 h-3 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: item.color }}
-                          ></span>
-                          <span className="text-gray-700 font-medium flex-1">{item.label}</span>
-                        </div>
-                        <div className="text-gray-900 font-semibold text-right min-w-max ml-2">
-                          <div className="text-xs text-gray-600">{item.value} app{item.value !== 1 ? 's' : ''}</div>
-                          <div className="text-sm">{item.days} day{item.days !== 1 ? 's' : ''}</div>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="border-t pt-3 mt-3 space-y-2">
-                      <div className="flex justify-between text-sm font-semibold">
-                        <span>Total Applications:</span>
-                        <span className="text-blue-600">{chartData.reduce((sum, item) => sum + item.value, 0)}</span>
-                      </div>
-                      <div className="flex justify-between text-sm font-semibold">
-                        <span>Total Days Used:</span>
-                        <span className="text-red-600">{usedDays} days</span>
-                      </div>
-                      <div className="flex justify-between text-sm font-semibold">
-                        <span>Remaining Balance:</span>
-                        <span className="text-green-600">{currentBalance - usedDays} days</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-sm">No leave applications this year yet.</p>
-                )}
+                <div className="flex items-center justify-center">
+                  <span className="h-3 w-3 rounded-full bg-green-500 mr-2"></span>
+                  Approved
+                </div>
+                <div className="flex items-center justify-center">
+                  <span className="h-3 w-3 rounded-full bg-red-500 mr-2"></span>
+                  Rejected
+                </div>
               </div>
+
+              {/* Summary Stats */}
+              {chartData.length > 0 && (
+                <div className="mt-4 pt-4 border-t space-y-2 text-xs text-gray-600">
+                  {chartData.map((item, index) => (
+                    <div key={index} className="flex justify-between">
+                      <span>{item.label}:</span>
+                      <span className="font-medium">{item.value} ({item.totalDays} days)</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
