@@ -21,6 +21,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import apiService from "@/services/api";
 import recruitmentRequestAPI from "@/services/modules/recruitment-management/recruitmentRequestAPI";
 import clientMasterAPI from "@/services/modules/client-contract-management/clientMasterAPI";
 import TicketAssignmentModal from "./modals/TicketAssignmentModal";
@@ -236,11 +237,13 @@ const RecruitmentRequest = ({ currentTheme, preferences, onBack }) => {
   // NEW: Fetch all Nigerian states from database
   const fetchAllStates = async () => {
     try {
-      const response = await fetch('/api/states-lgas');
-      const data = await response.json();
-      if (data.success && Array.isArray(data.data)) {
-        // Extract unique state names
-        const states = [...new Set(data.data.map(item => item.state_name))].sort();
+      const response = await apiService.makeRequest('/states-lgas', {
+        method: 'GET'
+      });
+      
+      if (response.status === 'success' && Array.isArray(response.uniqueStates)) {
+        // Extract state names from uniqueStates array
+        const states = response.uniqueStates.map(item => item.name).sort();
         setAvailableStates(states);
       }
     } catch (error) {
